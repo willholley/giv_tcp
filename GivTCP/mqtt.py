@@ -22,6 +22,10 @@ class GivMQTT():
         MQTTCredentials=True
         MQTT_Username=GiV_Settings.MQTT_Username
         MQTT_Password=GiV_Settings.MQTT_Password
+    if GiV_Settings.MQTT_Retain:
+        MQTT_Retain=True
+    else:
+        MQTT_Retain=False
 
     def on_connect(client, userdata, flags, rc):
         if rc==0:
@@ -53,7 +57,7 @@ class GivMQTT():
                 output=GivMQTT.iterate_dict(payload,rootTopic+p_load)   #create LUT for MQTT publishing
                 for value in output:
                     if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
-                        client.publish(value,output[value])
+                        client.publish(value,output[value], retain=GivMQTT.MQTT_Retain)
                     else:
                         logger.error("MQTT error trying to send a "+ str(type(output[value]))+" to the MQTT broker for: "+str(value))
         except:

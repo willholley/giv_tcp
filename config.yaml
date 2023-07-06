@@ -42,6 +42,7 @@ options:
   MQTT_TOPIC_2: ""
   MQTT_TOPIC_3: ""
   MQTT_PORT: 1883
+  MQTT_RETAIN: False
   LOG_LEVEL: "Info"
   PRINT_RAW: True
   SELF_RUN: True
@@ -101,6 +102,7 @@ schema:
   MQTT_TOPIC_2: "str?"
   MQTT_TOPIC_3: "str?"
   MQTT_PORT: int
+  MQTT_RETAIN: bool
   LOG_LEVEL: str
   PRINT_RAW: bool
   SELF_RUN: bool

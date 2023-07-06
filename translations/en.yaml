@@ -84,6 +84,10 @@ configuration:
     name: MQTT Port
     description: >-
       The TCP port used to communicate with your MQTT Broker. Default is 1883, if you're using the default Home Assistant Mosquitto add-on settings then you won't need to change this.
+  MQTT_RETAIN:
+    name: MQTT Retain
+    description: >-
+      (Optional) Whether to set retain flag on published MQTT messages (default False)
   LOG_LEVEL:
     name: Log Level
     description: >-

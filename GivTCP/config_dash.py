@@ -55,6 +55,7 @@ def set_config(formdata):
         outp.write("    MQTT_Password=\""+formdata["MQTT_Password"]+"\"\n")
         outp.write("    MQTT_Topic=\""+formdata["MQTT_Topic"]+"\"\n")
         outp.write("    MQTT_Port="+formdata["MQTT_Port"]+"\n")
+        outp.write("    MQTT_Retain="+formdata["MQTT_Retain"]+"\n")
         outp.write("    Log_Level=\""+formdata["Log_Level"]+"\"\n")
         outp.write("    Influx_Output="+formdata["Influx_Output"]+"\n")
         outp.write("    influxURL=\""+formdata["influxURL"]+"\"\n")
