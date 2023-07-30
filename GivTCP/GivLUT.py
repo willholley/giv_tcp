@@ -43,7 +43,7 @@ class GivLUT:
     logging.basicConfig(format='%(asctime)s - Inv'+ str(GiV_Settings.givtcp_instance)+' - %(module)-11s -  [%(levelname)-8s] - %(message)s')
     formatter = logging.Formatter(
         '%(asctime)s - %(module)s - [%(levelname)s] - %(message)s')
-    fh = TimedRotatingFileHandler(GiV_Settings.Debug_File_Location, when='D', interval=1, backupCount=7)
+    fh = TimedRotatingFileHandler(GiV_Settings.Debug_File_Location, when='midnight', backupCount=7)
     fh.setFormatter(formatter)
     logger = logging.getLogger()
     logger.addHandler(fh)
@@ -76,10 +76,12 @@ class GivLUT:
     invippkl=GiV_Settings.cache_location+"/invIPList.pkl"
 
 
-    if "TZ" in os.environ:
+    if hasattr(GiV_Settings,'timezone'):                        # If in Addon, use the HA Supervisor timezone
+        timezone=zoneinfo.ZoneInfo(key=GiV_Settings.timezone)    
+    elif "TZ" in os.environ:                                    # Otherwise use the ENV (for Docker)
         timezone=zoneinfo.ZoneInfo(key=os.getenv("TZ"))
     else:
-        timezone=zoneinfo.ZoneInfo(key="Europe/London")
+        timezone=zoneinfo.ZoneInfo(key="Europe/London")         # Otherwise Assume everyone is in UK!
 
     # Standard values for devices
     maxInvPower=11000
@@ -291,6 +293,8 @@ class GivLUT:
         "Local_control_mode":GEType("select","","setLocalControlMode","","",True,False,False),
         "Battery_pause_mode":GEType("select","","setBatteryPauseMode","","",True,False,False),
         "PV_input_mode":GEType("select","","setPVInputMode","","",True,False,False),
+        "Grid_Frequency":GEType("sensor","frequency","",0,60,True,False,False),
+        "Inverter_Output_Frequency":GEType("sensor","frequency","",0,60,True,False,False),
         }
     time_slots=[
 "00:00:00","00:01:00","00:02:00","00:03:00","00:04:00","00:05:00","00:06:00","00:07:00","00:08:00","00:09:00","00:10:00","00:11:00","00:12:00","00:13:00","00:14:00","00:15:00","00:16:00","00:17:00","00:18:00","00:19:00","00:20:00","00:21:00","00:22:00","00:23:00","00:24:00","00:25:00","00:26:00","00:27:00","00:28:00","00:29:00","00:30:00","00:31:00","00:32:00","00:33:00","00:34:00","00:35:00","00:36:00","00:37:00","00:38:00","00:39:00","00:40:00","00:41:00","00:42:00","00:43:00","00:44:00","00:45:00","00:46:00","00:47:00","00:48:00","00:49:00","00:50:00","00:51:00","00:52:00","00:53:00","00:54:00","00:55:00","00:56:00","00:57:00","00:58:00","00:59:00",
@@ -329,3 +333,13 @@ class GivLUT:
     def getTime(timestamp):
         timeslot=timestamp.strftime("%H:%M")
         return (timeslot)
+    
+
+'''
+Firmware Versions for each Model
+AC coupled 5xx old, 2xx new. 28x, 29x beta
+Gen1 4xx Old, 1xx New. 19x Beta
+Gen 2 909+ New. 99x Beta
+Gen3 303+ New 39x Beta
+AIO 6xx New 69x Beta
+'''
