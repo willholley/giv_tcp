@@ -49,6 +49,7 @@ except:
     logger.critical("SUPERVISOR TOKEN does not exist")
     isAddon=False
     hasMQTT=False
+    SuperTimezone=False
 
 if isAddon:
     #Get MQTT Details    
