@@ -102,6 +102,7 @@ class GivEnergyObj:
             self.invmaxrate=float(multi_output_old['Invertor_Details']['Invertor_Max_Bat_Rate']) / 1000
             self.batcap=float(multi_output_old['Invertor_Details']['Battery_Capacity_kWh'])
 
+
         # v0.9.2: Removed routine to download valid inverter commands from GE API - not used
         # in this version and superseded in palm.py to avoid errors if network is unreachable
         # on initialisation
@@ -695,8 +696,8 @@ if __name__ == '__main__':
     # GivEnergy power object initialisation
     ge: GivEnergyObj = GivEnergyObj()
 
-    if exists(ge.batcap):
-        logger.info("Battery Capacity: "+ str(ge.batcap))
+#    if exists(ge.batcap):
+#        logger.info("Battery Capacity: "+ str(ge.batcap))
     
     # Solcast PV prediction object initialisation
     solcast: SolcastObj = SolcastObj()

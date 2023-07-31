@@ -17,6 +17,7 @@ webDash={}
 rqWorker={}
 redis={}
 networks={}
+SuperTimezone=""
 
 logger = logging.getLogger("startup")
 logging.basicConfig(format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s')

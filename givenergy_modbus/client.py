@@ -318,7 +318,7 @@ class GivEnergyClient:
             if slot==1:
                 self.modbus_client.write_holding_register(HoldingRegister.CHARGE_SLOT_1_START, int(timeslot.strftime('%H%M')))
             else:
-                self.modbus_client.write_holding_register(HoldingRegister(243+((slot-3)*3)), int(timeslot.strftime('%H%M')))
+                self.modbus_client.write_holding_register(HoldingRegister(243+((slot-2)*3)), int(timeslot.strftime('%H%M')))
         else:
             raise ValueError(f'Specified slot ({slot}) is not in [1-10]%')
         

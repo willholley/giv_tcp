@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.3.2] - 2023-06-31
+### Fixed
+- Fixed "SuperTimezone" error occuring on Docker installations
+- Fixed PALM ge.batcap error
+- Fix CHargeslot start register offset error
+
+
 ## [2.3.1] - 2023-06-30
 ### Fixed
 - REST api fixed to correct (dis)charge timeslot error
