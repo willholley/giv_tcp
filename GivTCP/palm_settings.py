@@ -44,7 +44,7 @@ class GE:
     #batt_utilisation = 0.85
     batt_utilisation = float(os.getenv('PALM_BATT_UTILISATION'))
 
-    #batt_max_charge = batt_capacity * batt_utilisation
+    batt_max_charge = batt_capacity * batt_utilisation
 
     # Inverter charge/discharge rate in kW, INVERTER_MAX_BAT_RATE is in Watts
     #charge_rate = 2.5
