@@ -12,7 +12,8 @@ buildx.sh
 .venv
 .vscode
 GivTCP/__pycache__
-./givenergy_modbus/__pycache__
+givenergy_modbus/__pycache__
+givenergy_modbus/model/__pycache__
 GivTCP/givenergy_modbus_2
 GivTCP/asyncclient.py
 GivTCP/testdata.json
@@ -22,3 +23,16 @@ GivTCP/settings.py
 MQTT_TEST.py
 REST_TEST.py
 test.py
+settings.py
+__pycache__
+givenergy_modbus/model/__pycache__/inverter.cpython-310.pyc
+givenergy_modbus/model/__pycache__/plant.cpython-310.pyc
+givenergy_modbus/model/__pycache__/register_cache.cpython-310.pyc
+givenergy_modbus/model/__pycache__/register_getter.cpython-310.pyc
+givenergy_modbus/model/__pycache__/register.cpython-310.pyc
+givenergy_modbus/__pycache__/client.cpython-310.pyc
+givenergy_modbus/__pycache__/decoder.cpython-310.pyc
+givenergy_modbus/__pycache__/modbus.cpython-310.pyc
+givenergy_modbus/__pycache__/pdu.cpython-310.pyc
+givenergy_modbus/__pycache__/transaction.cpython-310.pyc
+givenergy_modbus/__pycache__/util.cpython-310.pyc

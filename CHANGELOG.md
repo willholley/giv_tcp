@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.3.2] - 2023-06-31
+### Fixed
+- Fixed "SuperTimezone" error occuring on Docker installations
+- Fixed PALM ge.batcap error
+- Fix CHargeslot start register offset error
+
+
+## [2.3.1] - 2023-06-30
+### Fixed
+- REST api fixed to correct (dis)charge timeslot error
+- Corrected Config page to clarify the Inverter_AC_X setting applies to all invertoers on "old" firmware
+
+### Added
+- Inverter frequency stats added
+- PALM updated to v1.0.0, imporving Smart Target (Thanks @salewis38)
+
+
+## [2.3] - 2023-06-29
+### Breaking Change
+- Inverter_Max_Rate now called Inverter_Max_Bat_Rate
+
+### Fixed
+- Upped maxBatPower to 8000 to account for AIO
+- fix for Eco mode setting (when moving from Eco (Paused)) Thanks Ed-M72
+- MQTT fix for retained topics (Thanks BrianUK6)
+- Improved monitoring of failed write commands and associated logging
+- soc_kWh state_class changed to 
+- Inverter Scanning improved to determine inverter type pre-config (doesn't affect config yet...)
+- Setting Charge Target to values below 4 or above 100 now force those max/min values
+- Day/Night costs fixed
+- Export rate now updates when ENV/Config is set
+- 
+### Added
+- New Controls available for beta firmware:
+  - Local Control Mode: Sets priority for Battery, Grid or Load
+  - PV Input Mode: Sets MPPT tracking to 1x2 or Independent
+  - Battery Pause Mode: Forces pause of Charge, Discharge or Both
+  - Gen2 inverters now have access to 10 charge and discharge slots
+- Inverter_Max_Inv_Rate added as new "Inverter Details" entity
+- New ENV/Config item Inverter_AC_X - Only turn this on if you have an AC inverter on "old" firmware and you get errors on startup 
+- MQTT changes to cope properly when run in docker (and not in Addon/HA)
+
+## [2.2.4] - 2023-07-14
+### Fixed
+- Fixed Temp Pause Charge and Temp Pause Discharge selct controls, which weren't reverting
+- Fixed Influxdb string error
+
 ## [2.2.3] - 2023-07-03
 ### Fixed
 - Fixed Charge_time_remaining device_class error
