@@ -41,7 +41,9 @@ def getInvDeets(HOST):
     except:
         logger.error("Gathering inverter details for " + str(HOST) + " failed.")
         return None
-    
+
+SuperTimezone={}        # 02-Aug-23  default it to None so that it is defined for saving in settngs.py for non-HA usage (otherwise exception)
+
 try:
     logger.debug("SUPERVISOR_TOKEN is: "+ os.getenv("SUPERVISOR_TOKEN"))
     isAddon=True
