@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """PALM - PV Active Load Manager."""
 
-import sys
+
 import time
 import json
 from datetime import datetime, timedelta
 from typing import Tuple, List
+from os.path import exists
+import pickle
 import requests
 import palm_settings as stgs
 import write as wr
 from GivLUT import GivLUT, GivQueue
-from os.path import exists
-import pickle
 logger = GivLUT.logger
 
 # This software in any form is covered by the following Open Source BSD license:
@@ -123,7 +123,7 @@ class GivEnergyObj:
             }
 
             try:
-                resp = requests.request('GET', url, headers=headers)
+                resp = requests.request('GET', url, headers=headers timeout=10)
             except requests.exceptions.RequestException as error:
                 logger.error(error)
                 return
@@ -155,7 +155,7 @@ class GivEnergyObj:
 
             url = stgs.GE.url + "meter-data/latest"
             try:
-                resp = requests.request('GET', url, headers=headers)
+                resp = requests.request('GET', url, headers=headers timeout=10)
             except requests.exceptions.RequestException as error:
                 logger.error(error)
                 return
@@ -206,7 +206,7 @@ class GivEnergyObj:
             }
 
             try:
-                resp = requests.request('GET', url, headers=headers, params=params)
+                resp = requests.request('GET', url, headers=headers, params=params timeout=10)
             except requests.exceptions.RequestException as error:
                 logger.error(error)
                 return load_array
@@ -293,7 +293,7 @@ class GivEnergyObj:
             resp = "TEST"
             if not TEST_MODE:
                 try:
-                    resp = requests.request('POST', url, headers=headers, json=payload)
+                    resp = requests.request('POST', url, headers=headers, json=payload timeout=10)
                 except requests.exceptions.RequestException as error:
                     logger.error(error)
                     return
@@ -317,7 +317,7 @@ class GivEnergyObj:
             payload = {}
 
             try:
-                resp = requests.request('POST', url, headers=headers, json=payload)
+                resp = requests.request('POST', url, headers=headers, json=payload timeout=10)
             except resp.exceptions.RequestException as error:
                 logger.error(error)
                 return
@@ -625,7 +625,7 @@ class SolcastObj:
                 break
 
             if i > 1 and i % interval == 0:
-                    cntr += 1
+                cntr += 1
             i += 1
 
         if solcast_offset > 720:  # Forget about current day
@@ -702,7 +702,7 @@ if __name__ == '__main__':
 
 #    if exists(ge.batcap):
 #        logger.info("Battery Capacity: "+ str(ge.batcap))
-    
+
     # Solcast PV prediction object initialisation
     solcast: SolcastObj = SolcastObj()
     solcast.update()
