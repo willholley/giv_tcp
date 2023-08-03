@@ -620,7 +620,8 @@ class SolcastObj:
                     pv_est10[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate10'] * 1000)
                     pv_est50[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate'] * 1000)
                     pv_est90[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate90'] * 1000)
-            except:
+            except Exception:
+                logger.error("Error: Unexpected end of Solcast data. i="+ str(i)+ "cntr="+ str(cntr))
                 break
 
             if i > 1 and i % interval == 0:
