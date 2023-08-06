@@ -1,47 +1,47 @@
 import paho.mqtt.client as mqtt
 import time, sys, importlib, time
 from os.path import exists
-from settings import GiV_Settings
+from settings import GivSettings
 import write as wr
 import pickle, settings
 from GivLUT import GivLUT
 from pickletools import read_uint1
 
-sys.path.append(GiV_Settings.default_path)
+sys.path.append(GivSettings.default_path)
 
 logger = GivLUT.logger
 
-if GiV_Settings.MQTT_Port=='':
+if GivSettings.MQTT_Port=='':
     MQTT_Port=1883
 else:
-    MQTT_Port=int(GiV_Settings.MQTT_Port)
-MQTT_Address=GiV_Settings.MQTT_Address
-if GiV_Settings.MQTT_Username=='':
+    MQTT_Port=int(GivSettings.MQTT_Port)
+MQTT_Address=GivSettings.MQTT_Address
+if GivSettings.MQTT_Username=='':
     MQTTCredentials=False
 else:
     MQTTCredentials=True
-    MQTT_Username=GiV_Settings.MQTT_Username
-    MQTT_Password=GiV_Settings.MQTT_Password
-if GiV_Settings.MQTT_Topic=='':
+    MQTT_Username=GivSettings.MQTT_Username
+    MQTT_Password=GivSettings.MQTT_Password
+if GivSettings.MQTT_Topic=='':
     MQTT_Topic='GivEnergy'
 else:
-    MQTT_Topic=GiV_Settings.MQTT_Topic
+    MQTT_Topic=GivSettings.MQTT_Topic
 
-logger.critical("Connecting to MQTT broker for control- "+str(GiV_Settings.MQTT_Address))
+logger.critical("Connecting to MQTT broker for control- "+str(GivSettings.MQTT_Address))
 #loop till serial number has been found
 count=0          # 09-July-2023  set start point
 
-while not hasattr(GiV_Settings,'serial_number'):
+while not hasattr(GivSettings,'serial_number'):
     time.sleep(5)
-    #del sys.modules['settings.GiV_Settings']
+    #del sys.modules['settings.GivSettings']
     importlib.reload(settings)
-    from settings import GiV_Settings
+    from settings import GivSettings
     count=count + 1      # 09-July-2023  previous +1 only simply reset value to 1 so loop was infinite
     if count==20:
         logger.error("No serial_number found in MQTT queue. MQTT Control not available.")
         break
     
-logger.debug("Serial Number retrieved: "+GiV_Settings.serial_number)
+logger.debug("Serial Number retrieved: "+GivSettings.serial_number)
 
 def isfloat(num):
     try:
@@ -376,13 +376,13 @@ def on_connect(client, userdata, flags, rc):
         client.connected_flag=True #set flag
         logger.debug("connected OK Returned code="+str(rc))
         #Subscribe to the control topic for this inverter - relies on serial_number being present
-        client.subscribe(MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
-        logger.debug("Subscribing to "+MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
+        client.subscribe(MQTT_Topic+"/control/"+GivSettings.serial_number+"/#")
+        logger.debug("Subscribing to "+MQTT_Topic+"/control/"+GivSettings.serial_number+"/#")
     else:
         logger.error("Bad connection Returned code= "+str(rc))
 
 
-client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance)+"_Control")
+client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance)+"_Control")
 mqtt.Client.connected_flag=False        			#create flag in class
 if MQTTCredentials:
     client.username_pw_set(MQTT_Username,MQTT_Password)

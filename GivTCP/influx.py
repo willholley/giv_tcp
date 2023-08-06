@@ -2,23 +2,23 @@
 from influxdb_client import InfluxDBClient, WriteApi, WriteOptions
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from settings import GiV_Settings
+from settings import GivSettings
 
-logger = logging.getLogger("GivTCP_Influx_"+str(GiV_Settings.givtcp_instance))
+logger = logging.getLogger("GivTCP_Influx_"+str(GivSettings.givtcp_instance))
 logging.basicConfig(format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s')
 formatter = logging.Formatter(
     '%(asctime)s - %(name)s - [%(levelname)s] - %(message)s')
-if GiV_Settings.Debug_File_Location!="":
-    fh = TimedRotatingFileHandler(GiV_Settings.Debug_File_Location, when='D', interval=1, backupCount=7)
+if GivSettings.Debug_File_Location!="":
+    fh = TimedRotatingFileHandler(GivSettings.Debug_File_Location, when='D', interval=1, backupCount=7)
     fh.setFormatter(formatter)
     logger.addHandler(fh)
-if GiV_Settings.Log_Level.lower()=="debug":
+if GivSettings.Log_Level.lower()=="debug":
     logger.setLevel(logging.DEBUG)
-elif GiV_Settings.Log_Level.lower()=="info":
+elif GivSettings.Log_Level.lower()=="info":
     logger.setLevel(logging.INFO)
-elif GiV_Settings.Log_Level.lower()=="critical":
+elif GivSettings.Log_Level.lower()=="critical":
     logger.setLevel(logging.CRITICAL)
-elif GiV_Settings.Log_Level.lower()=="warning":
+elif GivSettings.Log_Level.lower()=="warning":
     logger.setLevel(logging.WARNING)
 else:
     logger.setLevel(logging.ERROR)
@@ -63,9 +63,9 @@ class GivInflux():
         logging.debug("Data sending to Influx is: "+ output_str[:-1])
         data1=GivInflux.line_protocol(SN,output_str[:-1])
         
-        _db_client = InfluxDBClient(url=GiV_Settings.influxURL, token=GiV_Settings.influxToken, org=GiV_Settings.influxOrg, debug=True)
+        _db_client = InfluxDBClient(url=GivSettings.influxURL, token=GivSettings.influxToken, org=GivSettings.influxOrg, debug=True)
         _write_api = _db_client.write_api(write_options=WriteOptions(batch_size=1))
-        _write_api.write(bucket=GiV_Settings.influxBucket, record=data1)
+        _write_api.write(bucket=GivSettings.influxBucket, record=data1)
         logging.info("Written to InfluxDB")
 
         _write_api.close()

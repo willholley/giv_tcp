@@ -1,7 +1,7 @@
 # version 2022.01.21
 import sys, time, json
 import paho.mqtt.client as mqtt 
-from settings import GiV_Settings
+from settings import GivSettings
 from givenergy_modbus.model.inverter import Model
 from mqtt import GivMQTT
 from GivLUT import GivLUT
@@ -11,19 +11,19 @@ import pickle
 logger=GivLUT.logger
 
 class HAMQTT():
-    if GiV_Settings.MQTT_Port=='':
+    if GivSettings.MQTT_Port=='':
         MQTT_Port=1883
     else:
-        MQTT_Port=int(GiV_Settings.MQTT_Port)
-    MQTT_Address=GiV_Settings.MQTT_Address
-    if GiV_Settings.MQTT_Username=='':
+        MQTT_Port=int(GivSettings.MQTT_Port)
+    MQTT_Address=GivSettings.MQTT_Address
+    if GivSettings.MQTT_Username=='':
         MQTTCredentials=False
     else:
         MQTTCredentials=True
-        MQTT_Username=GiV_Settings.MQTT_Username
-        MQTT_Password=GiV_Settings.MQTT_Password
-    if GiV_Settings.MQTT_Topic=="":
-        GiV_Settings.MQTT_Topic="GivEnergy"
+        MQTT_Username=GivSettings.MQTT_Username
+        MQTT_Password=GivSettings.MQTT_Password
+    if GivSettings.MQTT_Topic=="":
+        GivSettings.MQTT_Topic="GivEnergy"
 
     def getinvbatmax():
         if exists(GivLUT.regcache):      # if there is a cache then grab it
@@ -43,8 +43,8 @@ class HAMQTT():
     
     def publish_discovery(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			#create flag in class
-        client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
-        rootTopic=str(GiV_Settings.MQTT_Topic+"/"+SN+"/")
+        client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance))
+        rootTopic=str(GivSettings.MQTT_Topic+"/"+SN+"/")
         if HAMQTT.MQTTCredentials:
             client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
         try:
@@ -59,7 +59,7 @@ class HAMQTT():
             logger.debug("Publishing MQTT: " + HAMQTT.MQTT_Address)
 
             ##publish the status message
-            client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/status","online", retain=True)
+            client.publish(GivSettings.MQTT_Topic+"/"+SN+"/status","online", retain=True)
 
             ### For each topic create a discovery message
             for p_load in array:
@@ -96,28 +96,28 @@ class HAMQTT():
     def create_device_payload(topic,SN):
         tempObj={}
         tempObj['stat_t']=str(topic).replace(" ","_")
-        tempObj['avty_t'] = GiV_Settings.MQTT_Topic+"/"+SN+"/status"
+        tempObj['avty_t'] = GivSettings.MQTT_Topic+"/"+SN+"/status"
         tempObj["pl_avail"]= "online"
         tempObj["pl_not_avail"]= "offline"
         tempObj['device']={}
         
         GiVTCP_Device=str(topic).split("/")[2]
         if "Battery_Details" in topic:
-            tempObj["name"]=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
-            tempObj['uniq_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
-            tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
+            tempObj["name"]=GivSettings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
+            tempObj['uniq_id']=GivSettings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
+            tempObj['object_id']=GivSettings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
             tempObj['device']['identifiers']=str(topic).split("/")[3]+"_"+GiVTCP_Device
-            tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+GiVTCP_Device.replace("_"," ")
+            tempObj['device']['name']=GivSettings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+GiVTCP_Device.replace("_"," ")
         else:
-            tempObj['uniq_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
-            tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
+            tempObj['uniq_id']=GivSettings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
+            tempObj['object_id']=GivSettings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
             tempObj['device']['identifiers']=SN+"_"+GiVTCP_Device
-            tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+SN+" "+str(GiVTCP_Device).replace("_"," ")
-            tempObj["name"]=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
+            tempObj['device']['name']=GivSettings.ha_device_prefix+" "+SN+" "+str(GiVTCP_Device).replace("_"," ")
+            tempObj["name"]=GivSettings.ha_device_prefix+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
         tempObj['device']['manufacturer']="GivEnergy"
 
         if not GivLUT.entity_type[str(topic).split("/")[-1]].controlFunc == "":
-            tempObj['command_topic']=GiV_Settings.MQTT_Topic+"/control/"+SN+"/"+GivLUT.entity_type[str(topic).split("/")[-1]].controlFunc
+            tempObj['command_topic']=GivSettings.MQTT_Topic+"/control/"+SN+"/"+GivLUT.entity_type[str(topic).split("/")[-1]].controlFunc
 
 #set device specific elements here:
         if GivLUT.entity_type[str(topic).split("/")[-1]].devType=="sensor":

@@ -2,7 +2,7 @@
 import paho.mqtt.client as mqtt
 import time
 from GivLUT import GivLUT
-from settings import GiV_Settings
+from settings import GivSettings
 import sys
 #from HA_Discovery import HAMQTT
 from givenergy_modbus.model.inverter import Model
@@ -11,17 +11,17 @@ logger = GivLUT.logger
 
 class GivMQTT():
 
-    if GiV_Settings.MQTT_Port=='':
+    if GivSettings.MQTT_Port=='':
         MQTT_Port=1883
     else:
-        MQTT_Port=int(GiV_Settings.MQTT_Port)
-    MQTT_Address=GiV_Settings.MQTT_Address
-    if GiV_Settings.MQTT_Username=='':
+        MQTT_Port=int(GivSettings.MQTT_Port)
+    MQTT_Address=GivSettings.MQTT_Address
+    if GivSettings.MQTT_Username=='':
         MQTTCredentials=False
     else:
         MQTTCredentials=True
-        MQTT_Username=GiV_Settings.MQTT_Username
-        MQTT_Password=GiV_Settings.MQTT_Password
+        MQTT_Username=GivSettings.MQTT_Username
+        MQTT_Password=GivSettings.MQTT_Password
 
     def on_connect(client, userdata, flags, rc):
         if rc==0:
@@ -33,7 +33,7 @@ class GivMQTT():
 
     def single_MQTT_publish(Topic,value):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			#create flag in class
-        client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+        client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance))
 
         if GivMQTT.MQTTCredentials:
             client.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)
@@ -55,7 +55,7 @@ class GivMQTT():
 
     def multi_MQTT_publish(rootTopic,array):                    #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			    #create flag in class
-        client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+        client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance))
         
         ##Check if first run then publish auto discovery message
         

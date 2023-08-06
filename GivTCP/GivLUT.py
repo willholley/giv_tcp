@@ -1,20 +1,20 @@
 class GivClient:
-    def getData(fullrefresh: bool):
+    def getData(self,fullrefresh: bool):
         from givenergy_modbus.client import GivEnergyClient
-        from settings import GiV_Settings
+        from settings import GivSettings
         from givenergy_modbus.model.plant import Plant  
-        client= GivEnergyClient(host=GiV_Settings.invertorIP)
-        numbat=GiV_Settings.numBatteries
+        client= GivEnergyClient(host=GivSettings.invertorIP)
+        numbat=GivSettings.numBatteries
         plant=Plant(number_batteries=numbat)
-        client.refresh_plant(plant,GiV_Settings.isAIO,GiV_Settings.isAC,fullrefresh)
+        client.refresh_plant(plant,GivSettings.is_AIO,GivSettings.is_AC,fullrefresh)
         return (plant)
         
 class GivQueue:
     from redis import Redis
     from rq import Queue
-    from settings import GiV_Settings
+    from settings import GivSettings
     redis_connection = Redis(host='127.0.0.1', port=6379, db=0)
-    q = Queue("GivTCP_"+str(GiV_Settings.givtcp_instance),connection=redis_connection)
+    q = Queue("GivTCP_"+str(GivSettings.givtcp_instance),connection=redis_connection)
     
 class GEType:
     def __init__(self,dT,sC,cF,mn,mx,aZ,sM,oI):
@@ -38,12 +38,13 @@ class InvType:
 class GivLUT:
     #Logging config
     import logging, os, zoneinfo
-    from settings import GiV_Settings
+    from settings import GivSettings
     from logging.handlers import TimedRotatingFileHandler
-    logging.basicConfig(format='%(asctime)s - Inv'+ str(GiV_Settings.givtcp_instance)+' - %(module)-11s -  [%(levelname)-8s] - %(message)s')
+    import datetime
+    logging.basicConfig(format='%(asctime)s - Inv'+ str(GivSettings.givtcp_instance)+' - %(module)-11s -  [%(levelname)-8s] - %(message)s')
     formatter = logging.Formatter(
         '%(asctime)s - %(module)s - [%(levelname)s] - %(message)s')
-    fh = TimedRotatingFileHandler(GiV_Settings.Debug_File_Location, when='midnight', backupCount=7)
+    fh = TimedRotatingFileHandler(GivSettings.Debug_File_Location, when='midnight', backupCount=7)
     fh.setFormatter(formatter)
     logger = logging.getLogger()
     logger.addHandler(fh)
@@ -60,24 +61,24 @@ class GivLUT:
 
     # File paths for use
     lockfile=".lockfile"
-    regcache=GiV_Settings.cache_location+"/regCache_"+str(GiV_Settings.givtcp_instance)+".pkl"
-    ratedata=GiV_Settings.cache_location+"/rateData_"+str(GiV_Settings.givtcp_instance)+".pkl"
-    lastupdate=GiV_Settings.cache_location+"/lastUpdate_"+str(GiV_Settings.givtcp_instance)+".pkl"
-    forcefullrefresh=GiV_Settings.cache_location+"/.forceFullRefresh_"+str(GiV_Settings.givtcp_instance)
-    batterypkl=GiV_Settings.cache_location+"/battery_"+str(GiV_Settings.givtcp_instance)+".pkl"
-    reservepkl=GiV_Settings.cache_location+"/reserve_"+str(GiV_Settings.givtcp_instance)+".pkl"
+    regcache=GivSettings.cache_location+"/regCache_"+str(GivSettings.givtcp_instance)+".pkl"
+    ratedata=GivSettings.cache_location+"/rateData_"+str(GivSettings.givtcp_instance)+".pkl"
+    lastupdate=GivSettings.cache_location+"/lastUpdate_"+str(GivSettings.givtcp_instance)+".pkl"
+    forcefullrefresh=GivSettings.cache_location+"/.forceFullRefresh_"+str(GivSettings.givtcp_instance)
+    batterypkl=GivSettings.cache_location+"/battery_"+str(GivSettings.givtcp_instance)+".pkl"
+    reservepkl=GivSettings.cache_location+"/reserve_"+str(GivSettings.givtcp_instance)+".pkl"
     ppkwhtouch=".ppkwhtouch"
     schedule=".schedule"
-    oldDataCount=GiV_Settings.cache_location+"/oldDataCount_"+str(GiV_Settings.givtcp_instance)+".pkl"
-    nightRate=GiV_Settings.cache_location+"/.nightRate"
-    dayRate=GiV_Settings.cache_location+"/.dayRate"
-    nightRateRequest=GiV_Settings.cache_location+"/.nightRateRequest"
-    dayRateRequest=GiV_Settings.cache_location+"/.dayRateRequest"
-    invippkl=GiV_Settings.cache_location+"/invIPList.pkl"
+    oldDataCount=GivSettings.cache_location+"/oldDataCount_"+str(GivSettings.givtcp_instance)+".pkl"
+    nightRate=GivSettings.cache_location+"/.nightRate"
+    dayRate=GivSettings.cache_location+"/.dayRate"
+    nightRateRequest=GivSettings.cache_location+"/.nightRateRequest"
+    dayRateRequest=GivSettings.cache_location+"/.dayRateRequest"
+    invippkl=GivSettings.cache_location+"/invIPList.pkl"
 
 
-    if hasattr(GiV_Settings,'timezone'):                        # If in Addon, use the HA Supervisor timezone
-        timezone=zoneinfo.ZoneInfo(key=GiV_Settings.timezone)    
+    if hasattr(GivSettings,'timezone'):                        # If in Addon, use the HA Supervisor timezone
+        timezone=zoneinfo.ZoneInfo(key=GivSettings.timezone)    
     elif "TZ" in os.environ:                                    # Otherwise use the ENV (for Docker)
         timezone=zoneinfo.ZoneInfo(key=os.getenv("TZ"))
     else:
@@ -330,7 +331,7 @@ class GivLUT:
     local_control_mode=["Load","Battery","Grid"]
     pv_input_mode=["Independent","1x2"]
 
-    def getTime(timestamp):
+    def getTime(self,timestamp: datetime.time):
         timeslot=timestamp.strftime("%H:%M")
         return (timeslot)
     

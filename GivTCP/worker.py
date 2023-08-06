@@ -1,12 +1,13 @@
-import os, redis, logging
-from rq import Worker, Queue, Connection
-from GivLUT import GivQueue
-from settings import GiV_Settings
-listen = ['GivTCP_'+str(GiV_Settings.givtcp_instance)]
+"""Loads RQ Dashboard worker to pull jobs off the queue"""
+import logging
+import redis
+from rq import Worker, Connection
+from settings import GivSettings
+listen = ['GivTCP_'+str(GivSettings.givtcp_instance)]
 
 
-redis_url = 'redis://127.0.0.1:6379'
-conn = redis.from_url(redis_url)
+REDIS_URL = 'redis://127.0.0.1:6379'
+conn = redis.from_url(REDIS_URL)
 
 if __name__ == '__main__':
     with Connection(conn):

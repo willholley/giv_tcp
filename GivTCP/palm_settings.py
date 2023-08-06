@@ -1,7 +1,7 @@
 # version 2023.06.21
 # Settings file for use with palm.py: 30-minute calculations (v0.9.0) and weightings for daily historical consumption (v0.10.0)
 
-from settings import GiV_Settings
+from settings import GivSettings
 from GivLUT import GivLUT
 import pickle
 from os.path import exists
@@ -11,7 +11,7 @@ import os
 class GE:
     enable = True
     # Modify url with system name in place of CExxxxxx and paste API key generated on GivEnergy web portal in place of xxxx
-    url = "https://api.givenergy.cloud/v1/inverter/"+GiV_Settings.serial_number+"/"
+    url = "https://api.givenergy.cloud/v1/inverter/"+GivSettings.serial_number+"/"
     key = str(os.getenv('GEAPI'))
     
     # Most users will not need to touch that many of the pre-configured settings below
