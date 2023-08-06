@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """PALM - PV Active Load Manager."""
 
-import sys
+
 import time
 import json
 from datetime import datetime, timedelta
 from typing import Tuple, List
+from os.path import exists
+import pickle
 import requests
 import palm_settings as stgs
 import write as wr
 from GivLUT import GivLUT, GivQueue
-from os.path import exists
-import pickle
 logger = GivLUT.logger
 
 # This software in any form is covered by the following Open Source BSD license:
@@ -123,7 +123,7 @@ class GivEnergyObj:
             }
 
             try:
-                resp = requests.request('GET', url, headers=headers)
+                resp = requests.request('GET', url, headers=headers, timeout=10)
             except requests.exceptions.RequestException as error:
                 logger.error(error)
                 return
@@ -155,7 +155,7 @@ class GivEnergyObj:
 
             url = stgs.GE.url + "meter-data/latest"
             try:
-                resp = requests.request('GET', url, headers=headers)
+                resp = requests.request('GET', url, headers=headers, timeout=10)
             except requests.exceptions.RequestException as error:
                 logger.error(error)
                 return
@@ -206,7 +206,7 @@ class GivEnergyObj:
             }
 
             try:
-                resp = requests.request('GET', url, headers=headers, params=params)
+                resp = requests.request('GET', url, headers=headers, params=params, timeout=10)
             except requests.exceptions.RequestException as error:
                 logger.error(error)
                 return load_array
@@ -293,7 +293,7 @@ class GivEnergyObj:
             resp = "TEST"
             if not TEST_MODE:
                 try:
-                    resp = requests.request('POST', url, headers=headers, json=payload)
+                    resp = requests.request('POST', url, headers=headers, json=payload, timeout=10)
                 except requests.exceptions.RequestException as error:
                     logger.error(error)
                     return
@@ -317,7 +317,7 @@ class GivEnergyObj:
             payload = {}
 
             try:
-                resp = requests.request('POST', url, headers=headers, json=payload)
+                resp = requests.request('POST', url, headers=headers, json=payload, timeout=10)
             except resp.exceptions.RequestException as error:
                 logger.error(error)
                 return
@@ -593,9 +593,9 @@ class SolcastObj:
         pv_est90 = [0] * 10080
 
         if stgs.Solcast.url_sw != "":  # Two arrays are specified
-            forecast_lines = min(len(solcast_data_1['forecasts']), len(solcast_data_2['forecasts']))
+            forecast_lines = min(len(solcast_data_1['forecasts']), len(solcast_data_2['forecasts'])) - 1
         else:
-            forecast_lines = len(solcast_data_1['forecasts'])
+            forecast_lines = len(solcast_data_1['forecasts']) - 1
         interval = int(solcast_data_1['forecasts'][0]['period'][2:4])
         solcast_offset = (60 * int(solcast_data_1['forecasts'][0]['period_end'][11:13]) +
             int(solcast_data_1['forecasts'][0]['period_end'][14:16]) - interval - 60)
@@ -608,17 +608,21 @@ class SolcastObj:
         i = solcast_offset
         cntr = 0
         while i < solcast_offset + forecast_lines * interval:
-            if stgs.Solcast.url_sw != "":  # Two arrays are specified
-                pv_est10[i] = (int(solcast_data_1['forecasts'][cntr]['pv_estimate10'] * 1000) +
-                    int(solcast_data_2['forecasts'][cntr]['pv_estimate10'] * 1000))
-                pv_est50[i] = (int(solcast_data_1['forecasts'][cntr]['pv_estimate'] * 1000) +
-                    int(solcast_data_2['forecasts'][cntr]['pv_estimate'] * 1000))
-                pv_est90[i] = (int(solcast_data_1['forecasts'][cntr]['pv_estimate90'] * 1000) +
-                    int(solcast_data_2['forecasts'][cntr]['pv_estimate90'] * 1000))
-            else:
-                pv_est10[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate10'] * 1000)
-                pv_est50[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate'] * 1000)
-                pv_est90[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate90'] * 1000)
+            try:
+                if stgs.Solcast.url_sw != "":  # Two arrays are specified
+                    pv_est10[i] = (int(solcast_data_1['forecasts'][cntr]['pv_estimate10'] * 1000) +
+                        int(solcast_data_2['forecasts'][cntr]['pv_estimate10'] * 1000))
+                    pv_est50[i] = (int(solcast_data_1['forecasts'][cntr]['pv_estimate'] * 1000) +
+                        int(solcast_data_2['forecasts'][cntr]['pv_estimate'] * 1000))
+                    pv_est90[i] = (int(solcast_data_1['forecasts'][cntr]['pv_estimate90'] * 1000) +
+                        int(solcast_data_2['forecasts'][cntr]['pv_estimate90'] * 1000))
+                else:
+                    pv_est10[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate10'] * 1000)
+                    pv_est50[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate'] * 1000)
+                    pv_est90[i] = int(solcast_data_1['forecasts'][cntr]['pv_estimate90'] * 1000)
+            except Exception:
+                logger.error("Error: Unexpected end of Solcast data. i="+ str(i)+ "cntr="+ str(cntr))
+                break
 
             if i > 1 and i % interval == 0:
                 cntr += 1
@@ -698,7 +702,7 @@ if __name__ == '__main__':
 
 #    if exists(ge.batcap):
 #        logger.info("Battery Capacity: "+ str(ge.batcap))
-    
+
     # Solcast PV prediction object initialisation
     solcast: SolcastObj = SolcastObj()
     solcast.update()
