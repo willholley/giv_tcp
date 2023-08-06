@@ -801,26 +801,35 @@ def self_run2():
 def publishOutput(array, SN):
     tempoutput = {}
     tempoutput = iterate_dict(array)
-
-    if GivSettings.MQTT_Output:
-        if GivSettings.first_run:        # 09-July-23 - HA is seperated to seperate if check.
-          updateFirstRun(SN)              # 09=July=23 - Always do this first irrespective of HA setting.
-          if GivSettings.HA_Auto_D:        # Home Assistant MQTT Discovery
-              logger.critical("Publishing Home Assistant Discovery messages")
-              from HA_Discovery import HAMQTT
-              HAMQTT.publish_discovery(tempoutput, SN)
-          GivSettings.first_run = False  # 09-July-23 - Always set firstrun irrespective of HA setting.
-
+#    threader = Threader(5)
+    if GiV_Settings.MQTT_Output:
+        if GiV_Settings.first_run:        # 09-July-23 - HA is seperated to seperate if check.
+            # Do this in a thread?
+#            threader.append(updateFirstRun,SN)
+            updateFirstRun(SN)              # 09=July=23 - Always do this first irrespective of HA setting.
+            if GiV_Settings.HA_Auto_D:        # Home Assistant MQTT Discovery
+                logger.critical("Publishing Home Assistant Discovery messages")
+                from HA_Discovery import HAMQTT
+                HAMQTT.publish_discovery(tempoutput, SN)
+#                threader.append(HAMQTT.publish_discovery,tempoutput, SN)
+            GiV_Settings.first_run = False  # 09-July-23 - Always set firstrun irrespective of HA setting.
+# Do this in a thread?
         from mqtt import GivMQTT
         logger.debug("Publish all to MQTT")
-        if GivSettings.MQTT_Topic == "":
-            GivSettings.MQTT_Topic = "GivEnergy"
-        GivMQTT.multi_MQTT_publish(str(GivSettings.MQTT_Topic+"/"+SN+"/"), tempoutput)
-    if GivSettings.Influx_Output:
+        if GiV_Settings.MQTT_Topic == "":
+            GiV_Settings.MQTT_Topic = "GivEnergy"
+        GivMQTT.multi_MQTT_publish(str(GiV_Settings.MQTT_Topic+"/"+SN+"/"), tempoutput)
+#        threader.append(GivMQTT.multi_MQTT_publish,str(GiV_Settings.MQTT_Topic+"/"+SN+"/"), tempoutput)
+# Do this in a thread?
+    if GiV_Settings.Influx_Output:
         from influx import GivInflux
         logger.debug("Pushing output to Influx")
         GivInflux.publish(SN, tempoutput)
-
+#        threader.append(GivInflux.publish,SN, tempoutput)
+#        logger.info("Starting publishing threads")
+#        threader.start()
+#        threader.join()
+#        logger.info("Publishing threads finished")
 
 def updateFirstRun(SN):
     isSN = False

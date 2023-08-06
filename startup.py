@@ -49,15 +49,16 @@ def get_inv_deets(hostname):
     except Exception:
         logger.error("Gathering inverter details for %s failed.",str(hostname))
         return None
-
+SuperTimezone={} 
 try:
     logger.debug("SUPERVISOR_TOKEN is: %s",os.getenv("SUPERVISOR_TOKEN"))
     ISADDON=True
     access_token = os.getenv("SUPERVISOR_TOKEN")
 except Exception:
     logger.critical("SUPERVISOR TOKEN does not exist")
-    ISADDON=False
-    HASMQTT=False
+    isAddon=False
+    hasMQTT=False
+    SuperTimezone=False
 
 if ISADDON:
     #Get MQTT Details

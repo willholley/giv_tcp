@@ -5,24 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [2.3.2] - 2023-06-31
+## [2.3.3] - 2023-08-06
+### Fixed
+- Fixed PALM error
+- Enabled long term stats for sensors. Thanks @ajcollins
+- Changed default setting for "old firmware" to True. 
+
+
+## [2.3.2] - 2023-07-31
 ### Fixed
 - Fixed "SuperTimezone" error occuring on Docker installations
 - Fixed PALM ge.batcap error
-- Fix CHargeslot start register offset error
+- Fix Chargeslot start register offset error
 
 
-## [2.3.1] - 2023-06-30
+## [2.3.1] - 2023-07-30
 ### Fixed
 - REST api fixed to correct (dis)charge timeslot error
-- Corrected Config page to clarify the Inverter_AC_X setting applies to all invertoers on "old" firmware
+- Corrected Config page to clarify the Inverter_AC_X setting applies to all inverters on "old" firmware
 
 ### Added
 - Inverter frequency stats added
 - PALM updated to v1.0.0, imporving Smart Target (Thanks @salewis38)
 
 
-## [2.3] - 2023-06-29
+## [2.3] - 2023-07-29
 ### Breaking Change
 - Inverter_Max_Rate now called Inverter_Max_Bat_Rate
 
