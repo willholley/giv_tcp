@@ -36,9 +36,17 @@ class GE:
     #batt_reserve = 4
     batt_reserve = int(os.getenv('PALM_BATT_RESERVE'))
 
-    # Nominal battery capacity
-    #batt_capacity = 10.4
-    #batt_capacity = float(os.getenv('PALM_BATT_CAPACITY')) 
+    # Inverter charge/discharge rate in kW, INVERTER_MAX_BAT_RATE is in Watts
+    if exists(GivLUT.regcache):      # if there is a cache then grab it
+        with open(GivLUT.regcache, 'rb') as inp:
+            regCacheStack = pickle.load(inp)
+            multi_output_old = regCacheStack[4]
+        charge_rate=float(multi_output_old['Invertor_Details']['Invertor_Max_Bat_Rate'])/1000
+        batt_capacity=float(multi_output_old['Invertor_Details']['Battery_Capacit_kWh'])
+    else:
+        charge_rate=2.5
+        # Nominal battery capacity
+        batt_capacity = 10.4
 
     # Usable proportion of battery (100% less reserve and any charge limit)
     #batt_utilisation = 0.85
@@ -46,18 +54,6 @@ class GE:
 
     batt_max_charge = batt_capacity * batt_utilisation
 
-    # Inverter charge/discharge rate in kW, INVERTER_MAX_BAT_RATE is in Watts
-    #charge_rate = 2.5
-    #charge_rate = float(os.getenv('INVERTER_MAX_BAT_RATE') / 1000)
-    if exists(GivLUT.regcache):      # if there is a cache then grab it
-        with open(GivLUT.regcache, 'rb') as inp:
-            regCacheStack = pickle.load(inp)
-            multi_output_old = regCacheStack[4]
-        charge_rate=float(multi_output_old['Invertor_Details']['Invertor_Max_Bat_Rate'])/1000
-    else:
-        charge_rate=2.5
-
-  
     # Default data for base load. Overwritten by actual data if available
     base_load = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, \
                  0.2, 0.2, 0.2, 0.3, 0.2, 0.2, 0.1, 0.3, 0.3, 0.2, 0.3, 0.8, 0.6, 0.3, 0.3, 0.2, \
