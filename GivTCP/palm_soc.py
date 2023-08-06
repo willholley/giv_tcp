@@ -428,8 +428,8 @@ class GivEnergyObj:
             wgt_50 = weight - 10
         wgt_90 = max(0, weight - 50)
 
-        logger.info("")
-        logger.info("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
+        logger.debug("")
+        logger.debug("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
             "Day", "Hour", "Charge", "Cons", "Gen", "SoC"))
 
         if stgs.GE.end_time != "":
