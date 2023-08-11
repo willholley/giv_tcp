@@ -77,7 +77,7 @@ class GivMQTT():
                     if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
                         client.publish(value,output[value])
                     else:
-                        logger.error("MQTT error trying to send a "+ str(type(output[value]))+" to the MQTT broker for: "+str(value))
+                        logger.error("MQTT error trying to send a "+ str(type(output[value]))+" to the MQTT broker for: "+str(value) + " - " + str(output[value]))
         except:
             e = sys.exc_info()
             logger.error("Error connecting to MQTT Broker: " + str(e))

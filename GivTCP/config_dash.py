@@ -3,8 +3,7 @@
 import sys, os, logging
 import pickle
 from os.path import exists
-from GivLUT import GivLUT, GivQueue, GivClient
-from datetime import datetime, timedelta
+from GivLUT import GivLUT
 from settings import GiV_Settings
 
 def get_config():
