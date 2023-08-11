@@ -1,8 +1,8 @@
 # version 2022.01.31
-from influxdb_client import InfluxDBClient, WriteApi, WriteOptions
 import logging
 from logging.handlers import TimedRotatingFileHandler
-from settings import GivSettings
+from influxdb_client import InfluxDBClient, WriteOptions
+from .settings import GivSettings
 
 logger = logging.getLogger("GivTCP_Influx_"+str(GivSettings.givtcp_instance))
 logging.basicConfig(format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s')

@@ -1,11 +1,13 @@
-import paho.mqtt.client as mqtt
-import time, sys, importlib, time
+"""MQTT Client to handle control messages"""
+import time
+import sys
+import importlib
 from os.path import exists
-from settings import GivSettings
+import paho.mqtt.client as mqtt
 import write as wr
-import pickle, settings
-from giv_lut import GivLUT
-from pickletools import read_uint1
+import settings
+from .settings import GivSettings
+from .giv_lut import GivLUT
 
 sys.path.append(GivSettings.default_path)
 

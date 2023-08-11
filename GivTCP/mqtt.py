@@ -2,9 +2,9 @@
 """MQTT Class to publish inverter data"""
 import sys
 import time
-from giv_lut import GivLUT
-from settings import GivSettings
+from .giv_lut import GivLUT
 import paho.mqtt.client as mqtt
+from .settings import GivSettings
 
 logger = GivLUT.logger
 

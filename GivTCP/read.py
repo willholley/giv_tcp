@@ -13,9 +13,9 @@ from datetime import timedelta
 from os.path import exists
 import os
 from rq import Retry
-from giv_lut import GivLUT, GivQueue, GivClient, InvType
 from givenergy_modbus.model.inverter import Model
-from settings import GivSettings
+from .giv_lut import GivLUT, GivQueue, GivClient, InvType
+from .settings import GivSettings
 
 logging.getLogger("givenergy_modbus").setLevel(logging.CRITICAL)
 logging.getLogger("rq.worker").setLevel(logging.CRITICAL)
@@ -31,7 +31,7 @@ cacheLock = Lock()
 def inverter_data(fullrefresh):
     """Actual inverter read function call"""
     try:
-        plant = GivClient.getData(fullrefresh)
+        plant = GivClient.get_data(fullrefresh)
         inverter = plant.inverter
         batteries = plant.batteries
     except Exception:
@@ -55,12 +55,12 @@ def get_data(fullrefresh):  # Read from Inverter put in cache
 
     # Connect to inverter and load data
     try:
-        logger.debug("Connecting to: " + GivSettings.invertorIP)
+        logger.debug("Connecting to: %s", GivSettings.invertorIP)
         plant=GivQueue.q.enqueue(inverter_data,fullrefresh,retry=Retry(max=GivSettings.queue_retries, interval=2))
         while plant.result is None and plant.exc_info is None:
             time.sleep(0.1)
         if "ERROR" in plant.result:
-            raise Exception ("Garbage or failed inverter Response: "+ str(plant.result))
+            raise Exception ("Garbage or failed inverter Response: %s", str(plant.result))
         ge_inverter=plant.result[0]
         ge_batteries=plant.result[1]
 
@@ -256,10 +256,10 @@ def get_data(fullrefresh):  # Read from Inverter put in cache
             power_output['SOC'] = ge_inverter.battery_percent
         elif ge_inverter.battery_percent == 0 and 'multi_output_old' in locals():
             power_output['SOC'] = multi_output_old['Power']['Power']['SOC']
-            logger.error("\"Battery SOC\" reported as: "+str(ge_inverter.battery_percent)+"% so using previous value")
+            logger.error("\"Battery SOC\" reported as: %s so using previous value",str(ge_inverter.battery_percent))
         elif ge_inverter.battery_percent == 0 and not 'multi_output_old' in locals():
             power_output['SOC'] = 1
-            logger.error("\"Battery SOC\" reported as: "+str(ge_inverter.battery_percent)+"% and no previous value so setting to 1%")
+            logger.error("\"Battery SOC\" reported as: %s and no previous value so setting to 1%",str(ge_inverter.battery_percent))
         power_output['SOC_kWh'] = (int(power_output['SOC'])*((battery_capacity)/1000))/100
 
         # Energy Stats
@@ -903,10 +903,10 @@ def rate_calcs(multi_output, multi_output_old):
 
     #       If no data then just save current import as base data
     if 'Night_Start_Energy_kWh' not in rate_data:
-        logger.debug("No Night Start Energy so setting it to: "+str(import_energy))
+        logger.debug("No Night Start Energy so setting it to: %s",str(import_energy))
         rate_data['Night_Start_Energy_kWh'] = import_energy
     if 'Day_Start_Energy_kWh' not in rate_data:
-        logger.debug("No Day Start Energy so setting it to: "+str(import_energy))
+        logger.debug("No Day Start Energy so setting it to: %s",str(import_energy))
         rate_data['Day_Start_Energy_kWh'] = import_energy
     if 'Night_Energy_kWh' not in rate_data:
         rate_data['Night_Energy_kWh'] = 0.00
@@ -983,7 +983,7 @@ def rate_calcs(multi_output, multi_output_old):
 
     # now calc the difference for each value between the correct start pickle and now
     if import_energy>import_energy_old: # Only run if there has been more import
-        logger.debug("Imported more energy so calculating current tariff costs: "+str(import_energy_old)+" -> "+str(import_energy))
+        logger.debug("Imported more energy so calculating current tariff costs: %s -> ",str(import_energy_old),str(import_energy))
 #        if night_start <= datetime.datetime.now(GivLUT.timezone) < day_start:
         if exists(GivLUT.nightRate):
             logger.debug("Current Tariff is Night, calculating stats...")

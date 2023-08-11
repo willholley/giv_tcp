@@ -4,8 +4,8 @@
 import os
 import pickle
 from os.path import exists
-from giv_lut import GivLUT
-from settings import GivSettings
+from .giv_lut import GivLUT
+from .settings import GivSettings
 
 def get_config():
     """Retrieve settings from file and display"""
@@ -79,5 +79,6 @@ def set_config(formdata):
             outp.write("    Debug_File_Location=\"/config/GivTCP/log_inv_"+str(inv)+".log\"\n")
         else:
             outp.write("    cache_location=\""+formdata["cache_location"]+"\"\n")
-            outp.write("    Debug_File_Location=\""+formdata["cache_location"]+"/log_inv_"+str(inv)+".log\"\n")
+            outp.write("    Debug_File_Location=\""+formdata["cache_location"]+
+                       "/log_inv_"+str(inv)+".log\"\n")
     return "Settings Updated, reloading GivTCP"
