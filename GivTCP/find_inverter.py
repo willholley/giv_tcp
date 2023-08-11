@@ -4,12 +4,9 @@
 #   call                                #
 #########################################
 
-## Create a modbus call which connects, gets SN, DTC and FW to determine what type it is
-
+"""Create a modbus call which connects, gets SN, DTC and FW to determine what type it is"""
 
 from threading import Thread, Lock
-from time import perf_counter
-from time import sleep
 import sys
 import socket
 
@@ -29,15 +26,15 @@ class Threader:
         self.print_lock = Lock()
 
     def stop(self) -> None:
-        # Signal all worker threads to stop
+        """ Signal all worker threads to stop"""
         self.running = False
 
     def append(self, function, *args) -> None:
-        # Add the function to a list of functions to be run
+        """ Add the function to a list of functions to be run"""
         self.functions.append((function, args))
 
     def start(self) -> None:
-        # Create a limited number of threads
+        """ Create a limited number of threads"""
         for i in range(self.nthreads):
             thread = Thread(target=self.worker, daemon=True)
             # We need to pass in `thread` as a parameter so we
@@ -47,12 +44,12 @@ class Threader:
             thread.start()
 
     def join(self) -> None:
-        # Joins the threads one by one until all of them are done.
+        """Joins the threads one by one until all of them are done."""
         for thread in self.threads:
             thread.join()
 
     def worker(self, thread:Thread) -> None:
-        # While we are running and there are functions to call:
+        """ While we are running and there are functions to call:"""
         while self.running and (len(self.functions) > 0):
             # Get a function
             with self.functions_lock:
@@ -66,18 +63,16 @@ class Threader:
         with self.thread_lock:
             self.threads.remove(thread)
 
-def findInvertor(subnet):
+def find_inverter(subnet):
+    """Seek and find the inverters"""
     segs=subnet.split('.')
-    BASE_IP = segs[0]+'.'+segs[1]+'.'+segs[2]+'.'"%i"
-    PORT = 8899
-    start = perf_counter()
+    base_ip = segs[0]+'.'+segs[1]+'.'+segs[2]+'.'"%i"
+    port = 8899
     # I didn't need a timeout of 1 so I used 0.1
     socket.setdefaulttimeout(0.1)
-
-    error_dict = {}
     invlist = {}
+
     def connect(hostname, port):
-        
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             result = sock.connect_ex((hostname, port))
         with threader.print_lock:
@@ -87,12 +82,11 @@ def findInvertor(subnet):
     # add more or less threads to complete your scan
     threader = Threader(20)
     for i in range(255):
-        threader.append(connect, BASE_IP%i, PORT)
-        #threader.append(connect, BASE_IP, PORT)
+        threader.append(connect, base_ip%i, port)
     threader.start()
     threader.join()
-    print(invlist)
-    return(invlist)
+    #print(invlist)
+    return invlist
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:

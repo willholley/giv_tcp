@@ -4,7 +4,7 @@ from os.path import exists
 from settings import GivSettings
 import write as wr
 import pickle, settings
-from GivLUT import GivLUT
+from giv_lut import GivLUT
 from pickletools import read_uint1
 
 sys.path.append(GivSettings.default_path)

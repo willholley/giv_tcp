@@ -1,22 +1,33 @@
+"""LUT for GivTCP"""
+
+import logging
+import os
+import zoneinfo
+from logging.handlers import TimedRotatingFileHandler
+import datetime
+from redis import Redis
+from rq import Queue
+from settings import GivSettings
+from givenergy_modbus.model.plant import Plant
+from givenergy_modbus.client import GivEnergyClient
+
 class GivClient:
-    def getData(self,fullrefresh: bool):
-        from givenergy_modbus.client import GivEnergyClient
-        from settings import GivSettings
-        from givenergy_modbus.model.plant import Plant  
+    """Creates CLient to access inverter via modbus"""
+    def get_data(self,fullrefresh: bool):
+        """Gets Data from inverter using lib"""
         client= GivEnergyClient(host=GivSettings.invertorIP)
         numbat=GivSettings.numBatteries
         plant=Plant(number_batteries=numbat)
         client.refresh_plant(plant,GivSettings.is_AIO,GivSettings.is_AC,fullrefresh)
-        return (plant)
-        
+        return plant
+
 class GivQueue:
-    from redis import Redis
-    from rq import Queue
-    from settings import GivSettings
+    """Instantiates a Redis Q for use in GivTCP"""
     redis_connection = Redis(host='127.0.0.1', port=6379, db=0)
     q = Queue("GivTCP_"+str(GivSettings.givtcp_instance),connection=redis_connection)
-    
+
 class GEType:
+    """Defines type for data objects"""
     def __init__(self,dT,sC,cF,mn,mx,aZ,sM,oI):
         self.devType = dT
         self.sensorClass=sC
@@ -28,6 +39,7 @@ class GEType:
         self.onlyIncrease=oI
 
 class InvType:
+    """Defines data type for Inverter model attributes"""
     def __init__(self,ph,md,pw,mr,gn):
         self.phase=ph
         self.model=md
@@ -36,12 +48,11 @@ class InvType:
         self.generation=gn
 
 class GivLUT:
-    #Logging config
-    import logging, os, zoneinfo
-    from settings import GivSettings
-    from logging.handlers import TimedRotatingFileHandler
-    import datetime
-    logging.basicConfig(format='%(asctime)s - Inv'+ str(GivSettings.givtcp_instance)+' - %(module)-11s -  [%(levelname)-8s] - %(message)s')
+    """Creates LUT for use in GivTCP"""
+
+    #Logging data
+    logging.basicConfig(
+        format='%(asctime)s - Inv'+ str(GivSettings.givtcp_instance)+' - %(module)-11s -  [%(levelname)-8s] - %(message)s')
     formatter = logging.Formatter(
         '%(asctime)s - %(module)s - [%(levelname)s] - %(message)s')
     fh = TimedRotatingFileHandler(GivSettings.Debug_File_Location, when='midnight', backupCount=7)
@@ -76,9 +87,8 @@ class GivLUT:
     dayRateRequest=GivSettings.cache_location+"/.dayRateRequest"
     invippkl=GivSettings.cache_location+"/invIPList.pkl"
 
-
     if hasattr(GivSettings,'timezone'):                        # If in Addon, use the HA Supervisor timezone
-        timezone=zoneinfo.ZoneInfo(key=GivSettings.timezone)    
+        timezone=zoneinfo.ZoneInfo(key=GivSettings.timezone)
     elif "TZ" in os.environ:                                    # Otherwise use the ENV (for Docker)
         timezone=zoneinfo.ZoneInfo(key=os.getenv("TZ"))
     else:
@@ -161,6 +171,7 @@ class GivLUT:
         "Meter_Type":GEType("sensor","string","","","",False,False,False),
         "Invertor_Type":GEType("sensor","string","","","",False,False,False),
         "Invertor_Temperature":GEType("sensor","temperature","",-maxTemp,maxTemp,True,True,False),
+
         "Discharge_start_time_slot_1":GEType("select","","setDischargeStart1","","",False,False,False),
         "Discharge_end_time_slot_1":GEType("select","","setDischargeEnd1","","",False,False,False),
         "Discharge_start_time_slot_2":GEType("select","","setDischargeStart2","","",False,False,False),
@@ -183,7 +194,7 @@ class GivLUT:
         "Discharge_end_time_slot_10":GEType("select","","setDischargeEnd10","","",False,False,False),
         "Battery_pause_start_time_slot":GEType("select","","setPauseStart","","",False,False,False),
         "Battery_pause_end_time_slot":GEType("select","","setPauseEnd","","",False,False,False),
-        
+
         "Charge_start_time_slot_1":GEType("select","","setChargeStart1","","",False,False,False),
         "Charge_end_time_slot_1":GEType("select","","setChargeEnd1","","",False,False,False),
         "Charge_start_time_slot_2":GEType("select","","setChargeStart2","","",False,False,False),
@@ -204,7 +215,7 @@ class GivLUT:
         "Charge_end_time_slot_9":GEType("select","","setChargeEnd9","","",False,False,False),
         "Charge_start_time_slot_10":GEType("select","","setChargeStart10","","",False,False,False),
         "Charge_end_time_slot_10":GEType("select","","setChargeEnd10","","",False,False,False),
-        
+
         "Battery_Serial_Number":GEType("sensor","string","","","",False,True,False),
         "Battery_SOC":GEType("sensor","battery","",0,100,False,False,False),
         "Battery_Capacity":GEType("sensor","","",0,250,False,True,False),
@@ -322,8 +333,7 @@ class GivLUT:
 "21:00:00","21:01:00","21:02:00","21:03:00","21:04:00","21:05:00","21:06:00","21:07:00","21:08:00","21:09:00","21:10:00","21:11:00","21:12:00","21:13:00","21:14:00","21:15:00","21:16:00","21:17:00","21:18:00","21:19:00","21:20:00","21:21:00","21:22:00","21:23:00","21:24:00","21:25:00","21:26:00","21:27:00","21:28:00","21:29:00","21:30:00","21:31:00","21:32:00","21:33:00","21:34:00","21:35:00","21:36:00","21:37:00","21:38:00","21:39:00","21:40:00","21:41:00","21:42:00","21:43:00","21:44:00","21:45:00","21:46:00","21:47:00","21:48:00","21:49:00","21:50:00","21:51:00","21:52:00","21:53:00","21:54:00","21:55:00","21:56:00","21:57:00","21:58:00","21:59:00",
 "22:00:00","22:01:00","22:02:00","22:03:00","22:04:00","22:05:00","22:06:00","22:07:00","22:08:00","22:09:00","22:10:00","22:11:00","22:12:00","22:13:00","22:14:00","22:15:00","22:16:00","22:17:00","22:18:00","22:19:00","22:20:00","22:21:00","22:22:00","22:23:00","22:24:00","22:25:00","22:26:00","22:27:00","22:28:00","22:29:00","22:30:00","22:31:00","22:32:00","22:33:00","22:34:00","22:35:00","22:36:00","22:37:00","22:38:00","22:39:00","22:40:00","22:41:00","22:42:00","22:43:00","22:44:00","22:45:00","22:46:00","22:47:00","22:48:00","22:49:00","22:50:00","22:51:00","22:52:00","22:53:00","22:54:00","22:55:00","22:56:00","22:57:00","22:58:00","22:59:00",
 "23:00:00","23:01:00","23:02:00","23:03:00","23:04:00","23:05:00","23:06:00","23:07:00","23:08:00","23:09:00","23:10:00","23:11:00","23:12:00","23:13:00","23:14:00","23:15:00","23:16:00","23:17:00","23:18:00","23:19:00","23:20:00","23:21:00","23:22:00","23:23:00","23:24:00","23:25:00","23:26:00","23:27:00","23:28:00","23:29:00","23:30:00","23:31:00","23:32:00","23:33:00","23:34:00","23:35:00","23:36:00","23:37:00","23:38:00","23:39:00","23:40:00","23:41:00","23:42:00","23:43:00","23:44:00","23:45:00","23:46:00","23:47:00","23:48:00","23:49:00","23:50:00","23:51:00","23:52:00","23:53:00","23:54:00","23:55:00","23:56:00","23:57:00","23:58:00","23:59:00"
-    ]
-    
+]
     delay_times=["Normal","Running","Cancel","2","15","30","45","60","90","120","150","180"]
     modes=["Eco","Eco (Paused)","Timed Demand","Timed Export","Unknown"]
     rates=["Day","Night"]
@@ -331,10 +341,10 @@ class GivLUT:
     local_control_mode=["Load","Battery","Grid"]
     pv_input_mode=["Independent","1x2"]
 
-    def getTime(self,timestamp: datetime.time):
+    def get_time(self,timestamp: datetime.time):
+        """Return inverter safe HH:MM from timestamp"""
         timeslot=timestamp.strftime("%H:%M")
-        return (timeslot)
-    
+        return timeslot
 
 '''
 Firmware Versions for each Model

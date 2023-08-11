@@ -7,7 +7,7 @@ from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
 import config_dash as cfdash
-from GivLUT import GivQueue, GivLUT
+from giv_lut import GivQueue, GivLUT
 
 logger = GivLUT.logger
 
@@ -27,7 +27,7 @@ def get_config_page():
 
 #Read from Invertor put in cache and publish
 @giv_api.route('/runAll', methods=['GET'])
-def getAll():
+def get_all():
     """Calls the runALL function from read.py via REST"""
     return rd.runAll(True)
 
@@ -38,101 +38,101 @@ def reboot():
 
 #Publish last cached Invertor Data
 @giv_api.route('/readData', methods=['GET'])
-def rdData():
+def rd_data():
     """Calls the pubFromPickle function from read.py via REST"""
     return rd.pubFromPickle()
 
 #Publish last cached Invertor Data
 @giv_api.route('/getCache', methods=['GET'])
-def gtCache():
+def gt_cache():
     """Calls the getCache function from read.py via REST"""
     return rd.getCache()
 
 #Read from Invertor put in cache
 @giv_api.route('/getData', methods=['GET'])
-def gtData():
+def gt_data():
     """Calls the getData function from read.py via REST"""
     return GivQueue.q.enqueue(rd.getData,True)
 
 #Proxy Write Functions
 @giv_api.route('/enableChargeTarget', methods=['POST'])
-def enChargeTrgt():
+def en_charge_trgt():
     """Calls the enableChargeTarget function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.enableChargeTarget(payload)
 
 @giv_api.route('/enableChargeSchedule', methods=['POST'])
-def enableChrgSchedule():
+def enable_chrg_schedule():
     """Calls the enableChargeSchedule function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.enableChargeSchedule(payload)
 
 @giv_api.route('/enableDischargeSchedule', methods=['POST'])
-def enableDischrgSchedule():
+def enable_dischrg_schedule():
     """Calls the enableDischargeSchedule function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.enableDischargeSchedule(payload)
 
 @giv_api.route('/enableDischarge', methods=['POST'])
-def enableBatDisharge():
+def enable_bat_disharge():
     """Calls the enableDischarge function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.enableDischarge(payload)
 
 @giv_api.route('/setChargeTarget', methods=['POST'])
-def setChrgTarget():
+def set_chrg_target():
     """Calls the setChargeTarget function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.setChargeTarget(payload)
 
 @giv_api.route('/setBatteryReserve', methods=['POST'])
-def setBattReserve():
+def set_batt_reserve():
     """Calls the setBatteryReserve function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.setBatteryReserve(payload)
 
 @giv_api.route('/setChargeRate', methods=['POST'])
-def setChrgeRate():
+def set_chrge_rate():
     """Calls the setChargeRate function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.setChargeRate(payload)
 
 @giv_api.route('/setDischargeRate', methods=['POST'])
-def setDischrgeRate():
+def set_dischrge_rate():
     """Calls the setDischargeRate function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.setDischargeRate(payload)
 
 @giv_api.route('/setChargeSlot1', methods=['POST'])
-def setChrgSlot1():
+def set_chrg_slot1():
     """Calls the setChargeSlot function for slot 1 from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     payload['slot']=1
     return wr.setChargeSlot(payload)
 
 @giv_api.route('/setChargeSlot2', methods=['POST'])
-def setChrgSlot2():
+def set_chrg_slot2():
     """Calls the setChargeSlot function for slot 2 from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     payload['slot']=2
     return wr.setChargeSlot(payload)
 
 @giv_api.route('/setDischargeSlot1', methods=['POST'])
-def setDischrgSlot1():
+def set_dischrg_slot1():
     """Calls the setDischargeSlot function for slot 1 from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     payload['slot']=1
     return wr.setDischargeSlot(payload)
 
 @giv_api.route('/setDischargeSlot2', methods=['POST'])
-def setDischrgSlot2():
+def set_dischrg_slot2():
     """Calls the setDischargeSlot function for slot 2 from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     payload['slot']=2
     return wr.setDischargeSlot(payload)
 
 @giv_api.route('/tempPauseDischarge', methods=['POST'])
-def tmpPauseDischrg():
+def tmp_pause_dischrg():
     """Calls the tempPauseCharge function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     if payload == "Cancel":
@@ -146,7 +146,7 @@ def tmpPauseDischrg():
         return wr.tempPauseDischarge(payload)
 
 @giv_api.route('/tempPauseCharge', methods=['POST'])
-def tmpPauseChrg():
+def tmp_pause_chrg():
     """Calls the tempPauseCharge function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     if payload == "Cancel":
@@ -160,7 +160,7 @@ def tmpPauseChrg():
         return wr.tempPauseCharge(payload)
 
 @giv_api.route('/forceCharge', methods=['POST'])
-def frceChrg():
+def frce_chrg():
     """Calls the forceCharge function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     #Check if Cancel then return the right function
@@ -175,7 +175,7 @@ def frceChrg():
         return wr.forceCharge(payload)
 
 @giv_api.route('/forceExport', methods=['POST'])
-def frceExprt():
+def frce_exprt():
     """Calls the forceExport function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     if payload == "Cancel":
@@ -189,19 +189,19 @@ def frceExprt():
         return wr.forceExport(payload)
 
 @giv_api.route('/setBatteryMode', methods=['POST'])
-def setBattMode():
+def set_batt_mode():
     """Calls the setBatteryMode function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.setBatteryMode(payload)
 
 @giv_api.route('/setDateTime', methods=['POST'])
-def setDate():
+def set_date():
     """Calls the setDateTime function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.setDateTime(payload)
 
 @giv_api.route('/switchRate', methods=['POST'])
-def swRates():
+def sw_rates():
     """Calls the switchRate function from write.py via REST"""
     payload = request.get_json(silent=True, force=True)
     return wr.switchRate(payload)

@@ -13,7 +13,7 @@ import requests
 import schedule
 from genericpath import exists
 import givenergy_modbus.model.inverter
-from GivTCP.findInvertor import findInvertor
+from GivTCP.find_inverter import find_inverter
 from givenergy_modbus.client import GivEnergyClient
 
 selfRun={}
@@ -49,16 +49,15 @@ def get_inv_deets(hostname):
     except Exception:
         logger.error("Gathering inverter details for %s failed.",str(hostname))
         return None
-SuperTimezone={} 
+SuperTimezone={}
 try:
     logger.debug("SUPERVISOR_TOKEN is: %s",os.getenv("SUPERVISOR_TOKEN"))
     ISADDON=True
     access_token = os.getenv("SUPERVISOR_TOKEN")
 except Exception:
     logger.critical("SUPERVISOR TOKEN does not exist")
-    isAddon=False
-    hasMQTT=False
-    SuperTimezone=False
+    ISADDON=False
+    HASMQTT=False
 
 if ISADDON:
     #Get MQTT Details
@@ -128,7 +127,7 @@ if len(networks)>0:
             while len(netlist)<=0:
                 if COUNT<2:
                     logger.info("Scanning network (%s): %s",str(COUNT+1),str(networks[subnet]))
-                    netlist=findInvertor(networks[subnet])
+                    netlist=find_inverter(networks[subnet])
                     if len(netlist)>0:
                         break
                     COUNT=COUNT+1
@@ -326,7 +325,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
 
     GUPORT=6344+inv
     logger.critical ("Starting Gunicorn on port %s",str(GUPORT))
-    command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
+    command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" rest:giv_api")
     gunicorn[inv]=subprocess.Popen(command)
 
     os.chdir(PATH2)
@@ -375,7 +374,7 @@ while True:
             os.chdir(PATH)
             GUPORT=6344+inv
             logger.critical ("Starting Gunicorn on port %s",str(GUPORT))
-            command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
+            command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" rest:giv_api")
             gunicorn[inv]=subprocess.Popen(command)
     if os.getenv('MQTT_ADDRESS')=="127.0.0.1" and not mqttBroker.poll() is None:
         logger.error("MQTT Broker process died. Restarting...")

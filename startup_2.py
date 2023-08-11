@@ -6,7 +6,7 @@ import rq_dashboard
 import zoneinfo
 import sys
 import requests
-from GivTCP.findInvertor import findInvertor
+from GivTCP.find_inverter import findInvertor
 import givenergy_modbus.model.inverter
 from givenergy_modbus.client import GivEnergyClient
 

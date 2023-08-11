@@ -4,15 +4,15 @@
 import os
 import pickle
 from os.path import exists
-from GivLUT import GivLUT
+from giv_lut import GivLUT
 from settings import GivSettings
 
 def get_config():
     """Retrieve settings from file and display"""
     if exists(GivLUT.regcache):      # if there is a cache then grab it
         with open(GivLUT.regcache, 'rb') as inp:
-            regCacheStack= pickle.load(inp)
-            multi_output_old=regCacheStack[4]
+            reg_cache_stack= pickle.load(inp)
+            multi_output_old=reg_cache_stack[4]
         serial_number=multi_output_old["Invertor_Details"]['Invertor_Serial_Number']
     else:
         serial_number="Unknown"
@@ -27,7 +27,8 @@ def get_config():
         if not attribute.startswith('__'):
             form=form+f'''
             <p><label for="{attribute}">{attribute}: </label>
-            <input name="{attribute}" id="{attribute}" value="{vars(GivSettings)[attribute]}"/></p>'''
+            <input name="{attribute}" id="{attribute}" 
+            value="{vars(GivSettings)[attribute]}"/></p>'''
     form=form+'''
         <p><input type="submit" value="Save Config" /></p>
         </form>'''
@@ -40,12 +41,10 @@ def get_config():
 
 def set_config(formdata):
     """Take contents of web form and save to settings.py file"""""
-    
     inv=formdata["givtcp_instance"]
-#update the ENV
-    PATH= "/app/GivTCP_"+str(inv)
+    path= "/app/GivTCP_"+str(inv)
 
-    with open(PATH+"/settings.py", 'w', encoding='ascii') as outp:
+    with open(path+"/settings.py", 'w', encoding='ascii') as outp:
         outp.write("class GivSettings:\n")
         outp.write("    invertorIP=\""+formdata["invertorIP"]+"\"\n")
         outp.write("    numBatteries=\""+formdata["numBatteries"]+"\"\n")

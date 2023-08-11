@@ -9,7 +9,7 @@ import time
 from os.path import exists
 import pickle
 import os
-from GivLUT import GivLUT, GivQueue
+from giv_lut import GivLUT, GivQueue
 from givenergy_modbus.client import GivEnergyClient
 from rq import Retry
 from mqtt import GivMQTT
@@ -23,14 +23,14 @@ client=GivEnergyClient(host=GivSettings.invertorIP)
 
 logger = GivLUT.logger
 
-def updateControlMQTT(entity,value):
+def update_control_mqtt(entity,value):
     """ immediately update broker on success of control áction"""
     importlib.reload(settings)
     from settings import GivSettings
     if GivSettings.MQTT_Topic == "":
         GivSettings.MQTT_Topic = "GivEnergy"
     topic=str(GivSettings.MQTT_Topic+"/"+GivSettings.serial_number+"/Control/")+str(entity)
-    GivMQTT.single_MQTT_publish(topic,str(value))
+    GivMQTT.single_mqtt_publish(topic,str(value))
     return
 
 
@@ -39,11 +39,11 @@ def sct(target):
     temp={}
     try:
         client.enable_charge_target(target)
-        updateControlMQTT("Target_SOC",target)
+        update_control_mqtt("Target_SOC",target)
         temp['result']="Setting Charge Target "+str(target)+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Target "+str(target)+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Target "+str(target)+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sct2(target,slot):
@@ -51,11 +51,11 @@ def sct2(target,slot):
     temp={}
     try:
         client.enable_charge_target_2(target,slot)
-        updateControlMQTT("Charge_Target_SOC_"+str(slot),target)
+        update_control_mqtt("Charge_Target_SOC_"+str(slot),target)
         temp['result']="Setting Charge Target "+str(slot) + " was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Target "+str(slot) + " failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Target "+str(slot) + " failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def ect():
@@ -65,8 +65,8 @@ def ect():
         client.enable_charge_target(100)
         temp['result']="Setting Charge Enable was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Enable failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Enable failed: " + str(error)
     logger.info(temp['result'])    
     return json.dumps(temp)
 def dct():
@@ -74,11 +74,11 @@ def dct():
     temp={}
     try:
         client.disable_charge_target()
-        updateControlMQTT("Target_SOC","100")
+        update_control_mqtt("Target_SOC","100")
         temp['result']="Setting Discharge Disable was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Discharge Disable failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Discharge Disable failed: " + str(error)
     logger.info(temp['result'])    
     return json.dumps(temp)
 def ed():
@@ -86,11 +86,11 @@ def ed():
     temp={}
     try:
         client.enable_discharge()
-        updateControlMQTT("Enable_Discharge_Schedule","enable")
+        update_control_mqtt("Enable_Discharge_Schedule","enable")
         temp['result']="Enabling Discharge was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Enabling Discharge failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Enabling Discharge failed: " + str(error)
     logger.info(temp['result'])   
     return json.dumps(temp)
 def dd():
@@ -98,11 +98,11 @@ def dd():
     temp={}
     try:
         client.disable_discharge()
-        updateControlMQTT("Enable_Discharge_Schedule","disable")
+        update_control_mqtt("Enable_Discharge_Schedule","disable")
         temp['result']="Disabling discharge was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Disabling discharge failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Disabling discharge failed: " + str(error)
     logger.info(temp['result'])    
     return json.dumps(temp)
 def ec():
@@ -110,11 +110,11 @@ def ec():
     temp={}
     try:
         client.enable_charge()
-        updateControlMQTT("Enable_Charge_Schedule","enable")
+        update_control_mqtt("Enable_Charge_Schedule","enable")
         temp['result']="Setting Charge Enable was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Enable failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Enable failed: " + str(error)
     logger.info(temp['result'])    
     return json.dumps(temp)
 def dc():
@@ -122,11 +122,11 @@ def dc():
     temp={}
     try:
         client.disable_charge()
-        updateControlMQTT("Enable_Charge_Schedule","disable")
+        update_control_mqtt("Enable_Charge_Schedule","disable")
         temp['result']="Disabling Charge was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Disabling Charge failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Disabling Charge failed: " + str(error)
     logger.info(temp['result'])    
     return json.dumps(temp)
 
@@ -135,11 +135,11 @@ def slcm(val):
     temp={}
     try:
         client.set_local_control_mode(val)
-        updateControlMQTT("Local_control_mode",str(GivLUT.local_control_mode[int(val)]))
+        update_control_mqtt("Local_control_mode",str(GivLUT.local_control_mode[int(val)]))
         temp['result']="Setting Local Control Mode to " +str(GivLUT.local_control_mode[val])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Local Control Mode to " +str(GivLUT.local_control_mode[val])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Local Control Mode to " +str(GivLUT.local_control_mode[val])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 
@@ -148,11 +148,11 @@ def sbpm(val):
     temp={}
     try:
         client.set_battery_pause_mode(val)
-        updateControlMQTT("Battery_pause_mode",str(GivLUT.battery_pause_mode[int(val)]))
+        update_control_mqtt("Battery_pause_mode",str(GivLUT.battery_pause_mode[int(val)]))
         temp['result']="Setting Battery Pause Mode to " +str(GivLUT.battery_pause_mode[val])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Battery Pause Mode to " +str(GivLUT.battery_pause_mode[val])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Battery Pause Mode to " +str(GivLUT.battery_pause_mode[val])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
     #return temp
@@ -162,11 +162,11 @@ def ssc(target):
     temp={}
     try:
         client.set_shallow_charge(target)
-        updateControlMQTT("Battery_Power_Reserve",str(target))
+        update_control_mqtt("Battery_Power_Reserve",str(target))
         temp['result']="Setting shallow charge "+str(target)+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting shallow charge "+str(target)+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting shallow charge "+str(target)+" failed: " + str(error)
     logger.info(temp['result'])    
     return json.dumps(temp)
 def sbpr(target):
@@ -174,11 +174,11 @@ def sbpr(target):
     temp={}
     try:
         client.set_battery_power_reserve(target)
-        updateControlMQTT("Battery_Power_Cutoff",str(target))
+        update_control_mqtt("Battery_Power_Cutoff",str(target))
         temp['result']="Setting battery power reserve to "+str(target)+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting battery power reserve "+str(target)+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting battery power reserve "+str(target)+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def ri():
@@ -188,8 +188,8 @@ def ri():
         client.reboot_inverter()
         temp['result']="Rebooting Inverter was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Rebooting Inverter failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Rebooting Inverter failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sapr(target):
@@ -197,11 +197,11 @@ def sapr(target):
     temp={}
     try:
         client.set_active_power_rate(target)
-        updateControlMQTT("Active_Power_Rate",str(target))
+        update_control_mqtt("Active_Power_Rate",str(target))
         temp['result']="Setting active power rate "+str(target)+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting active power rate "+str(target)+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting active power rate "+str(target)+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sbcl(target):
@@ -217,11 +217,11 @@ def sbcl(target):
                 batteryCapacity=int(multi_output_old["Invertor_Details"]['Battery_Capacity_kWh'])*1000
                 batmaxrate=int(multi_output_old["Invertor_Details"]['Invertor_Max_Bat_Rate'])
             val=int(min((target/100)*(batteryCapacity), batmaxrate))
-            updateControlMQTT("Battery_Charge_Rate",str(val))
+            update_control_mqtt("Battery_Charge_Rate",str(val))
         temp['result']="Setting battery charge rate "+str(target)+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting battery charge rate "+str(target)+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting battery charge rate "+str(target)+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sbdl(target):
@@ -239,8 +239,8 @@ def sbdl(target):
         client.set_battery_discharge_limit(val)
         temp['result']="Setting battery discharge limit "+str(target)+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting battery discharge limit "+str(target)+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting battery discharge limit "+str(target)+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def smd():
@@ -248,11 +248,11 @@ def smd():
     temp={}
     try:
         client.set_mode_dynamic()
-        #updateControlMQTT("Mode","Eco")
+        #update_control_mqtt("Mode","Eco")
         temp['result']="Setting dynamic mode was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting dynamic mode failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting dynamic mode failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sms(target):
@@ -262,8 +262,8 @@ def sms(target):
         client.set_mode_storage(target)
         temp['result']="Setting storage mode "+str(target)+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting storage mode "+str(target)+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting storage mode "+str(target)+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sbdmd():
@@ -271,11 +271,11 @@ def sbdmd():
     temp={}
     try:
         client.set_battery_discharge_mode_demand()
-        #updateControlMQTT("Mode","Timed Demand")
+        #update_control_mqtt("Mode","Timed Demand")
         temp['result']="Setting demand mode was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting demand mode failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting demand mode failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sbdmmp():
@@ -283,11 +283,11 @@ def sbdmmp():
     temp={}
     try:
         client.set_battery_discharge_mode_max_power()
-        #updateControlMQTT("Mode","Timed Export")
+        #update_control_mqtt("Mode","Timed Export")
         temp['result']="Setting export mode was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting export mode failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting export mode failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 
@@ -296,11 +296,11 @@ def spvim(val):
     temp={}
     try:
         client.set_pv_input_mode(val)
-        updateControlMQTT("PV_input_mode",str(GivLUT.pv_input_mode[int(val)]))
+        update_control_mqtt("PV_input_mode",str(GivLUT.pv_input_mode[int(val)]))
         temp['result']="Setting PV Input mode to "+str(GivLUT.pv_input_mode[val])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting PV Input mode to "+str(GivLUT.pv_input_mode[val])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting PV Input mode to "+str(GivLUT.pv_input_mode[val])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 
@@ -311,8 +311,8 @@ def sdt(idateTime):
         client.set_datetime(idateTime)
         temp['result']="Setting inverter time was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting inverter time failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting inverter time failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sds(payload):
@@ -320,12 +320,12 @@ def sds(payload):
     temp={}
     try:
         client.set_discharge_slot(int(payload['slot']),[datetime.strptime(payload['start'],"%H:%M"),datetime.strptime(payload['finish'],"%H:%M")])
-        updateControlMQTT("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
-        updateControlMQTT("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
+        update_control_mqtt("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
+        update_control_mqtt("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
         temp['result']="Setting Discharge Slot "+str(payload['slot'])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Discharge Slot "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Discharge Slot "+str(payload['slot'])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def sdss(payload):
@@ -333,11 +333,11 @@ def sdss(payload):
     temp={}
     try:
         client.set_discharge_slot_start(int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"))
-        updateControlMQTT("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
+        update_control_mqtt("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
         temp['result']="Setting Discharge Slot Start "+str(payload['slot'])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Discharge Slot Start "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Discharge Slot Start "+str(payload['slot'])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 
@@ -346,11 +346,11 @@ def sdse(payload):
     temp={}
     try:
         client.set_discharge_slot_end(int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"))
-        updateControlMQTT("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
+        update_control_mqtt("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
         temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 
@@ -359,11 +359,11 @@ def sps(payload):
     temp={}
     try:
         client.set_pause_slot_start(datetime.strptime(payload['start'],"%H:%M"))
-        updateControlMQTT("Battery_pause_end_time_slot"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
+        update_control_mqtt("Battery_pause_end_time_slot"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
         temp['result']="Setting Pause Slot Start was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Pause Slot Start failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Pause Slot Start failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 
@@ -372,11 +372,11 @@ def spe(payload):
     temp={}
     try:
         client.set_pause_slot_end(datetime.strptime(payload['finish'],"%H:%M"))
-        updateControlMQTT("Battery_pause_end_time_slot"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
+        update_control_mqtt("Battery_pause_end_time_slot"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
         temp['result']="Setting Pause Slot End was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Pause Slot End failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Pause Slot End failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 
@@ -385,12 +385,12 @@ def scs(payload):
     temp={}
     try:
         client.set_charge_slot(int(payload['slot']),[datetime.strptime(payload['start'],"%H:%M"),datetime.strptime(payload['finish'],"%H:%M")])
-        updateControlMQTT("Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
-        updateControlMQTT("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
+        update_control_mqtt("Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
+        update_control_mqtt("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
         temp['result']="Setting Charge Slot "+str(payload['slot'])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 def scss(payload):
@@ -398,11 +398,11 @@ def scss(payload):
     temp={}
     try:
         client.set_charge_slot_start(int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"))
-        updateControlMQTT("Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
+        update_control_mqtt("Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")))
         temp['result']="Setting Charge Slot Start "+str(payload['slot'])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Slot Start "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Slot Start "+str(payload['slot'])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
 
@@ -411,11 +411,11 @@ def scse(payload):
     temp={}
     try:
         client.set_charge_slot_end(int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"))
-        updateControlMQTT("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
+        update_control_mqtt("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")))
         temp['result']="Setting Charge Slot End "+str(payload['slot'])+" was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Slot End "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Slot End "+str(payload['slot'])+" failed: " + str(error)
     logger.info(temp['result'])
     return json.dumps(temp)
     
@@ -432,8 +432,8 @@ def enableChargeSchedule(payload):
             from write import dc
             GivQueue.q.enqueue(dc,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting charge schedule "+str(payload['state'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting charge schedule "+str(payload['state'])+" failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -450,8 +450,8 @@ def enableChargeTarget(payload):
             from write import dct
             GivQueue.q.enqueue(dct,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Target failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Target failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -469,8 +469,8 @@ def enableDischarge(payload):
             from write import ssc
             GivQueue.q.enqueue(ssc,100,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Discharge Enable failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Discharge Enable failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -487,8 +487,8 @@ def enableDischargeSchedule(payload):
             from write import dd
             GivQueue.q.enqueue(dd,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Enable failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Enable failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -500,8 +500,8 @@ def setShallowCharge(payload):
         from write import ssc
         GivQueue.q.enqueue(ssc,int(payload['val']),retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting shallow charge failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting shallow charge failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -516,8 +516,8 @@ def setChargeTarget(payload):
         from write import sct
         GivQueue.q.enqueue(sct,target,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Target failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Target failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -533,8 +533,8 @@ def setChargeTarget2(payload):
         from write import sct2
         GivQueue.q.enqueue(sct2,target,slot,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Target "+str(slot) + " failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Target "+str(slot) + " failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -550,8 +550,8 @@ def setBatteryReserve(payload):
         from write import ssc
         GivQueue.q.enqueue(ssc,target,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Battery Reserve failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Battery Reserve failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -569,8 +569,8 @@ def setBatteryCutoff(payload):
         from write import sbpr
         GivQueue.q.enqueue(sbpr,target,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Battery Cutoff failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Battery Cutoff failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -582,8 +582,8 @@ def rebootinverter():
         from write import ri
         GivQueue.q.enqueue(ri,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Reboot inverter failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Reboot inverter failed: " + str(error)
         logger.error (temp['result'])
         #raise Exception
     return json.dumps(temp)
@@ -599,8 +599,8 @@ def setActivePowerRate(payload):
         from write import sapr
         GivQueue.q.enqueue(sapr,target,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Active Power Rate failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Active Power Rate failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -625,8 +625,8 @@ def setChargeRate(payload):
             from write import sbcl
             GivQueue.q.enqueue(sbcl,target,retry=Retry(max=GivSettings.queue_retries, interval=2))
         except Exception:
-            e = sys.exc_info()
-            temp['result']="Setting Charge Rate failed: " + str(e)
+            error = sys.exc_info()
+            temp['result']="Setting Charge Rate failed: " + str(error)
             logger.error (temp['result'])
             #raise Exception
     else:
@@ -656,8 +656,8 @@ def setDischargeRate(payload):
             from write import sbdl
             GivQueue.q.enqueue(sbdl,target,retry=Retry(max=GivSettings.queue_retries, interval=2))
         except Exception:
-            e = sys.exc_info()
-            temp['result']="Setting Discharge Rate failed: " + str(e)
+            error = sys.exc_info()
+            temp['result']="Setting Discharge Rate failed: " + str(error)
             logger.error (temp['result'])
     else:
         temp['result']="Setting Discharge Rate failed: No discharge rate limit available"
@@ -678,8 +678,8 @@ def setChargeSlot(payload):
         from write import scs
         GivQueue.q.enqueue(scs,payload,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -693,8 +693,8 @@ def setChargeSlotStart(payload):
         from write import scss
         GivQueue.q.enqueue(scss,payload,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -708,8 +708,8 @@ def setChargeSlotEnd(payload):
         from write import scse
         GivQueue.q.enqueue(scse,payload,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -727,8 +727,8 @@ def setDischargeSlot(payload):
         from write import sds
         GivQueue.q.enqueue(sds,payload,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Discharge Slot "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Discharge Slot "+str(payload['slot'])+" failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -742,8 +742,8 @@ def setDischargeSlotStart(payload):
         from write import sdss
         GivQueue.q.enqueue(sdss,payload,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Discharge Slot start "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Discharge Slot start "+str(payload['slot'])+" failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -757,8 +757,8 @@ def setDischargeSlotEnd(payload):
         from write import sdse
         GivQueue.q.enqueue(sdse,payload,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -772,8 +772,8 @@ def setPauseStart(payload):
         from write import sps
         GivQueue.q.enqueue(sps,payload,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Pause Slot Start failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Pause Slot Start failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -787,8 +787,8 @@ def setPauseEnd(payload):
         from write import spe
         GivQueue.q.enqueue(spe,payload,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Pause Slot End failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Pause Slot End failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -819,10 +819,10 @@ def FEResume(revert):
         payload["mode"]=revert["mode"]
         setBatteryMode(payload)
         os.remove(".FERunning")
-        updateControlMQTT("Force_Export","Normal")
+        update_control_mqtt("Force_Export","Normal")
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Force Export Revert failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Force Export Revert failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -875,11 +875,11 @@ def forceExport(export_time):
         f.close()
         logger.info("Force Export revert jobid is: "+fejob.id)
         temp['result']="Export successfully forced for "+str(export_time)+" minutes"
-        updateControlMQTT("Force_Export","Running")
+        update_control_mqtt("Force_Export","Running")
         logger.info(temp['result'])
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Force Export failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Force Export failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -901,7 +901,7 @@ def FCResume(revert):
     payload['slot']=1
     setChargeSlot(payload)
     os.remove(".FCRunning")
-    updateControlMQTT("Force_Charge","Normal")
+    update_control_mqtt("Force_Charge","Normal")
 
 def cancelJob(jobid):
     """Cancels a curenty queued job in the Redis queue"""
@@ -978,11 +978,11 @@ def forceCharge(chargeTime):
         f.close()
         logger.info("Force Charge revert jobid is: "+fcjob.id)
         temp['result']="Charge successfully forced for "+str(chargeTime)+" minutes"
-        updateControlMQTT("Force_Charge","Running")
+        update_control_mqtt("Force_Charge","Running")
         logger.info(temp['result'])
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Force charge failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Force charge failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -996,11 +996,11 @@ def tmpPDResume(payload):
         setDischargeRate(payload)
         if exists(".tpdRunning"): os.remove(".tpdRunning")
         temp['result']="Temp Pause Discharge Reverted"
-        updateControlMQTT("Temp_Pause_Discharge","Normal")
+        update_control_mqtt("Temp_Pause_Discharge","Normal")
         logger.info(temp['result'])
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Temp Pause Discharge Resume failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Temp Pause Discharge Resume failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -1028,11 +1028,11 @@ def tempPauseDischarge(pauseTime):
         f.close()
         logger.info("Temp Pause Discharge revert jobid is: "+tpdjob.id)
         temp['result']="Discharge paused for "+str(delay)+" seconds"
-        updateControlMQTT("Temp_Pause_Discharge","Running")
+        update_control_mqtt("Temp_Pause_Discharge","Running")
         logger.info(temp['result'])
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Pausing Discharge failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Pausing Discharge failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -1046,11 +1046,11 @@ def tmpPCResume(payload):
         setChargeRate(payload)
         if exists(".tpcRunning"): os.remove(".tpcRunning")
         temp['result']="Temp Pause Charge Reverted"
-        updateControlMQTT("Temp_Pause_Charge","Normal")
+        update_control_mqtt("Temp_Pause_Charge","Normal")
         logger.info(temp['result'])
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Temp Pause Charge Resume failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Temp Pause Charge Resume failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -1077,12 +1077,12 @@ def tempPauseCharge(pauseTime):
         f.close()
         logger.info("Temp Pause Charge revert jobid is: "+tpcjob.id)
         temp['result']="Charge paused for "+str(delay)+" seconds"
-        updateControlMQTT("Temp_Pause_Charge","Running")
+        update_control_mqtt("Temp_Pause_Charge","Running")
         logger.info(temp['result'])
         logger.debug("Result is: "+temp['result'])
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Pausing Charge failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Pausing Charge failed: " + str(error)
         logger.error(temp['result'])
     return json.dumps(temp)
 
@@ -1170,8 +1170,8 @@ def setBatteryMode(payload):
             return json.dumps(temp)
         temp['result']="Setting Battery Mode was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Battery Mode failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting Battery Mode failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -1190,8 +1190,8 @@ def setPVInputMode(payload):
             temp['result']="Invalid Mode requested"
         temp['result']="Setting PV Input Mode was a success"
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting PV Input Mode failed: " + str(e)
+        error = sys.exc_info()
+        temp['result']="Setting PV Input Mode failed: " + str(error)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -1208,8 +1208,8 @@ def setDateTime(payload):
         from write import sdt
         GivQueue.q.enqueue(sdt,iDateTime,retry=Retry(max=GivSettings.queue_retries, interval=2))
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting inverter DateTime failed: " + str(e) 
+        error = sys.exc_info()
+        temp['result']="Setting inverter DateTime failed: " + str(error) 
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -1230,8 +1230,8 @@ def switchRate(payload):
             open(GivLUT.nightRateRequest, 'w',encoding='ascii').close()
             logger.info ("Setting nightRate via external trigger")
     except Exception:
-        e = sys.exc_info()
-        temp['result']="Setting Rate failed: " + str(e) 
+        error = sys.exc_info()
+        temp['result']="Setting Rate failed: " + str(error) 
         logger.error (temp['result'])
     return json.dumps(temp)
 

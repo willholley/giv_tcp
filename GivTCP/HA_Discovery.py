@@ -1,16 +1,19 @@
 # version 2022.01.21
-import sys, time, json
-import paho.mqtt.client as mqtt 
-from settings import GivSettings
-from givenergy_modbus.model.inverter import Model
-from mqtt import GivMQTT
-from GivLUT import GivLUT
-from os.path import exists
+"""Module for generating HA auto discovery messages"""
+import sys
+import time
+import json
 import pickle
+import paho.mqtt.client as mqtt
+from mqtt import GivMQTT
+from giv_lut import GivLUT
+from os.path import exists
+from settings import GivSettings
 
 logger=GivLUT.logger
 
 class HAMQTT():
+    """Class for generating HA auto discovery messages"""
     if GivSettings.MQTT_Port=='':
         MQTT_Port=1883
     else:
@@ -25,7 +28,8 @@ class HAMQTT():
     if GivSettings.MQTT_Topic=="":
         GivSettings.MQTT_Topic="GivEnergy"
 
-    def getinvbatmax():
+    def get_inv_bat_max():
+        """Gets inverter max rate from cache"""
         if exists(GivLUT.regcache):      # if there is a cache then grab it
             with open(GivLUT.regcache, 'rb') as inp:
                 regCacheStack = pickle.load(inp)
@@ -34,17 +38,19 @@ class HAMQTT():
         return 5000
 
     def on_connect(client, userdata, flags, rc):
+        """Handles mqtt connection"""
         if rc==0:
             client.connected_flag=True #set flag
             logger.debug("connected OK Returned code="+str(rc))
             #client.subscribe(topic)
         else:
             logger.error("Bad connection Returned code= "+str(rc))
-    
-    def publish_discovery(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
+
+    def publish_discovery(array,serial_number):
+        """Recieve multiple payloads with Topics and publish in a single MQTT connection"""
         mqtt.Client.connected_flag=False        			#create flag in class
         client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance))
-        rootTopic=str(GivSettings.MQTT_Topic+"/"+SN+"/")
+        root_topic=str(GivSettings.MQTT_Topic+"/"+serial_number+"/")
         if HAMQTT.MQTTCredentials:
             client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
         try:
@@ -59,121 +65,117 @@ class HAMQTT():
             logger.debug("Publishing MQTT: " + HAMQTT.MQTT_Address)
 
             ##publish the status message
-            client.publish(GivSettings.MQTT_Topic+"/"+SN+"/status","online", retain=True)
+            client.publish(GivSettings.MQTT_Topic+"/"+serial_number+"/status","online", retain=True)
 
             ### For each topic create a discovery message
             for p_load in array:
                 if p_load != "raw":
                     payload=array[p_load]
-                    logger.debug('Publishing: '+rootTopic+p_load)
-                    output=GivMQTT.iterate_dict(payload,rootTopic+p_load)   #create LUT for MQTT publishing
+                    logger.debug('Publishing: '+root_topic+p_load)
+                    output=GivMQTT.iterate_dict(payload,root_topic+p_load)   #create LUT for MQTT publishing
                     for topic in output:
                         #Determine Entitiy type (switch/sensor/number) and publish the right message
-                        if GivLUT.entity_type[str(topic).split("/")[-1]].devType=="sensor":
+                        if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="sensor":
                             if "Battery_Details" in topic:
-                                client.publish("homeassistant/sensor/GivEnergy/"+str(topic).split("/")[-2]+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
+                                client.publish("homeassistant/sensor/GivEnergy/"+str(topic).split("/")[-2]+"_"+str(topic).rsplit('/', maxsplit=1)[-1]+"/config",HAMQTT.create_device_payload(topic,serial_number),retain=True)
                             else:
-                                client.publish("homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="switch":
-                            client.publish("homeassistant/switch/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="number":
-                            client.publish("homeassistant/number/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                    #    elif GivLUT.entity_type[str(topic).split("/")[-1]][0]=="binary_sensor":
-                    #        client.publish("homeassistant2/binary_sensor/GivEnergy/"+str(topic).split("/")[-1]+"/config",HAMQTT.create_binary_sensor_payload(topic,SN),retain=True)
-                        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="select":
-                            client.publish("homeassistant/select/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                
+                                client.publish("homeassistant/sensor/GivEnergy/"+serial_number+"_"+str(topic).rsplit('/', maxsplit=1)[-1]+"/config",HAMQTT.create_device_payload(topic,serial_number),retain=True)
+                        elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="switch":
+                            client.publish("homeassistant/switch/GivEnergy/"+serial_number+"_"+str(topic).rsplit('/', maxsplit=1)[-1]+"/config",HAMQTT.create_device_payload(topic,serial_number),retain=True)
+                        elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="number":
+                            client.publish("homeassistant/number/GivEnergy/"+serial_number+"_"+str(topic).rsplit('/', maxsplit=1)[-1]+"/config",HAMQTT.create_device_payload(topic,serial_number),retain=True)
+                    #    elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]][0]=="binary_sensor":
+                    #        client.publish("homeassistant2/binary_sensor/GivEnergy/"+str(topic).rsplit('/', maxsplit=1)[-1]+"/config",HAMQTT.create_binary_sensor_payload(topic,serial_number),retain=True)
+                        elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="select":
+                            client.publish("homeassistant/select/GivEnergy/"+serial_number+"_"+str(topic).rsplit('/', maxsplit=1)[-1]+"/config",HAMQTT.create_device_payload(topic,serial_number),retain=True)
             client.loop_stop()                      			#Stop loop
             client.disconnect()
-            
-        except:
+        except Exception:
             e = sys.exc_info()
             logger.error("Error connecting to MQTT Broker: " + str(e))
-    
         return
-    
 
-    def create_device_payload(topic,SN):
-        tempObj={}
-        tempObj['stat_t']=str(topic).replace(" ","_")
-        tempObj['avty_t'] = GivSettings.MQTT_Topic+"/"+SN+"/status"
-        tempObj["pl_avail"]= "online"
-        tempObj["pl_not_avail"]= "offline"
-        tempObj['device']={}
-        
-        GiVTCP_Device=str(topic).split("/")[2]
+    def create_device_payload(self,topic,serial_number):
+        """Creates device payload for HA auto discovery method"""
+        temp_obj={}
+        temp_obj['stat_t']=str(topic).replace(" ","_")
+        temp_obj['avty_t'] = GivSettings.MQTT_Topic+"/"+serial_number+"/status"
+        temp_obj["pl_avail"]= "online"
+        temp_obj["pl_not_avail"]= "offline"
+        temp_obj['device']={}
+        givtcp_device=str(topic).split("/")[2]
         if "Battery_Details" in topic:
-            tempObj["name"]=GivSettings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
-            tempObj['uniq_id']=GivSettings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
-            tempObj['object_id']=GivSettings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
-            tempObj['device']['identifiers']=str(topic).split("/")[3]+"_"+GiVTCP_Device
-            tempObj['device']['name']=GivSettings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+GiVTCP_Device.replace("_"," ")
+            temp_obj["name"]=GivSettings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+str(topic).rsplit('/', maxsplit=1)[-1].replace("_"," ") #Just final bit past the last "/"
+            temp_obj['uniq_id']=GivSettings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).rsplit('/', maxsplit=1)[-1]
+            temp_obj['object_id']=GivSettings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).rsplit('/', maxsplit=1)[-1]
+            temp_obj['device']['identifiers']=str(topic).split("/")[3]+"_"+givtcp_device
+            temp_obj['device']['name']=GivSettings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+givtcp_device.replace("_"," ")
         else:
-            tempObj['uniq_id']=GivSettings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
-            tempObj['object_id']=GivSettings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
-            tempObj['device']['identifiers']=SN+"_"+GiVTCP_Device
-            tempObj['device']['name']=GivSettings.ha_device_prefix+" "+SN+" "+str(GiVTCP_Device).replace("_"," ")
-            tempObj["name"]=GivSettings.ha_device_prefix+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
-        tempObj['device']['manufacturer']="GivEnergy"
+            temp_obj['uniq_id']=GivSettings.ha_device_prefix+"_"+serial_number+"_"+str(topic).rsplit('/', maxsplit=1)[-1]
+            temp_obj['object_id']=GivSettings.ha_device_prefix+"_"+serial_number+"_"+str(topic).rsplit('/', maxsplit=1)[-1]
+            temp_obj['device']['identifiers']=serial_number+"_"+givtcp_device
+            temp_obj['device']['name']=GivSettings.ha_device_prefix+" "+serial_number+" "+str(givtcp_device).replace("_"," ")
+            temp_obj["name"]=GivSettings.ha_device_prefix+" "+str(topic).rsplit('/', maxsplit=1)[-1].replace("_"," ") #Just final bit past the last "/"
+        temp_obj['device']['manufacturer']="GivEnergy"
 
-        if not GivLUT.entity_type[str(topic).split("/")[-1]].controlFunc == "":
-            tempObj['command_topic']=GivSettings.MQTT_Topic+"/control/"+SN+"/"+GivLUT.entity_type[str(topic).split("/")[-1]].controlFunc
+        if not GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].controlFunc == "":
+            temp_obj['command_topic']=GivSettings.MQTT_Topic+"/control/"+serial_number+"/"+GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].controlFunc
 
 #set device specific elements here:
-        if GivLUT.entity_type[str(topic).split("/")[-1]].devType=="sensor":
-            tempObj['unit_of_meas']=""
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="energy":
-                tempObj['unit_of_meas']="kWh"
-                tempObj['device_class']="Energy"
+        if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="sensor":
+            temp_obj['unit_of_meas']=""
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="energy":
+                temp_obj['unit_of_meas']="kWh"
+                temp_obj['device_class']="Energy"
                 if "soc" in str(topic.split("/")[-2]).lower():
-                    tempObj['state_class']="measurement"
+                    temp_obj['state_class']="measurement"
                 else:
-                    tempObj['state_class']="total_increasing"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="money":
+                    temp_obj['state_class']="total_increasing"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="money":
                 if "ppkwh" in str(topic).lower() or "rate" in str(topic).lower():
-                    tempObj['unit_of_meas']="{GBP}/kWh"
+                    temp_obj['unit_of_meas']="{GBP}/kWh"
                 else:
-                    tempObj['unit_of_meas']="{GBP}"
-                tempObj['device_class']="Monetary"
-                tempObj['icon_template']= "mdi:currency-gbp"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="power":
-                tempObj['unit_of_meas']="W"
-                tempObj['device_class']="Power"
-                tempObj['state_class']="measurement"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="temperature":
-                tempObj['unit_of_meas']="°C"
-                tempObj['device_class']="Temperature"
-                tempObj['state_class']="measurement"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="voltage":
-                tempObj['unit_of_meas']="V"
-                tempObj['device_class']="Voltage"
-                tempObj['state_class']="measurement"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="frequency":
-                tempObj['unit_of_meas']="Hz"
-                tempObj['device_class']="frequency"
-                tempObj['state_class']="measurement"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="current":
-                tempObj['unit_of_meas']="A"
-                tempObj['device_class']="Current"
-                tempObj['state_class']="measurement"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="battery":
-                tempObj['unit_of_meas']="%"
-                tempObj['device_class']="Battery"
-                tempObj['state_class']="measurement"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="timestamp":
-                del(tempObj['unit_of_meas'])
-                tempObj['device_class']="timestamp"
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="datetime":
-                del(tempObj['unit_of_meas'])
-            if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="string":
-                del(tempObj['unit_of_meas'])
-        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="switch":
-            tempObj['payload_on']="enable"
-            tempObj['payload_off']="disable"
-    #    elif GivLUT.entity_type[str(topic).split("/")[-1].devType=="binary_sensor":
-    #        client.publish("homeassistant/binary_sensor/GivEnergy/"+str(topic).split("/")[-1]+"/config",HAMQTT.create_binary_sensor_payload(topic,SN),retain=True)
-        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="select":
-            item=str(topic).split("/")[-1]
+                    temp_obj['unit_of_meas']="{GBP}"
+                temp_obj['device_class']="Monetary"
+                temp_obj['icon_template']= "mdi:currency-gbp"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="power":
+                temp_obj['unit_of_meas']="W"
+                temp_obj['device_class']="Power"
+                temp_obj['state_class']="measurement"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="temperature":
+                temp_obj['unit_of_meas']="°C"
+                temp_obj['device_class']="Temperature"
+                temp_obj['state_class']="measurement"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="voltage":
+                temp_obj['unit_of_meas']="V"
+                temp_obj['device_class']="Voltage"
+                temp_obj['state_class']="measurement"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="frequency":
+                temp_obj['unit_of_meas']="Hz"
+                temp_obj['device_class']="frequency"
+                temp_obj['state_class']="measurement"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="current":
+                temp_obj['unit_of_meas']="A"
+                temp_obj['device_class']="Current"
+                temp_obj['state_class']="measurement"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="battery":
+                temp_obj['unit_of_meas']="%"
+                temp_obj['device_class']="Battery"
+                temp_obj['state_class']="measurement"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="timestamp":
+                del(temp_obj['unit_of_meas'])
+                temp_obj['device_class']="timestamp"
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="datetime":
+                del(temp_obj['unit_of_meas'])
+            if GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].sensorClass=="string":
+                del(temp_obj['unit_of_meas'])
+        elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="switch":
+            temp_obj['payload_on']="enable"
+            temp_obj['payload_off']="disable"
+    #    elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1].devType=="binary_sensor":
+    #        client.publish("homeassistant/binary_sensor/GivEnergy/"+str(topic).rsplit('/', maxsplit=1)[-1]+"/config",HAMQTT.create_binary_sensor_payload(topic,serial_number),retain=True)
+        elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="select":
+            item=str(topic).rsplit('/', maxsplit=1)[-1]
             if item == "Battery_pause_mode":
                 options=GivLUT.battery_pause_mode
             elif item == "Local_control_mode":
@@ -190,21 +192,20 @@ class HAMQTT():
                 options=GivLUT.delay_times
             elif "Rate" in item:
                 options=GivLUT.rates
-            tempObj['options']=options
-        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="number":
+            temp_obj['options']=options
+        elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="number":
             # If its a rate then change to Watts
             if "SOC" in str(topic).lower():
-                tempObj['unit_of_meas']="%"
+                temp_obj['unit_of_meas']="%"
             elif "charge" in str(topic).lower():
-                tempObj['unit_of_meas']="W"
-                tempObj['min']=0
-                tempObj['max']=HAMQTT.getinvbatmax()
-                tempObj['mode']="slider"
+                temp_obj['unit_of_meas']="W"
+                temp_obj['min']=0
+                temp_obj['max']=HAMQTT.get_inv_bat_max()
+                temp_obj['mode']="slider"
             else:
-                tempObj['unit_of_meas']="%"
-        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="button":
-            tempObj['device_class']="restart"
-            tempObj['payload_press']="restart"
+                temp_obj['unit_of_meas']="%"
+        elif GivLUT.entity_type[str(topic).rsplit('/', maxsplit=1)[-1]].devType=="button":
+            temp_obj['device_class']="restart"
+            temp_obj['payload_press']="restart"
         ## Convert this object to json string
-        jsonOut=json.dumps(tempObj)
-        return(jsonOut)
+        return json.dumps(temp_obj)

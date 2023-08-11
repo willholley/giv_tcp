@@ -1,15 +1,15 @@
 # version 2022.01.21
-import paho.mqtt.client as mqtt
-import time
-from GivLUT import GivLUT
-from settings import GivSettings
+"""MQTT Class to publish inverter data"""
 import sys
-#from HA_Discovery import HAMQTT
-from givenergy_modbus.model.inverter import Model
+import time
+from giv_lut import GivLUT
+from settings import GivSettings
+import paho.mqtt.client as mqtt
 
 logger = GivLUT.logger
 
 class GivMQTT():
+    """MQTT Class to publish inverter data"""
 
     if GivSettings.MQTT_Port=='':
         MQTT_Port=1883
@@ -23,7 +23,8 @@ class GivMQTT():
         MQTT_Username=GivSettings.MQTT_Username
         MQTT_Password=GivSettings.MQTT_Password
 
-    def on_connect(client, userdata, flags, rc):
+    def on_connect(self,client, userdata, flags, rc):
+        """MQTT on_connect overload"""
         if rc==0:
             client.connected_flag=True #set flag
             logger.debug("connected OK Returned code="+str(rc))
@@ -31,7 +32,8 @@ class GivMQTT():
         else:
             logger.error("Bad connection Returned code= "+str(rc))
 
-    def single_MQTT_publish(Topic,value):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
+    def single_mqtt_publish(topic,value):
+        """Recieve multiple payloads with Topics and publish in a single MQTT connection"""
         mqtt.Client.connected_flag=False        			#create flag in class
         client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance))
 
@@ -45,20 +47,19 @@ class GivMQTT():
             while not client.connected_flag:        			#wait in loop
                 logger.debug ("In wait loop")
                 time.sleep(0.2)
-            client.publish(Topic,value)
-        except:
-            e = sys.exc_info()
-            logger.error("Error connecting to MQTT Broker: " + str(e))
+            client.publish(topic,value)
+        except Exception:
+            error = sys.exc_info()
+            logger.error("Error connecting to MQTT Broker: " + str(error))
         client.loop_stop()                      			    #Stop loop
         client.disconnect()
         return client
 
-    def multi_MQTT_publish(rootTopic,array):                    #Recieve multiple payloads with Topics and publish in a single MQTT connection
+    def multi_mqtt_publish(self,root_topic,array):
+        """Recieve multiple payloads with Topics and publish in a single MQTT connection"""
         mqtt.Client.connected_flag=False        			    #create flag in class
         client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance))
-        
         ##Check if first run then publish auto discovery message
-        
         if GivMQTT.MQTTCredentials:
             client.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)
         try:
@@ -71,31 +72,32 @@ class GivMQTT():
                 time.sleep(0.2)
             for p_load in array:
                 payload=array[p_load]
-                logger.debug('Publishing: '+rootTopic+p_load)
-                output=GivMQTT.iterate_dict(payload,rootTopic+p_load)   #create LUT for MQTT publishing
-                for value in output:
+                logger.debug('Publishing: '+root_topic+p_load)
+                output=GivMQTT.iterate_dict(payload,root_topic+p_load)   #create LUT for MQTT publishing
+                for value in output.items():
                     if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
                         client.publish(value,output[value])
                     else:
                         logger.error("MQTT error trying to send a "+ str(type(output[value]))+" to the MQTT broker for: "+str(value))
-        except:
-            e = sys.exc_info()
-            logger.error("Error connecting to MQTT Broker: " + str(e))
+        except Exception:
+            error = sys.exc_info()
+            logger.error("Error connecting to MQTT Broker: " + str(error))
         client.loop_stop()                      			    #Stop loop
         client.disconnect()
         return client
 
-    def iterate_dict(array,topic):      #Create LUT of topics and datapoints
-        MQTT_LUT={}
+    def iterate_dict(array,topic):
+        """Iterate through a dict to Create LUT of topics and datapoints"""
+        mqtt_lut={}
         if isinstance(array, dict):
             # Create a publish safe version of the output
             for p_load in array:
                 output=array[p_load]
                 if isinstance(output, dict):
-                    MQTT_LUT.update(GivMQTT.iterate_dict(output,topic+"/"+p_load))
+                    mqtt_lut.update(GivMQTT.iterate_dict(output,topic+"/"+p_load))
                     logger.debug('Prepping '+p_load+" for publishing")
                 else:
-                    MQTT_LUT[topic+"/"+p_load]=output
+                    mqtt_lut[topic+"/"+p_load]=output
         else:
-            MQTT_LUT[topic]=array
-        return(MQTT_LUT)
+            mqtt_lut[topic]=array
+        return mqtt_lut

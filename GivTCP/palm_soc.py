@@ -11,7 +11,7 @@ import pickle
 import requests
 import palm_settings as stgs
 import write as wr
-from GivLUT import GivLUT, GivQueue
+from giv_lut import GivLUT, GivQueue
 logger = GivLUT.logger
 
 # This software in any form is covered by the following Open Source BSD license:
@@ -97,9 +97,9 @@ class GivEnergyObj:
         #Grab most recent data from invertor and store useful attributes
         if exists(GivLUT.regcache):      # if there is a cache then grab it
             with open(GivLUT.regcache, 'rb') as inp:
-                regCacheStack = pickle.load(inp)
-                multi_output_old = regCacheStack[4]
-            self.invmaxrate=float(multi_output_old['Invertor_Details']['Invertor_Max_Bat_Rate']) / 1000
+                reg_cache_stack = pickle.load(inp)
+                multi_output_old = reg_cache_stack[4]
+            self.invmaxrate=float(multi_output_old['Invertor_Details']['Invertor_Max_Bat_Rate'])/1000
             self.batcap=float(multi_output_old['Invertor_Details']['Battery_Capacity_kWh'])
 
 
@@ -534,13 +534,13 @@ class SolcastObj:
 
     def __init__(self):
         # Skeleton solcast summary array
-        self.pv_est10_day: [int] = [0] * 7
-        self.pv_est50_day: [int] = [0] *  7
-        self.pv_est90_day: [int] = [0] * 7
+        self.pv_est10_day: List[int] = [0] * 7
+        self.pv_est50_day: List[int] = [0] *  7
+        self.pv_est90_day: List[int] = [0] * 7
 
-        self.pv_est10_30: [int] = [0] * 96
-        self.pv_est50_30: [int] = [0] * 96
-        self.pv_est90_30: [int] = [0] * 96
+        self.pv_est10_30: List[int] = [0] * 96
+        self.pv_est50_30: List[int] = [0] * 96
+        self.pv_est90_30: List[int] = [0] * 96
 
     def update(self):
         """Updates forecast generation from Solcast server."""
