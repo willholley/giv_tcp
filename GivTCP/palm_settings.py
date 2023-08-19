@@ -1,11 +1,26 @@
-# version 2023.06.21
-# Settings file for use with palm.py: 30-minute calculations (v0.9.0) and weightings for daily historical consumption (v0.10.0)
-
+# version 2023.08.07
+"""
+Settings file for use with palm.py: Compatible with v0.9, v0.10, v1.0.x and v1.1.x
+"""
 from settings import GiV_Settings
 from GivLUT import GivLUT
 import pickle
 from os.path import exists
 import os
+
+class pg:
+    """PALM global variable definitions. Used by palm_utils and project-specific wrappers"""
+
+    test_mode: bool = False
+    debug_mode: bool = False
+    once_mode: bool = False
+    long_t_now: str = ""
+    month: str = ""
+    t_now: str = ""
+    t_now_mins: int = 0
+    loop_counter: int = 0  # 1 minute minor frame. "0" = initialise
+    pvo_tstamp: int = 0  # Records value of loop_counter when PV data last written
+    palm_version: str = ""
 
 # User settings for GivEnergy inverter API
 class GE:
