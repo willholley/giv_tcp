@@ -1,6 +1,9 @@
+"""HA_Discovery: """
 # version 2022.01.21
-import sys, time, json
-import paho.mqtt.client as mqtt 
+import sys
+import time
+import json
+import paho.mqtt.client as mqtt
 from settings import GiV_Settings
 from givenergy_modbus.model.inverter import Model
 from mqtt import GivMQTT
@@ -40,7 +43,7 @@ class HAMQTT():
             #client.subscribe(topic)
         else:
             logger.error("Bad connection Returned code= "+str(rc))
-    
+
     def publish_discovery(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			#create flag in class
         client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
@@ -82,16 +85,14 @@ class HAMQTT():
                     #        client.publish("homeassistant2/binary_sensor/GivEnergy/"+str(topic).split("/")[-1]+"/config",HAMQTT.create_binary_sensor_payload(topic,SN),retain=True)
                         elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="select":
                             client.publish("homeassistant/select/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                
+
             client.loop_stop()                      			#Stop loop
             client.disconnect()
-            
+
         except:
             e = sys.exc_info()
             logger.error("Error connecting to MQTT Broker: " + str(e))
-    
-        return
-    
+
 
     def create_device_payload(topic,SN):
         tempObj={}
@@ -100,7 +101,7 @@ class HAMQTT():
         tempObj["pl_avail"]= "online"
         tempObj["pl_not_avail"]= "offline"
         tempObj['device']={}
-        
+
         GiVTCP_Device=str(topic).split("/")[2]
         if "Battery_Details" in topic:
             tempObj["name"]=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
@@ -161,12 +162,12 @@ class HAMQTT():
                 tempObj['device_class']="Battery"
                 tempObj['state_class']="measurement"
             if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="timestamp":
-                del(tempObj['unit_of_meas'])
+                del tempObj['unit_of_meas']
                 tempObj['device_class']="timestamp"
             if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="datetime":
-                del(tempObj['unit_of_meas'])
+                del tempObj['unit_of_meas']
             if GivLUT.entity_type[str(topic).split("/")[-1]].sensorClass=="string":
-                del(tempObj['unit_of_meas'])
+                del tempObj['unit_of_meas']
         elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="switch":
             tempObj['payload_on']="enable"
             tempObj['payload_off']="disable"
@@ -207,4 +208,4 @@ class HAMQTT():
             tempObj['payload_press']="restart"
         ## Convert this object to json string
         jsonOut=json.dumps(tempObj)
-        return(jsonOut)
+        return jsonOut
