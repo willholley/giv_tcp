@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from typing import Tuple, List
 import logging
 ## import matplotlib.pyplot as plt
-import random
 import requests
 import palm_settings as stgs
 
@@ -49,7 +48,7 @@ logger = logging.getLogger(__name__)
 # ...
 # v0.10.0   21/Jun/23 Added multi-day averaging for usage calcs
 # v1.0.0    15/Jul/23 Random start time, Solcast data correction, IO compatibility, 48-hour fcast
-# v1.1.0    06/Aug/23 Split out generic functions as palm_utils.py (this file)
+# v1.1.0    06/Aug/23 Split out generic functions as palm_utils.py (this file), remove random start time (add comment in settings instead) 
 
 PALM_VERSION = "v1.1.0"
 # -*- coding: utf-8 -*-
@@ -324,10 +323,10 @@ class GivEnergyObj:
                 logger.error("Readback failed on GivEnergy API... Expected " +
                     str(value) + ", Read: "+ str(returned_cmd))
 
-        if cmd == "set_soc":  # Sets target SoC to value, randomises start time to be grid friendly
+        if cmd == "set_soc":  # Sets target SoC to value
             set_inverter_register("77", str(self.tgt_soc))
             if stgs.GE.start_time != "":
-                start_time = t_to_hrs(t_to_mins(stgs.GE.start_time) + random.randint(1,14))
+                start_time = t_to_hrs(t_to_mins(stgs.GE.start_time))
                 set_inverter_register("64", start_time)
             if stgs.GE.end_time != "":
                 set_inverter_register("65", stgs.GE.end_time)
@@ -335,7 +334,7 @@ class GivEnergyObj:
         elif cmd == "set_soc_winter":  # Restore default overnight charge params
             set_inverter_register("77", "100")
             if stgs.GE.start_time != "":
-                start_time = t_to_hrs(t_to_mins(stgs.GE.start_time) + random.randint(1,14))
+                start_time = t_to_hrs(t_to_mins(stgs.GE.start_time))
                 set_inverter_register("64", stgs.GE.start_time)
             if stgs.GE.end_time_winter != "":
                 set_inverter_register("65", stgs.GE.end_time_winter)
@@ -345,8 +344,19 @@ class GivEnergyObj:
             set_inverter_register("64", "00:01")
             set_inverter_register("65", "23:59")
 
+        elif cmd == "charge_now_soc":
+            set_inverter_register("77", str(self.tgt_soc))
+            set_inverter_register("64", "00:01")
+            set_inverter_register("65", "23:59")
+
         elif cmd == "pause":
             set_inverter_register("72", "0")
+            set_inverter_register("73", "0")
+
+        elif cmd == "pause_charge":
+            set_inverter_register("72", "0")
+
+        elif cmd == "pause_discharge":
             set_inverter_register("73", "0")
 
         elif cmd == "resume":
@@ -463,16 +473,18 @@ class GivEnergyObj:
         else:
             low_soc = stgs.GE.min_soc_target
 
-        # So we now have the four values of max & min charge for tomorrow & overmorrow
+        max_charge_pc = max_charge_pcnt[0]
+        min_charge_pc = min_charge_pcnt[0]
+
+        # We now have the four values of max & min charge for tomorrow & overmorrow
         # Check if overmorrow is better than tomorrow and there is opportunity to reduce target
-        # to avoid residual charge at the end of the day in anticipation of a sunny day
-        if max_charge_pcnt[1] > 100 - low_soc > max_charge_pcnt[0]:
+        # to avoid residual charge at the end of the day in anticipation of a sunny day.
+        # Reduce the target by implying that there will be more than forecast generation
+        if max_charge_pcnt[1] > 100 and  max_charge_pcnt[0] < 100:
             logger.info("Overmorrow correction enabled")
-            max_charge_pc = max_charge_pcnt[0] + (max_charge_pcnt[1] - 100) / 2
+            max_charge_pc += int((max_charge_pcnt[1] - 100) / 2)
         else:
             logger.info("Overmorrow correction not needed/enabled")
-            max_charge_pc = max_charge_pcnt[0]
-        min_charge_pc = min_charge_pcnt[0]
 
         # The really clever bit: reduce the target SoC to the greater of:
         #     The surplus above 100% for max_charge_pcnt
