@@ -11,7 +11,7 @@ import pickle
 import requests
 import palm_settings as stgs
 import write as wr
-from .giv_lut import GivLUT, GivQueue
+from giv_lut import GivLUT, GivQueue
 logger = GivLUT.logger
 
 # This software in any form is covered by the following Open Source BSD license:

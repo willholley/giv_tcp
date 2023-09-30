@@ -4,10 +4,10 @@
 from os.path import exists
 from flask import Flask, request
 from flask_cors import CORS
-from . import read       #grab passthrough functions from main read file
-from . import write      #grab passthrough functions from main write file
+import read       #grab passthrough functions from main read file
+import write      #grab passthrough functions from main write file
 import config_dash as cfdash
-from .giv_lut import GivQueue, GivLUT
+from giv_lut import GivQueue, GivLUT
 
 logger = GivLUT.logger
 

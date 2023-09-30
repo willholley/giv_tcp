@@ -9,13 +9,13 @@ import logging
 import datetime
 import pickle
 import time
+import os
 from datetime import timedelta
 from os.path import exists
-import os
 from rq import Retry
+from giv_lut import GivLUT, GivClient, InvType, GivQueue
+from settings import GivSettings
 from givenergy_modbus.model.inverter import Model
-from .giv_lut import GivLUT, GivQueue, GivClient, InvType
-from .settings import GivSettings
 
 logging.getLogger("givenergy_modbus").setLevel(logging.CRITICAL)
 logging.getLogger("rq.worker").setLevel(logging.CRITICAL)
@@ -30,8 +30,9 @@ cacheLock = Lock()
 
 def inverter_data(fullrefresh):
     """Actual inverter read function call"""
+    client=GivClient(fullrefresh)
     try:
-        plant = GivClient.get_data(fullrefresh)
+        plant = client.get_data()
         inverter = plant.inverter
         batteries = plant.batteries
     except Exception:
@@ -60,11 +61,11 @@ def get_data(fullrefresh):  # Read from Inverter put in cache
         while plant.result is None and plant.exc_info is None:
             time.sleep(0.1)
         if "ERROR" in plant.result:
-            raise Exception ("Garbage or failed inverter Response: %s", str(plant.result))
+            raise Exception ("Garbage or failed inverter Response: "+ str(plant.result))
         ge_inverter=plant.result[0]
         ge_batteries=plant.result[1]
 
-#        plant=inverter_data(True)
+#        plant=inverter_data(fullrefresh)
 #        ge_inverter=plant[0]
 #        ge_batteries=plant[1]
 
@@ -81,36 +82,27 @@ def get_data(fullrefresh):  # Read from Inverter put in cache
 
     try:
         logger.debug("Beginning parsing of Inverter data")
-        inverter_model= InvType
-        # Determine inverter Model and max charge rate first...
-
-        #genint=math.floor(int(ge_inverter.arm_firmware_version)/100)
-
-        inverter_model.model=ge_inverter.inverter_model
-        inverter_model.generation=ge_inverter.inverter_generation
-        inverter_model.phase=ge_inverter.inverter_phases
-        inverter_model.invmaxrate=ge_inverter.inverter_maxpower
-
         if ge_inverter.device_type_code=="8001":  # if AIO
             battery_capacity=ge_inverter.battery_nominal_capacity*307
         else:
             battery_capacity=ge_inverter.battery_nominal_capacity*51.2
 
-        if inverter_model.generation == 'Gen 1':
-            if inverter_model.model == "AC":
+        if ge_inverter.inverter_generation == 'Gen 1':
+            if ge_inverter.inverter_model == "AC":
                 max_bat_charge_rate=3000
-            elif inverter_model.model == "All in One":
+            elif ge_inverter.inverter_model == "All in One":
                 max_bat_charge_rate=6000
             else:
                 max_bat_charge_rate=2600
         else:
-            if inverter_model.model == "AC":
+            if ge_inverter.inverter_model == "AC":
                 max_bat_charge_rate=5000
             else:
                 max_bat_charge_rate=3600
 
         # Calc max charge rate
-        inverter_model.batmaxrate=min(max_bat_charge_rate, battery_capacity/2)
+        batmaxrate=min(max_bat_charge_rate, battery_capacity/2)
+        inverter_model= InvType(ge_inverter.inverter_phases,ge_inverter.inverter_model,ge_inverter.inverter_maxpower,batmaxrate,ge_inverter.inverter_generation)
 
 ############  Energy Stats    ############
 
@@ -149,8 +141,8 @@ def get_data(fullrefresh):  # Read from Inverter put in cache
                                                                  (energy_today_output['Export_Energy_Today_kWh']-energy_today_output['Import_Energy_Today_kWh'])+energy_today_output['PV_Energy_Today_kWh'], 2)
 
         checksum = 0
-        for item in energy_today_output.items():
-            checksum = checksum+energy_today_output[item]
+        for item, value in energy_today_output.items():
+            checksum = checksum+value
         if checksum == 0 and ge_inverter.system_time.hour == 0 and ge_inverter.system_time.minute == 0:
             with cacheLock:
                 if exists(GivLUT.regcache):
@@ -482,8 +474,8 @@ def get_data(fullrefresh):  # Read from Inverter put in cache
 
         # Check for all zeros
         checksum = 0
-        for item in energy_total_output.items():
-            checksum = checksum+energy_total_output[item]
+        for item,value in energy_total_output.items():
+            checksum = checksum+value
         if checksum == 0:
             raise ValueError("All zeros returned by inverter, skipping update")
 
@@ -568,7 +560,7 @@ def get_data(fullrefresh):  # Read from Inverter put in cache
         if ge_inverter.battery_type == 0:
             batterytype = "Lead Acid"
         inverter['Battery_Type'] = batterytype
-        inverter['Battery_Capacity_kWh'] = ((battery_capacity)/1000)
+        inverter['Battery_Capacity_kWh'] = (battery_capacity)/1000
         inverter['Invertor_Serial_Number'] = ge_inverter.inverter_serial_number
         inverter['Modbus_Version'] = ge_inverter.modbus_version
         inverter['Invertor_Firmware'] = ge_inverter.arm_firmware_version
@@ -682,7 +674,7 @@ def get_data(fullrefresh):  # Read from Inverter put in cache
                 with open(GivLUT.lastupdate, 'rb') as inp:
                     previous_update = pickle.load(inp)
                 timediff = datetime.datetime.fromisoformat(multi_output['Last_Updated_Time'])-datetime.datetime.fromisoformat(previous_update)
-                multi_output['Time_Since_Last_Update'] = (((timediff.seconds*1000000)+timediff.microseconds)/1000000)
+                multi_output['Time_Since_Last_Update'] = ((timediff.seconds*1000000)+timediff.microseconds)/1000000
 
             # Save new time to pickle
             with open(GivLUT.lastupdate, 'wb') as outp:
@@ -774,18 +766,18 @@ def get_cache():
 def self_run2():
     """Main function to loop through read and publish"""
     counter = 0
-    run_all("True")
+    run_all(True)
     while True:
         counter = counter+1
         if exists(GivLUT.forcefullrefresh):
-            run_all("True")
+            run_all(True)
             os.remove(GivLUT.forcefullrefresh)
             counter = 0
         elif counter == 20:
             counter = 0
-            run_all("True")
+            run_all(True)
         else:
-            run_all("False")
+            run_all(False)
         time.sleep(GivSettings.self_run_timer)
 
 
@@ -802,12 +794,12 @@ def publish_output(array, serial_number):
         if GivSettings.first_run:        # 09-July-23 - HA is seperated to seperate if check.
             # Do this in a thread?
 #            threader.append(update_first_run,serial_number)
-            update_first_run(serial_number)              # 09=July=23 - Always do this first irrespective of HA setting.
             if GivSettings.HA_Auto_D:        # Home Assistant MQTT Discovery
                 logger.critical("Publishing Home Assistant Discovery messages")
                 from ha_discovery import HAMQTT
                 HAMQTT.publish_discovery(tempoutput, serial_number)
 #                threader.append(HAMQTT.publish_discovery,tempoutput, serial_number)
+            update_first_run(serial_number)              # 09=July=23 - Always do this first irrespective of HA setting.
             GivSettings.first_run = False  # 09-July-23 - Always set firstrun irrespective of HA setting.
 # Do this in a thread?
         from mqtt import GivMQTT

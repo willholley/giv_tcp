@@ -60,16 +60,19 @@ class GivEnergyClient:
         #How do I know which inverter I'm connecting to from inside the library...
         if is_aio:
             self.fetch_register_pages(
-                inverter_registers, plant.inverter_rc, slave_address=0x11, sleep_between_queries=sleep_between_queries
+                inverter_registers, plant.inverter_rc, slave_address=0x11,
+                sleep_between_queries=sleep_between_queries
             )
             _logger.debug("Inverter is AIO so using the 0x11 slave_address")
         elif is_ac:
             self.fetch_register_pages(
-                inverter_registers, plant.inverter_rc_ac, slave_address=0x31, sleep_between_queries=sleep_between_queries
+                inverter_registers, plant.inverter_rc_ac, slave_address=0x31,
+                sleep_between_queries=sleep_between_queries
             )
         else:
             self.fetch_register_pages(
-                inverter_registers, plant.inverter_rc, slave_address=0x31, sleep_between_queries=sleep_between_queries
+                inverter_registers, plant.inverter_rc, slave_address=0x31,
+                sleep_between_queries=sleep_between_queries
             )
             _logger.debug("Inverter is normal so using the 0x31 slave_address")
         for i, battery_rc in enumerate(plant.batteries_rcs):

@@ -531,7 +531,7 @@ class Inverter_AC(GivEnergyBaseModel):
 
     @root_validator
     def compute_maxpower(cls, values) -> dict:
-        """Computes the inverter model from the firmware version."""
+        """Computes the inverter max power from the firmware version."""
         values['inverter_maxpower'] = InvertorPower.from_dtc_power(values['device_type_code'])
         return values
 

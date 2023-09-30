@@ -21,7 +21,7 @@ class GiV_Settings:
     influxToken=""
     influxBucket="GivEnergy"
     influxOrg="GivTCP"
-    first_run= False
+    first_run= True
     serial_number = "SA2047G098"
     Web_Dash = True
     Web_Dash_Port = 3000

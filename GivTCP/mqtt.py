@@ -2,13 +2,13 @@
 """MQTT Class to publish inverter data"""
 import sys
 import time
-from .giv_lut import GivLUT
+from giv_lut import GivLUT
 import paho.mqtt.client as mqtt
-from .settings import GivSettings
+from settings import GivSettings
 
 logger = GivLUT.logger
 
-class GivMQTT():
+class GivMQTT:
     """MQTT Class to publish inverter data"""
 
     if GivSettings.MQTT_Port=='':
@@ -23,7 +23,7 @@ class GivMQTT():
         MQTT_Username=GivSettings.MQTT_Username
         MQTT_Password=GivSettings.MQTT_Password
 
-    def on_connect(self,client, userdata, flags, rc):
+    def on_connect(client, userdata, flags, rc):
         """MQTT on_connect overload"""
         if rc==0:
             client.connected_flag=True #set flag
@@ -55,7 +55,7 @@ class GivMQTT():
         client.disconnect()
         return client
 
-    def multi_mqtt_publish(self,root_topic,array):
+    def multi_mqtt_publish(root_topic,array):
         """Recieve multiple payloads with Topics and publish in a single MQTT connection"""
         mqtt.Client.connected_flag=False        			    #create flag in class
         client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance))
@@ -74,9 +74,10 @@ class GivMQTT():
                 payload=array[p_load]
                 logger.debug('Publishing: '+root_topic+p_load)
                 output=GivMQTT.iterate_dict(payload,root_topic+p_load)   #create LUT for MQTT publishing
-                for value in output.items():
-                    if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
-                        client.publish(value,output[value])
+                for item,value in output.items():
+                    #if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
+                    if isinstance(value,(int, str, float, bytearray)):      #Only publish typesafe data
+                        client.publish(item,value)
                     else:
                         logger.error("MQTT error trying to send a "+ str(type(output[value]))+" to the MQTT broker for: "+str(value))
         except Exception:

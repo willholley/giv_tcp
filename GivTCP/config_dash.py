@@ -4,8 +4,8 @@
 import os
 import pickle
 from os.path import exists
-from .giv_lut import GivLUT
-from .settings import GivSettings
+from giv_lut import GivLUT
+from settings import GivSettings
 
 def get_config():
     """Retrieve settings from file and display"""

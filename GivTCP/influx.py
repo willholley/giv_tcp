@@ -1,8 +1,9 @@
 # version 2022.01.31
+"""Influx Module"""
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from influxdb_client import InfluxDBClient, WriteOptions
-from .settings import GivSettings
+from settings import GivSettings
 
 logger = logging.getLogger("GivTCP_Influx_"+str(GivSettings.givtcp_instance))
 logging.basicConfig(format='%(asctime)s - %(name)s - [%(levelname)s] - %(message)s')
@@ -24,45 +25,49 @@ else:
     logger.setLevel(logging.ERROR)
 
 
-class GivInflux():
+class GivInflux:
+    """Class to handle writing data to Influx db"""
 
-    def line_protocol(SN,readings):
-        return '{},tagKey={} {}'.format(SN,'GivReal', readings) 
+    def line_protocol(serial_number,readings):
+        """Create Influx Line protocol"""
+        return '%s,tagKey=%s %s',serial_number,'GivReal', readings
 
-    def make_influx_string(datastr):
+    def make_influx_string(datastr: str):
+        """Create Influx Line string"""
         new_str=datastr.replace(" ","_")
         new_str=new_str.lower()
         return new_str
 
-    def stringSafe(data):
+    def string_safe(data):
+        """Create a safe string"""
         output=str(data)
         if isinstance(data,str):
             output="\""+str(data)+"\""
         return output
 
-    def publish(SN,data):
+    def publish(serial_number,data):
+        """Publish data to influx"""
         output_str=""
         power_output = data['Power']['Power']
         for key in power_output:
             logging.debug("Creating Power string for InfluxDB")
-            output_str=output_str+str(GivInflux.make_influx_string(key))+'='+GivInflux.stringSafe(power_output[key])+','
+            output_str=output_str+str(GivInflux.make_influx_string(key))+'='+GivInflux.string_safe(power_output[key])+','
         flow_output = data['Power']['Flows']
         for key in flow_output:
             logging.debug("Creating Power Flow string for InfluxDB")
-            output_str=output_str+str(GivInflux.make_influx_string(key))+'='+GivInflux.stringSafe(flow_output[key])+','
+            output_str=output_str+str(GivInflux.make_influx_string(key))+'='+GivInflux.string_safe(flow_output[key])+','
         energy_today = data['Energy']['Today']
         for key in energy_today:
             logging.debug("Creating Energy/Today string for InfluxDB")
-            output_str=output_str+str(GivInflux.make_influx_string(key))+'='+GivInflux.stringSafe(energy_today[key])+','
+            output_str=output_str+str(GivInflux.make_influx_string(key))+'='+GivInflux.string_safe(energy_today[key])+','
 
         energy_total = data['Energy']['Total']
         for key in energy_total:
             logging.debug("Creating Energy/Total string for InfluxDB")
-            output_str=output_str+str(GivInflux.make_influx_string(key))+'='+GivInflux.stringSafe(energy_total[key])+','
+            output_str=output_str+str(GivInflux.make_influx_string(key))+'='+GivInflux.string_safe(energy_total[key])+','
 
-        logging.debug("Data sending to Influx is: "+ output_str[:-1])
-        data1=GivInflux.line_protocol(SN,output_str[:-1])
-        
+        logging.debug("Data sending to Influx is: %s", output_str[:-1])
+        data1=GivInflux.line_protocol(serial_number,output_str[:-1])
         _db_client = InfluxDBClient(url=GivSettings.influxURL, token=GivSettings.influxToken, org=GivSettings.influxOrg, debug=True)
         _write_api = _db_client.write_api(write_options=WriteOptions(batch_size=1))
         _write_api.write(bucket=GivSettings.influxBucket, record=data1)

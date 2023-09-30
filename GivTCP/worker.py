@@ -2,7 +2,7 @@
 import logging
 import redis
 from rq import Worker, Connection
-from .settings import GivSettings
+from settings import GivSettings
 listen = ['GivTCP_'+str(GivSettings.givtcp_instance)]
 
 

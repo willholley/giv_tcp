@@ -123,36 +123,37 @@ if len(networks)>0:
     logger.critical("Scanning network for inverters...")
     try:
         for subnet in networks.items():
-            COUNT=0
-            while len(netlist)<=0:
-                if COUNT<2:
-                    logger.info("Scanning network (%s): %s",str(COUNT+1),str(networks[subnet]))
-                    netlist=find_inverter(networks[subnet])
-                    if len(netlist)>0:
-                        break
-                    COUNT=COUNT+1
-                else:
-                    break
-            if netlist:
-                logger.info("%s Inverters found on %s - %s",str(len(netlist)),str(networks[subnet]),str(netlist))
-                invList.update(list)
-                for inv in invList.items():
-                    deets={}
-                    logger.debug("Getting inverter stats for: %s",str(invList[inv]))
-                    COUNT=0
-                    while not deets:
-                        if COUNT<2:
-                            deets=get_inv_deets(invList[inv])
-                            if deets:
-                                logger.critical ('Inverter %s which is a %s - %s has been found at: %s',deets[0],deets[1],deets[2],str(invList[inv]))
-                                Stats['Serial_Number']=deets[0]
-                                Stats['Firmware']=deets[3]
-                                Stats['Model']=deets[2]
-                                Stats['Generation']=deets[1]
-                                inverterStats[inv]=Stats
-                            COUNT=COUNT+1
-                        else:
+            if subnet:
+                COUNT=0
+                while len(netlist)<=0:
+                    if COUNT<2:
+                        logger.info("Scanning network (%s): %s",str(COUNT+1),str(networks[subnet]))
+                        netlist=find_inverter(networks[subnet])
+                        if len(netlist)>0:
                             break
+                        COUNT=COUNT+1
+                    else:
+                        break
+                if netlist:
+                    logger.info("%s Inverters found on %s - %s",str(len(netlist)),str(networks[subnet]),str(netlist))
+                    invList.update(list)
+                    for inv in invList.items():
+                        deets={}
+                        logger.debug("Getting inverter stats for: %s",str(invList[inv]))
+                        COUNT=0
+                        while not deets:
+                            if COUNT<2:
+                                deets=get_inv_deets(invList[inv])
+                                if deets:
+                                    logger.critical ('Inverter %s which is a %s - %s has been found at: %s',deets[0],deets[1],deets[2],str(invList[inv]))
+                                    Stats['Serial_Number']=deets[0]
+                                    Stats['Firmware']=deets[3]
+                                    Stats['Model']=deets[2]
+                                    Stats['Generation']=deets[1]
+                                    inverterStats[inv]=Stats
+                                COUNT=COUNT+1
+                            else:
+                                break
             if len(invList)==0:
                 logger.critical("No inverters found...")
             else:
@@ -206,8 +207,8 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
     FILENAME=""
     # create settings file
     logger.critical ("Recreating settings.py for invertor %s",str(inv))
-    with open(PATH+"/settings.py", 'w', encoding=str) as outp:
-        outp.write("class GiV_Settings:\n")
+    with open(PATH+"/settings.py", 'w', encoding='ascii') as outp:
+        outp.write("class GivSettings:\n")
         outp.write("    invertorIP=\""+str(os.getenv("INVERTOR_IP_"+str(inv),""))+"\"\n")
         outp.write("    numBatteries="+str(os.getenv("NUMBATTERIES_"+str(inv),"")+"\n"))
         outp.write("    isAIO="+str(os.getenv("INVERTOR_AIO_"+str(inv),"")+"\n"))

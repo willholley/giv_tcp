@@ -5,8 +5,8 @@ and weightings for daily historical consumption (v0.10.0)"""
 import pickle
 from os.path import exists
 import os
-from .giv_lut import GivLUT
-from .settings import GivSettings
+from giv_lut import GivLUT
+from settings import GivSettings
 
 # User settings for GivEnergy inverter API
 class GE:

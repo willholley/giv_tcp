@@ -6,40 +6,40 @@ from os.path import exists
 import paho.mqtt.client as mqtt
 import write as wr
 import settings
-from .settings import GivSettings
-from .giv_lut import GivLUT
+from settings import GivSettings
+from giv_lut import GivLUT
 
 sys.path.append(GivSettings.default_path)
 
 logger = GivLUT.logger
 
 if GivSettings.MQTT_Port=='':
-    MQTT_Port=1883
+    MQTT_PORT=1883
 else:
-    MQTT_Port=int(GivSettings.MQTT_Port)
-MQTT_Address=GivSettings.MQTT_Address
+    MQTT_PORT=int(GivSettings.MQTT_Port)
+MQTT_ADDRESS=GivSettings.MQTT_Address
 if GivSettings.MQTT_Username=='':
-    MQTTCredentials=False
+    MQTT_CREDENTIALS=False
 else:
-    MQTTCredentials=True
-    MQTT_Username=GivSettings.MQTT_Username
-    MQTT_Password=GivSettings.MQTT_Password
+    MQTT_CREDENTIALS=True
+    MQTT_USERNAME=GivSettings.MQTT_Username
+    MQTT_PASSWORD=GivSettings.MQTT_Password
 if GivSettings.MQTT_Topic=='':
-    MQTT_Topic='GivEnergy'
+    MQTT_TOPIC='GivEnergy'
 else:
-    MQTT_Topic=GivSettings.MQTT_Topic
+    MQTT_TOPIC=GivSettings.MQTT_Topic
 
 logger.critical("Connecting to MQTT broker for control- "+str(GivSettings.MQTT_Address))
 #loop till serial number has been found
-count=0          # 09-July-2023  set start point
+COUNT=0          # 09-July-2023  set start point
 
 while not hasattr(GivSettings,'serial_number'):
     time.sleep(5)
     #del sys.modules['settings.GivSettings']
     importlib.reload(settings)
     from settings import GivSettings
-    count=count + 1      # 09-July-2023  previous +1 only simply reset value to 1 so loop was infinite
-    if count==20:
+    COUNT=COUNT + 1      # 09-July-2023  previous +1 only simply reset value to 1 so loop was infinite
+    if COUNT==20:
         logger.error("No serial_number found in MQTT queue. MQTT Control not available.")
         break
     
@@ -57,7 +57,7 @@ def on_message(client, userdata, message):
     logger.debug("MQTT Message Recieved: "+str(message.topic)+"= "+str(message.payload.decode("utf-8")))
     writecommand={}
     try:
-        command=str(message.topic).split("/")[-1]
+        command=str(message.topic).rsplit('/', maxsplit=1)[-1]
         if command=="setDischargeRate":
             writecommand['dischargeRate']=str(message.payload.decode("utf-8"))
             wr.setDischargeRate(writecommand)
@@ -322,9 +322,9 @@ def on_message(client, userdata, message):
             elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
                 # Get the Job ID from the touchfile
                 if exists(".tpdRunning"):
-                    jobid= str(open(".tpdRunning","r").readline())
+                    jobid= str(open(".tpdRunning","r", encoding='ascii').readline())
                     logger.info("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
-                    result=wr.cancelJob(jobid)
+                    wr.cancelJob(jobid)
                 else:
                     logger.error("Temp Pause Charge is not currently running")
         elif command=="tempPauseCharge":
@@ -334,9 +334,9 @@ def on_message(client, userdata, message):
             elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
                 # Get the Job ID from the touchfile
                 if exists(".tpcRunning"):
-                    jobid= str(open(".tpcRunning","r").readline())
+                    jobid= str(open(".tpcRunning","r", encoding='ascii').readline())
                     logger.info("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
-                    result=wr.cancelJob(jobid)
+                    wr.cancelJob(jobid)
                 else:
                     logger.error("Temp Pause Charge is not currently running")
         elif command=="forceCharge":
@@ -346,9 +346,9 @@ def on_message(client, userdata, message):
             elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
                 # Get the Job ID from the touchfile
                 if exists(".FCRunning"):
-                    jobid= str(open(".FCRunning","r").readline())
+                    jobid= str(open(".FCRunning","r", encoding='ascii').readline())
                     logger.info("Retrieved jobID to cancel Force Charge: "+ str(jobid))
-                    result=wr.cancelJob(jobid)
+                    wr.cancelJob(jobid)
                 else:
                     logger.error("Force Charge is not currently running")
         elif command=="forceExport":
@@ -358,40 +358,40 @@ def on_message(client, userdata, message):
             elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
                 # Get the Job ID from the touchfile
                 if exists(".FERunning"):
-                    jobid= str(open(".FERunning","r").readline())
+                    jobid= str(open(".FERunning","r", encoding='ascii').readline())
                     logger.info("Retrieved jobID to cancel Force Export: "+ str(jobid))
-                    result=wr.cancelJob(jobid)
+                    wr.cancelJob(jobid)
                 else:
                     logger.error("Force Export is not currently running")
         elif command=="switchRate":
             writecommand=message.payload.decode("utf-8")
             wr.switchRate(writecommand)
-    except:
-        e = sys.exc_info()
-        logger.error("MQTT.OnMessage Exception: "+str(e))
+    except Exception:
+        logger.error("MQTT.OnMessage Exception: "+str(sys.exc_info()))
         return
     
     #Do something with the result??
 
 def on_connect(client, userdata, flags, rc):
+    """Overloaded connection method for MQTT"""
     if rc==0:
         client.connected_flag=True #set flag
         logger.debug("connected OK Returned code="+str(rc))
         #Subscribe to the control topic for this inverter - relies on serial_number being present
-        client.subscribe(MQTT_Topic+"/control/"+GivSettings.serial_number+"/#")
-        logger.debug("Subscribing to "+MQTT_Topic+"/control/"+GivSettings.serial_number+"/#")
+        client.subscribe(MQTT_TOPIC+"/control/"+GivSettings.serial_number+"/#")
+        logger.debug("Subscribing to "+MQTT_TOPIC+"/control/"+GivSettings.serial_number+"/#")
     else:
         logger.error("Bad connection Returned code= "+str(rc))
 
 
 client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance)+"_Control")
 mqtt.Client.connected_flag=False        			#create flag in class
-if MQTTCredentials:
-    client.username_pw_set(MQTT_Username,MQTT_Password)
+if MQTT_CREDENTIALS:
+    client.username_pw_set(MQTT_USERNAME,MQTT_PASSWORD)
 client.on_connect=on_connect     			        #bind call back function
 client.on_message=on_message                        #bind call back function
 #client.loop_start()
 
-logger.debug ("Connecting to broker(sub): "+ MQTT_Address)
-client.connect(MQTT_Address,port=MQTT_Port)
+logger.debug ("Connecting to broker(sub): "+ MQTT_ADDRESS)
+client.connect(MQTT_ADDRESS,port=MQTT_PORT)
 client.loop_forever()
