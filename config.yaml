@@ -84,6 +84,9 @@ options:
   SOLCASTSITEID: ""
   SOLCASTSITEID2: ""
   LOAD_HIST_WEIGHT: "1"
+  EVC_ENABLE: False
+  EVC_IP_ADDRESS: ""
+  EVC_SELF_RUN_TIMER: 5
 schema: 
   NUMINVERTORS: int
   INVERTOR_IP_1:  str
@@ -146,3 +149,6 @@ schema:
   SOLCASTSITEID: "str?"
   SOLCASTSITEID2: "str?"
   LOAD_HIST_WEIGHT: "str?"
+  EVC_ENABLE: bool
+  EVC_IP_ADDRESS: "str?"
+  EVC_SELF_RUN_TIMER: int

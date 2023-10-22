@@ -3,6 +3,7 @@ import time, sys, importlib, time
 from os.path import exists
 from settings import GiV_Settings
 import write as wr
+import evc as evc
 import pickle, settings
 from GivLUT import GivLUT
 from pickletools import read_uint1
@@ -40,8 +41,8 @@ while not hasattr(GiV_Settings,'serial_number'):
     if count==20:
         logger.error("No serial_number found in MQTT queue. MQTT Control not available.")
         break
-    
-logger.debug("Serial Number retrieved: "+GiV_Settings.serial_number)
+if hasattr(GiV_Settings,'serial_number'):
+    logger.debug("Serial Number retrieved: "+GiV_Settings.serial_number)
 
 def isfloat(num):
     try:
@@ -364,6 +365,12 @@ def on_message(client, userdata, message):
         elif command=="switchRate":
             writecommand=message.payload.decode("utf-8")
             wr.switchRate(writecommand)
+        elif command=="chargeMode":
+            writecommand=message.payload.decode("utf-8")
+            evc.setChargeMode(writecommand)
+        elif command=="controlCharge":
+            writecommand=message.payload.decode("utf-8")
+            evc.setChargeControl(writecommand)
     except:
         e = sys.exc_info()
         logger.error("MQTT.OnMessage Exception: "+str(e))

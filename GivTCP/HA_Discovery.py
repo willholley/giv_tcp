@@ -82,6 +82,8 @@ class HAMQTT():
                     #        client.publish("homeassistant2/binary_sensor/GivEnergy/"+str(topic).split("/")[-1]+"/config",HAMQTT.create_binary_sensor_payload(topic,SN),retain=True)
                         elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="select":
                             client.publish("homeassistant/select/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
+                        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="button":
+                            client.publish("homeassistant/button/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)   
                 
             client.loop_stop()                      			#Stop loop
             client.disconnect()
@@ -108,6 +110,12 @@ class HAMQTT():
             tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
             tempObj['device']['identifiers']=str(topic).split("/")[3]+"_"+GiVTCP_Device
             tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+GiVTCP_Device.replace("_"," ")
+        elif len(SN)>10:    #If EVC and not INV
+            tempObj['uniq_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
+            tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
+            tempObj['device']['identifiers']=SN+"_"+GiVTCP_Device
+            tempObj['device']['name']="GivEVC"#+str(GiVTCP_Device).replace("_"," ")
+            tempObj["name"]=str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
         else:
             tempObj['uniq_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
             tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
@@ -180,6 +188,8 @@ class HAMQTT():
                 options=GivLUT.local_control_mode
             elif item == "PV_input_mode":
                 options=GivLUT.pv_input_mode
+            elif "Charge_Mode" in item:
+                options= GivLUT.charge_mode
             elif "Mode" in item:
                 options=GivLUT.modes
             elif "slot" in item:
@@ -190,11 +200,18 @@ class HAMQTT():
                 options=GivLUT.delay_times
             elif "Rate" in item:
                 options=GivLUT.rates
+            elif "Charge_Control" in item:
+                options= GivLUT.charge_control
             tempObj['options']=options
         elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="number":
             # If its a rate then change to Watts
             if "SOC" in str(topic).lower():
                 tempObj['unit_of_meas']="%"
+            elif "limit" in str(topic).lower():   #if EVC current
+                tempObj['unit_of_meas']="A"
+                tempObj['min']=6
+                tempObj['max']=32
+                tempObj['mode']="slider"
             elif "charge" in str(topic).lower():
                 tempObj['unit_of_meas']="W"
                 tempObj['min']=0
@@ -203,8 +220,8 @@ class HAMQTT():
             else:
                 tempObj['unit_of_meas']="%"
         elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="button":
-            tempObj['device_class']="restart"
-            tempObj['payload_press']="restart"
+            tempObj['device_class']=""
+            tempObj['payload_press']="toggle"
         ## Convert this object to json string
         jsonOut=json.dumps(tempObj)
         return(jsonOut)

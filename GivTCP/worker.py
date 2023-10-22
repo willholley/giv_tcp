@@ -1,6 +1,5 @@
-import os, redis, logging
-from rq import Worker, Queue, Connection
-from GivLUT import GivQueue
+import redis, logging
+from rq import Worker, Connection
 from settings import GiV_Settings
 listen = ['GivTCP_'+str(GiV_Settings.givtcp_instance)]
 

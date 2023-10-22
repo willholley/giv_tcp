@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from genericpath import exists
 import os, pickle, subprocess, logging,shutil, shlex, schedule
 from time import sleep
-import rq_dashboard
+#import rq_dashboard
 import zoneinfo
 import sys
 import requests
@@ -118,41 +118,42 @@ if len(networks)>0:
     logger.critical("Scanning network for inverters...")
     try:
         for subnet in networks:
-            count=0
-            while len(list)<=0:
-                if count<2:
-                    logger.info("Scanning network ("+str(count+1)+"):"+str(networks[subnet]))
-                    list=findInvertor(networks[subnet])
-                    if len(list)>0: break
-                    count=count+1
+            if subnet:
+                count=0
+                while len(list)<=0:
+                    if count<2:
+                        logger.info("Scanning network ("+str(count+1)+"):"+str(networks[subnet]))
+                        list=findInvertor(networks[subnet])
+                        if len(list)>0: break
+                        count=count+1
+                    else:
+                        break
+                if list:
+                    logger.info(str(len(list))+" Inverters found on "+str(networks[subnet])+" - "+str(list))
+                    invList.update(list)
+                    for inv in invList:
+                        deets={}
+                        logger.debug("Getting inverter stats for: "+str(invList[inv]))
+                        count=0
+                        while not deets:
+                            if count<2:
+                                deets=getInvDeets(invList[inv])
+                                if deets:
+                                    logger.critical (f'Inverter {deets[0]} which is a {str(deets[1])} - {str(deets[2])} has been found at: {str(invList[inv])}')
+                                    Stats['Serial_Number']=deets[0]
+                                    Stats['Firmware']=deets[3]
+                                    Stats['Model']=deets[2]
+                                    Stats['Generation']=deets[1]
+                                    inverterStats[inv]=Stats
+                                count=count+1
+                            else:
+                                break
+                if len(invList)==0:
+                    logger.critical("No inverters found...")
                 else:
-                    break
-            if list:
-                logger.info(str(len(list))+" Inverters found on "+str(networks[subnet])+" - "+str(list))
-                invList.update(list)
-                for inv in invList:
-                    deets={}
-                    logger.debug("Getting inverter stats for: "+str(invList[inv]))
-                    count=0
-                    while not deets:
-                        if count<2:
-                            deets=getInvDeets(invList[inv])
-                            if deets:
-                                logger.critical (f'Inverter {deets[0]} which is a {str(deets[1])} - {str(deets[2])} has been found at: {str(invList[inv])}')
-                                Stats['Serial_Number']=deets[0]
-                                Stats['Firmware']=deets[3]
-                                Stats['Model']=deets[2]
-                                Stats['Generation']=deets[1]
-                                inverterStats[inv]=Stats
-                            count=count+1
-                        else:
-                            break
-            if len(invList)==0:
-                logger.critical("No inverters found...")
-            else:
-            # write data to pickle
-                with open('invippkl.pkl', 'wb') as outp:
-                    pickle.dump(inverterStats, outp, pickle.HIGHEST_PROTOCOL)
+                # write data to pickle
+                    with open('invippkl.pkl', 'wb') as outp:
+                        pickle.dump(inverterStats, outp, pickle.HIGHEST_PROTOCOL)
     except:
         e = sys.exc_info()
         logger.error("Error scanning for Inverters- "+str(e))
@@ -235,6 +236,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
         outp.write("    influxBucket=\""+str(os.getenv("INFLUX_BUCKET","")+"\"\n"))
         outp.write("    influxOrg=\""+str(os.getenv("INFLUX_ORG","")+"\"\n"))
         outp.write("    first_run= True\n")
+        outp.write("    first_run_evc= True\n")
         outp.write("    self_run_timer="+str(os.getenv("SELF_RUN_LOOP_TIMER","5"))+"\n")
         outp.write("    queue_retries="+str(os.getenv("QUEUE_RETRIES","2"))+"\n")    
         outp.write("    givtcp_instance="+str(inv)+"\n")
@@ -257,6 +259,10 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
             outp.write("    cache_location=\""+str(os.getenv("CACHELOCATION")+"\"\n"))
             outp.write("    Debug_File_Location=\""+os.getenv("CACHELOCATION")+"/log_inv_"+str(inv)+".log\"\n")
         outp.write("    inverter_num=\""+str(inv)+"\"\n")
+
+        outp.write("    evc_enable=\""+os.getenv("EVC_ENABLE")+"\"\n")
+        outp.write("    evc_ip_address=\""+os.getenv("EVC_IP_ADDRESS")+"\"\n")
+        outp.write("    evc_self_run_timer="+os.getenv("EVC_SELF_RUN_TIMER")+"\n")
         if SuperTimezone: outp.write("    timezone=\""+str(SuperTimezone)+"\"\n")
         
 
@@ -312,6 +318,13 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
     if os.getenv('SELF_RUN')=="True" or isAddon:
         logger.critical ("Running Invertor read loop every "+str(os.getenv('SELF_RUN_LOOP_TIMER'))+"s")
         selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "self_run2"])
+
+    if os.getenv('EVC_ENABLE')=="True" and inv==1:  #only run it once
+        logger.critical ("Running EVC read loop every "+str(os.getenv('EVC_SELF_RUN_TIMER'))+"s")
+        evcSelfRun=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
+        logger.critical ("Subscribing MQTT Broker for EVC control")
+        mqttClientEVC=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client_evc.py"])
+
     if os.getenv('MQTT_OUTPUT')=="True" or isAddon:
         logger.critical ("Subscribing MQTT Broker for control")
         mqttClient[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client.py"])
@@ -350,19 +363,19 @@ while True:
             os.chdir(PATH)
             logger.critical ("Restarting Invertor read loop every "+str(os.getenv('SELF_RUN_LOOP_TIMER'))+"s")
             selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "self_run2"])
-        elif os.getenv('MQTT_OUTPUT')==True and not mqttClient[inv].poll()==None:
+        if os.getenv('MQTT_OUTPUT')==True and not mqttClient[inv].poll()==None:
             logger.error("MQTT Client process died. Restarting...")
             os.chdir(PATH)
             logger.critical ("Resubscribing Mosquitto for control on port "+str(os.getenv('MQTT_PORT')))
             mqttClient[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client.py"])
-        elif os.getenv('WEB_DASH')==True and not webDash[inv].poll()==None:
+        if os.getenv('WEB_DASH')==True and not webDash[inv].poll()==None:
             logger.error("Web Dashboard process died. Restarting...")
             os.chdir(PATH2)
             WDPORT=int(os.getenv('WEB_DASH_PORT'))+inv-1
             logger.critical ("Serving Web Dashboard from port "+str(WDPORT))
             command=shlex.split("/usr/bin/node /usr/local/bin/serve -p "+ str(WDPORT))
             webDash[inv]=subprocess.Popen(command)
-        elif not gunicorn[inv].poll()==None:
+        if not gunicorn[inv].poll()==None:
             logger.error("REST API process died. Restarting...")
             os.chdir(PATH)
             GUPORT=6344+inv
@@ -374,6 +387,11 @@ while True:
         os.chdir(PATH)
         logger.critical ("Starting Mosquitto on port "+str(os.getenv('MQTT_PORT')))
         mqttBroker=subprocess.Popen(["/usr/sbin/mosquitto", "-c",PATH+"/mqtt.conf"])
+    if os.getenv('EVC_ENABLE')==True and not evcSelfRun.poll()==None:
+        logger.error("EVC Self Run loop process died. restarting...")
+        os.chdir(PATH)
+        logger.critical ("Restarting EVC read loop every "+str(os.getenv('EVC_SELF_RUN_TIMER'))+"s")
+        selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
 
     #Run jobs for smart target
     schedule.run_pending()

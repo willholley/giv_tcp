@@ -722,8 +722,8 @@ def consecFails(e):
             with open(GivLUT.oldDataCount, 'rb') as inp:
                 oldDataCount= pickle.load(inp)
             oldDataCount = oldDataCount + 1
-            if oldDataCount > 3:
-                logger.error("Consecutive failure count= "+str(oldDataCount) +" -- "+ str(e))
+            #if oldDataCount > 3:
+            #    logger.error("Consecutive failure count= "+str(oldDataCount) +" -- "+ str(e))
         else:
             oldDataCount = 1
         if oldDataCount>10:
@@ -748,7 +748,6 @@ def runAll(full_refresh):  # Read from Inverter put in cache and publish
     # Step here to validate data against previous pickle?
     multi_output = pubFromPickle()
     return multi_output
-
 
 def pubFromJSON():
     temp = open('GivTCP\\testdata.json')
@@ -838,19 +837,41 @@ def updateFirstRun(SN):
     script_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
     rel_path = "settings.py"
     abs_file_path = os.path.join(script_dir, rel_path)
-    with open(abs_file_path, "r") as f:
-        lines = f.readlines()
-    with open(abs_file_path, "w") as f:
-        for line in lines:
-            if line.strip("\n") == "    first_run= True":
-                f.write("    first_run= False\n")
-            else:
-                f.write(line)
-            if "serial_number" in line:
-                isSN = True
+    #check for settings lockfile before
+    count=0
+    while True:
+        logger.debug("OPening settings for first run evc")
+        if exists('.settings_lockfile'):
+            logger.debug("Waiting for settings to be availble")
+            time.sleep(1)
+            count=count+1
+            if count==50:
+                logger.error("Could not access settings file to update EVC Serial Number")
+                break
+        else:
+            logger.debug("Settings availble")
+            #Create setting lockfile
+            open(".settings_lockfile",'a').close()
 
-        if not isSN:
-            f.writelines("    serial_number = \""+SN+"\"\n")  # only add SN if its not there
+            with open(abs_file_path, "r") as f:
+                lines = f.readlines()
+            with open(abs_file_path, "w") as f:
+                for line in lines:
+                    if line.strip("\n") == "    first_run= True":
+                        f.write("    first_run= False\n")
+                    else:
+                        f.write(line)
+                    if "serial_number=" in line:
+                        logger.debug("serial number aready exists: \""+line+"\"")
+                        isSN = True
+
+                if not isSN:
+                    logger.debug("serial number not in file, adding now")
+                    f.writelines("    serial_number= \""+SN+"\"\n")  # only add SN if its not there
+            # Delete settings_lockfile
+            os.remove('.settings_lockfile')
+            logger.debug("removing lockfile")
+            break
 
 
 def iterate_dict(array):        # Create a publish safe version of the output (convert non string or int datapoints)
