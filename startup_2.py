@@ -166,6 +166,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
             outp.write("    MQTT_Username=\""+str(os.getenv("MQTT_USERNAME","")+"\"\n"))
             outp.write("    MQTT_Password=\""+str(os.getenv("MQTT_PASSWORD","")+"\"\n"))
             outp.write("    MQTT_Port="+str(os.getenv("MQTT_PORT","")+"\n"))
+            outp.write("    MQTT_Retain="+str(os.getenv("MQTT_RETAIN","")+"\n"))
         if isAddon:
             outp.write("    HA_Auto_D=True\n")
         else:
