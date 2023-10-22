@@ -61,6 +61,9 @@ class HAMQTT():
 
             logger.debug("Publishing MQTT: " + HAMQTT.MQTT_Address)
 
+            ## set the will message
+            client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/status","offline", retain=True)
+
             ##publish the status message
             client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/status","online", retain=True)
 

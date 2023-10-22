@@ -23,6 +23,7 @@ class GiV_Settings:
     MQTT_Password="mqtt2020"        #Optional - Password for MQTT broker
     MQTT_Topic=""                   #Optional - Root topic for all MQTT messages. Defaults to "GivEnergy/<SerialNumber> 
     MQTT_Port=1883                  #Optional - Int - define port that MQTT broker is listening on (default 1883)
+    MQTT_Retain=False               #Optional - Bool - whether to set retain flag on published MQTT messages (default False)
 
 # Influx Settings
     Influx_Output= False            #Optional - turns on Influx as a data publisher. True or False

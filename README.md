@@ -52,6 +52,7 @@ This will populate HA with all devices and entities for control and monitoring. 
 | MQTT_TOPIC | GivEnergy/Data | Optional - default is Givenergy.<serial number>|
 | MQTT_TOPIC_2 | GivEnergy/Data | Optional - Setting for second Inverter if configured. default is Givenergy.<serial number>|
 | MQTT_TOPIC_2 | GivEnergy/Data | Optional - Setting for third Inverter if configured. default is Givenergy.<serial number>|
+| MQTT_RETAIN | False | Optional - Whether to set retain flag on published MQTT messages. |
 | LOG_LEVEL | Error | Optional - you can choose Error, Info or Debug. Output will be sent to the debug file location if specified, otherwise it is sent to stdout|
 | DEBUG_FILE_LOCATION | /usr/pi/data | Optional  |
 | PRINT_RAW | False | Optional - If set to True the raw register values will be returned alongside the normal data |
