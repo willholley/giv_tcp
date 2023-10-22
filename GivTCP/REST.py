@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # version 2021.12.22
-from flask import Flask, json, request
+from os.path import exists
+from flask import Flask, request
 from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
 import config_dash as cfdash
 from GivLUT import GivQueue, GivLUT
-from os.path import exists
 
 logger = GivLUT.logger
 
@@ -19,7 +19,7 @@ CORS(giv_api)
 def get_config_page():
     if request.method=="GET":
         return cfdash.get_config()
-    elif request.method=="POST":
+    if request.method=="POST":
         return cfdash.set_config(request.form)
 
 #Read from Invertor put in cache and publish
@@ -41,7 +41,7 @@ def rdData():
 def gtCache():
     return rd.getCache()
 
-#Read from Invertor put in cache 
+# Read from Invertor put in cache
 @giv_api.route('/getData', methods=['GET'])
 def gtData():
     return GivQueue.q.enqueue(rd.getData,True)
@@ -51,7 +51,7 @@ def gtData():
 def enChargeTrgt():
     payload = request.get_json(silent=True, force=True)
     return wr.enableChargeTarget(payload)
-    
+
 @giv_api.route('/enableChargeSchedule', methods=['POST'])
 def enableChrgSchedule():
     payload = request.get_json(silent=True, force=True)
@@ -148,8 +148,7 @@ def frceChrg():
             return wr.cancelJob(jobid)
         else:
             logger.error("Force Charge is not currently running")
-    else:
-        return wr.forceCharge(payload)
+    return wr.forceCharge(payload)
 
 @giv_api.route('/forceExport', methods=['POST'])
 def frceExprt():
@@ -161,8 +160,7 @@ def frceExprt():
             return wr.cancelJob(jobid)
         else:
             logger.error("Force Charge is not currently running")
-    else:
-        return wr.forceExport(payload)
+    return wr.forceExport(payload)
 
 @giv_api.route('/setBatteryMode', methods=['POST'])
 def setBattMode():
