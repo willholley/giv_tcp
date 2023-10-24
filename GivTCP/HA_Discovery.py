@@ -192,8 +192,8 @@ class HAMQTT():
                 options=GivLUT.local_control_mode
             elif item == "PV_input_mode":
                 options=GivLUT.pv_input_mode
-            elif "Charge_Mode" in item:
-                options= GivLUT.charge_mode
+            elif "Charging_Mode" in item:
+                options= GivLUT.charging_mode
             elif "Mode" in item:
                 options=GivLUT.modes
             elif "slot" in item:

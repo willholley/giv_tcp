@@ -28,8 +28,9 @@ COPY GivEnergy-Smart-Home-Display-givtcp/ ./GivEnergy-Smart-Home-Display-givtcp
 COPY givenergy_modbus/ /usr/local/lib/python3.10/site-packages/givenergy_modbus
 
 COPY startup.py startup.py
-COPY startup_2.py startup_2.py
+COPY startup_3.py startup_3.py
 COPY redis.conf redis.conf
+COPY settings.json /app/settings.json
 
 #COPY givtcp-vuejs/package.json ./config_frontend/package.json
 #RUN cd /app/config_frontend && npm install
@@ -107,4 +108,4 @@ ENV EVC_SELF_RUN_TIMER=5
 
 EXPOSE 6345 1883 3000 5173 6379 9181
 
-CMD ["python3", "/app/startup.py"]
+CMD ["python3", "/app/startup_3.py"]

@@ -118,7 +118,7 @@ if len(networks)>0:
     logger.critical("Scanning network for inverters...")
     try:
         for subnet in networks:
-            if subnet:
+            if networks[subnet]:
                 count=0
                 while len(list)<=0:
                     if count<2:
@@ -174,8 +174,8 @@ logger.critical("Running Redis")
 #rqdash=subprocess.Popen(["/usr/local/bin/rq-dashboard","-u redis://127.0.0.1:6379"])
 #logger.critical("Running RQ Dashboard on port 9181")
 
-#vueConfig=subprocess.Popen(["npm", "run", "dev","-- --host"],cwd="/app/config_frontend")
-#logger.critical("Running Config Frontend")
+vueConfig=subprocess.Popen(["npm", "run", "dev","-- --host"],cwd="/app/config_frontend")
+logger.critical("Running Config Frontend")
 
 ##########################################################################################################
 #
@@ -195,6 +195,11 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
     if not exists(PATH):
         shutil.copytree("/app/GivTCP", PATH)
         shutil.copytree("/app/GivEnergy-Smart-Home-Display-givtcp", PATH2)
+    if not exists(PATH+"/settings.json"):
+        logger.info("Copying in a template settings.json")
+        shutil.copyfile("/app/settings.json",PATH+"/settings.json")
+    else:
+        logger.info("Settings.json already exists")
     # Remove old settings file
     if exists(PATH+"/settings.py"):
         os.remove(PATH+"/settings.py")
@@ -219,7 +224,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
             outp.write("    MQTT_Username=\""+str(os.getenv("MQTT_USERNAME","")+"\"\n"))
             outp.write("    MQTT_Password=\""+str(os.getenv("MQTT_PASSWORD","")+"\"\n"))
             outp.write("    MQTT_Port="+str(os.getenv("MQTT_PORT","")+"\n"))
-            outp.write("    MQTT_Retain="+str(os.getenv("MQTT_RETAIN","")+"\n"))
+        outp.write("    MQTT_Retain="+str(os.getenv("MQTT_RETAIN","")+"\n"))
         if isAddon:
             outp.write("    HA_Auto_D=True\n")
         else:

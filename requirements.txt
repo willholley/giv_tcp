@@ -13,4 +13,5 @@ redis
 npm
 pymodbus
 async_timeout
-git+https://github.com/jace/rq-dashboard.git
+vite
+#git+https://github.com/jace/rq-dashboard.git

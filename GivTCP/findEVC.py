@@ -12,7 +12,8 @@ from time import perf_counter
 from time import sleep
 import sys
 import socket
-
+import logging
+logger=logging.getLogger()
 class Threader:
     """
     This is a class that calls a list of functions in a limited number of
@@ -66,10 +67,10 @@ class Threader:
         with self.thread_lock:
             self.threads.remove(thread)
 
-def findInvertor(subnet):
+def findEVC(subnet):
     segs=subnet.split('.')
     BASE_IP = segs[0]+'.'+segs[1]+'.'+segs[2]+'.'"%i"
-    PORT = 8899
+    PORT = 502
     start = perf_counter()
     # I didn't need a timeout of 1 so I used 0.1
     socket.setdefaulttimeout(0.1)
@@ -91,6 +92,7 @@ def findInvertor(subnet):
         #threader.append(connect, BASE_IP, PORT)
     threader.start()
     threader.join()
+    logger.info("evcList (inside): "+str(invlist))
     return(invlist)
 
 if __name__ == '__main__':

@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 # version 2021.12.22
 from os.path import exists
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
 import config_dash as cfdash
 from GivLUT import GivQueue, GivLUT
+import os
+import json
+from settings import GiV_Settings
 
 logger = GivLUT.logger
 
@@ -15,12 +18,18 @@ giv_api = Flask(__name__)
 CORS(giv_api)
 
 #Proxy Read Functions
-@giv_api.route('/config', methods=['GET', 'POST'])
+
+@giv_api.route('/', methods=['GET', 'POST'])
+def root():
+  return send_from_directory('/app/config_frontend/dist/', 'index.html')
+
+@giv_api.route('/config')
 def get_config_page():
-    if request.method=="GET":
-        return cfdash.get_config()
-    if request.method=="POST":
-        return cfdash.set_config(request.form)
+  return send_from_directory('/app/config_frontend/dist/', 'index.html')
+#    if request.method=="GET":
+#        return cfdash.get_config()
+#    if request.method=="POST":
+#        return cfdash.set_config(request.form)
 
 #Read from Invertor put in cache and publish
 @giv_api.route('/runAll', methods=['GET'])
@@ -176,6 +185,25 @@ def setDate():
 def swRates():
     payload = request.get_json(silent=True, force=True)
     return wr.switchRate(payload)
+
+@giv_api.route('/settings', methods=['GET'])
+def getFileData():
+    file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'r')
+    #file = open(os.path.dirname(__file__) + '/settings.json', 'r')
+    data = json.load(file)
+    file.close()
+    return data
+
+@giv_api.route('/settings', methods=['POST'])
+def editFileData():
+    file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'r')
+    data = json.load(file)
+    file.close()
+    data.update(request.get_json(silent=True, force=True))
+    file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'w')
+    json.dump(data, file,indent=4)
+    file.close()
+    return data
 
 if __name__ == "__main__":
     giv_api.run()

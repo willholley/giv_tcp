@@ -77,10 +77,7 @@ class EVCLut:
         36: 'Charge_Limit',
         72: 'Charge_Session_Energy',
         79: 'Charge_Session_Duration',
-        #87: 'MAX_SAFE_CURRENT',
-        #89: 'COMM_TIMEOUT',
-        #90: 'CHARGE_CURRENT_LIMIT',
-        93: 'Plug_and_Go',#('Charge_Mode',GivLUT.charge_mode),
+        93: 'Plug_and_Go',
         94: ('Charge_Control',GivLUT.charge_control),
         109: 'Voltage_L1',
         111: 'Voltage_L2',
@@ -135,13 +132,30 @@ def getEVC():
                 output['Charge_End_Time']=evcRegCache['Charger']['Charge_End_Time']
             else:
                 output['Charge_End_Time']=datetime.datetime.now().replace(hour=regs[82],minute=regs[83],second=regs[84],microsecond=0,tzinfo=datetime.timezone.utc).isoformat()
+            
+            if not "Import_Cap" in evcRegCache['Charger']:
+                output['Import_Cap']="disable"
+            else:
+                output['Import_Cap']=evcRegCache['Charger']['Import_Cap']
 
+            if not "Charging_Mode" in evcRegCache['Charger']:
+                output['Charging_Mode']="Grid"
+            else:
+                output['Charging_Mode']=evcRegCache['Charger']['Charging_Mode']
+            if not 'Max_Session_Energy' in evcRegCache['Charger']:
+                output['Max_Session_Energy']=0
+            else:
+                output['Max_Session_Energy']=evcRegCache['Charger']['Max_Session_Energy']
+                
+                
         else:
             ts=datetime.datetime.now().replace(hour=regs[82],minute=regs[83],second=regs[84],microsecond=0)
             output['Charge_End_Time']=ts.replace(tzinfo=datetime.timezone.utc).isoformat()
             ts=datetime.datetime.now().replace(hour=regs[74],minute=regs[75],second=regs[76],microsecond=0)
             output['Charge_Start_Time']=ts.replace(tzinfo=datetime.timezone.utc).isoformat()
-        
+            output['Import_Cap']="disable"
+            output['Charging_Mode']="Grid"
+            output['Max_Session_Energy']=0
         if regs[0]==4:
             output['Charge_Control']='Start'
         else:
@@ -151,15 +165,15 @@ def getEVC():
             output['Plug_and_Go']='enable'
         else:
             output['Plug_and_Go']='disable'
-        
 
         output['System_Time']=datetime.datetime(regs[97],regs[98],regs[99],regs[100],regs[101],regs[102]).replace(tzinfo=datetime.timezone.utc).isoformat()
         td=datetime.timedelta(seconds=int(regs[79]))
         output['Charge_Session_Duration']=str(td)
         multi_output['Charger']=output
         # Save new data to Pickle
-        with open(EVCLut.regcache, 'wb') as outp:
-            pickle.dump(multi_output, outp, pickle.HIGHEST_PROTOCOL)
+        with cacheLock:
+            with open(EVCLut.regcache, 'wb') as outp:
+                pickle.dump(multi_output, outp, pickle.HIGHEST_PROTOCOL)
     except Exception:
         e = sys.exc_info()
         #logger.error("Error: "+ str(e))
@@ -297,28 +311,41 @@ def setChargeMode(mode):
         logger.error("Invalid control mode called: "+str(mode))
         return
     logger.info("Setting Charge mode to: "+ mode)
-    logger.info("numeric value "+str(val)+ "sent to EVC")
-    client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-    client.write_registers(93,val)
+    logger.info("numeric value "+str(val)+ " sent to EVC")
+    try:
+        client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+        client.write_registers(93,val)
+    except:
+        e=sys.exc_info()
+        logger.error("Error controlling EVC: "+str(e))
 
 def setChargeControl(mode):
     logger.info("Setting Charge control to: "+ mode)
     val=GivLUT.charge_control.index(mode)
-    logger.info("numeric value "+str(val)+ "sent to EVC")
-    client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-    client.write_registers(95,val)
+    logger.info("numeric value "+str(val)+ " sent to EVC")
+    try:
+        client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+        client.write_registers(95,val)
+    except:
+        e=sys.exc_info()
+        logger.error("Error controlling EVC: "+str(e))
 
 def setCurrentLimit(val):
     #Check limit is between 6 and MAX SAFE LIMIT
-    with open(EVCLut.regcache, 'rb') as inp:
-        evcRegCache= pickle.load(inp)
+    with cacheLock:
+        with open(EVCLut.regcache, 'rb') as inp:
+            evcRegCache= pickle.load(inp)
     safeMax=int(evcRegCache['Charger']['Evse_Max_Current'])
     safeMin=int(evcRegCache['Charger']['Evse_Min_Current'])
     val=max(val,safeMin)  #Force to 6 if less than
     val=min(val,safeMax) # Get safe MAX value from pkl
     logger.info("Setting Charge current limit to: "+ str(val))
-    client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-    client.write_registers(91,(val*10))
+    try:
+        client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+        client.write_registers(91,(val*10))
+    except:
+        e=sys.exc_info()
+        logger.error("Error controlling EVC: "+str(e))
 
 def test():
     client=ModbusTcpClient(GiV_Settings.evc_ip_address)
@@ -326,6 +353,106 @@ def test():
     client.close()
     #getEVC()
     print (result)
+
+def chargeMode():
+    while True:
+        #Run a regular check and manage load based on current mode and session energy
+        if exists(EVCLut.regcache):
+            with open(EVCLut.regcache, 'rb') as inp:
+                evcRegCache= pickle.load(inp)
+            if evcRegCache['Charger']['Charging_State']=="Charging" or evcRegCache['Charger']['Charging_State']=="Connected":
+                if evcRegCache['Charger']['Charging_Mode']=="Hybrid":
+                    hybridmode()
+                elif evcRegCache['Charger']['Charging_Mode']=="Solar":
+                    solarmode()
+            if evcRegCache['Charger']['Charge_Session_Energy']>evcRegCache['Charger']['Max_Session_Energy'] and evcRegCache['Charger']['Charge_Control']=="Start":
+                setChargeControl("Stop")
+        time.sleep(60)
+    
+
+def hybridmode():
+    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
+        # Set charging current to min 6A plus the level of excess solar
+        with open(EVCLut.regcache, 'rb') as inp:
+            evcRegCache= pickle.load(inp)
+        with open(GivLUT.regcache, 'rb') as inp:
+            invRegCache= pickle.load(inp)
+        sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
+        spareCurrent=int(min(sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage'],0)+6)   #Spare current cannot be negative
+        if not spareCurrent==evcRegCache['Charger']['Current_L1']:
+            logger.info("Topping up min charge with Solar curent ("+str(spareCurrent-6)+"A), setting EVC charge to: "+str(spareCurrent)+"A")
+            setCurrentLimit(spareCurrent)
+
+def gridmode():
+    # Just don't do anything in Grid Mode and leave charging current as it was
+    return
+
+def solarmode():
+    # Set charging current to the level of excess solar
+    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
+        with open(EVCLut.regcache, 'rb') as inp:
+            evcRegCache= pickle.load(inp)
+        with open(GivLUT.regcache, 'rb') as inp:
+            invRegCache= pickle.load(inp)
+        sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
+        spareCurrent=sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']
+        if sparePower>6:    #only if there's excess above min evse level
+            if not spareCurrent==evcRegCache['Charger']['Current_L1']:
+                logger.info("Spare Solar curent ("+str(spareCurrent)+"), setting EVC charge to: "+str(spareCurrent)+"A")
+                setChargeControl("Start")
+                setCurrentLimit(spareCurrent)
+        else:
+            if not evcRegCache['Charger']['Control_Charge']=="Stop":
+                logger.info("Solar excess dropped to below 6A, stopping charge")
+                setChargeControl("Stop")
+
+def importcap():
+    # Check grid import and ensure its not exceeding threshold
+    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
+        with open(GivLUT.regcache, 'rb') as inp:
+            invRegCache= pickle.load(inp)
+        with open(EVCLut.regcache, 'rb') as inp:
+            evcRegCache= pickle.load(inp)
+        importcurrent=float(invRegCache[4]['Power']['Power']['Grid_Current'])
+        evccurrent=float(evcRegCache['Charger']['Current_L1'])
+        if importcurrent>GiV_Settings.evc_import_max_current:
+            excess=importcurrent-GiV_Settings.evc_import_max_current
+            newcurrent=int(max(6,evccurrent-excess))
+            logger.info("Import current exceeded ("+str(excess)+"), reducing EVC charge to: "+str(newcurrent)+"A")
+            setCurrentLimit(newcurrent)
+
+
+def setMaxSessionEnergy(val):
+    if exists(EVCLut.regcache):
+        logger.info("Setting Max Session energy to: "+str(val))
+        with open(EVCLut.regcache, 'rb') as inp:
+            evcRegCache= pickle.load(inp)
+        evcRegCache['Charger']['Max_Session_Energy']=val
+        with cacheLock:
+            with open(EVCLut.regcache, 'wb') as outp:
+                pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
+
+
+def setImportCap(val):
+    if exists(EVCLut.regcache):
+        logger.info("Setting Charging Mode to: "+str(val))
+        with open(EVCLut.regcache, 'rb') as inp:
+            evcRegCache= pickle.load(inp)
+        evcRegCache['Charger']['Import_Cap']=val
+        with cacheLock:
+            with open(EVCLut.regcache, 'wb') as outp:
+                pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
+
+def setChargingMode(mode):
+    if exists(EVCLut.regcache):
+        logger.info("Setting Charging Mode to: "+str(mode))
+        with open(EVCLut.regcache, 'rb') as inp:
+            evcRegCache= pickle.load(inp)
+        evcRegCache['Charger']['Charging_Mode']=mode
+        with cacheLock:
+            with open(EVCLut.regcache, 'wb') as outp:
+                pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
+        chargeMode()    # Run an initial call when changing modes
 
 
 if __name__ == '__main__':

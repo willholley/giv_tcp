@@ -4,73 +4,77 @@ import { useStorage } from '@vueuse/core'
 export const useTcpStore = defineStore('givtcp-form', {
   state: () => ({
     inverter: useStorage('inverter', {
-      numberOfInverters: 1,
-      inverterIpAddress: null,
-      numberOfBatteries: 1
+      NUMINVERTORS: 1,
+      invertorIP: "",
+      numBatteries: 1,
+      isAIO: false,
+      isAC: false
     }),
     mqtt: useStorage('mqtt', {
-      output: false,
-      address: null,
-      username: null,
-      password: null,
+      MQTT_Output: false,
+      MQTT_Address: "",
+      MQTT_Username: "",
+      MQTT_Password: "",
+      MQTT_Retain: true,
       //optional
-      topic: [],
-      port: 1833
+      MQTT_Topic: "GivEnergy",
+      MQTT_Port: 1883
     }),
     influx: useStorage('influx', {
-      output: false,
-      url: null,
-      token: null,
-      bucket: null,
-      org: null
+      Influx_Output: false,
+      influxURL: "",
+      influxToken: "",
+      influxBucket: "",
+      influxOrg: ""
     }),
     homeAssistant: useStorage('homeAssistant', {
-      devicePrefix: [],
-      pythonPath: '/app'
+      HA_Auto_D: true,
+      ha_device_prefix: "GivTCP"
+      //PYTHONPATH: '/app',
     }),
     tariffs: useStorage('tariffs', {
-      dynamic: false,
-      exportRate: 0.04,
-      day: {
-        rate: 0.395,
-        start: '05:30'
-      },
-      night: {
-        rate: 0.155,
-        start: '23:30'
-      }
+      dynamic_tariff: false,
+      export_rate: 0.04,
+      day_rate:0.395,
+      day_rate_start: "05:30",
+      night_rate: 0.155,
+      night_rate_start: "23:30",
     }),
     miscellaneous: useStorage('miscellaneous', {
-      hostIp: null,
-      cacheLocation: '/config/GivTCP',
-      timezone: 'Europe/London',
-      printRaw: true,
-      haAutoD: true
+      TZ: 'Europe/London',
+      Print_Raw_Registers: true,
+      Log_Level: "Info",
+      self_run: true,
+      self_run_timer: 15,
+      queue_retries: 2,
+      data_smoother: "medium",
+      cache_location: "/config/GivTCP"
     }),
     web: useStorage('web', {
-      dashboard: false,
-      port: 3000
-    }),
-    keys: useStorage('keys', {
-      givenergy: null,
-      solcast: {
-        apiKey: null,
-        siteIdOne: null,
-        siteIdTwo: null
-      }
+      Host_IP: "",
+      Web_Dash: false,
+      Web_Dash_Port: 3000
     }),
     palm: useStorage('palm', {
-      smoothing: 'medium',
-      settings: {
-        winter: '01,02,03,10,11,12',
-        shoulder: '04,05,09',
-        minSocTarget: 25,
-        maxSocTarget: 45,
-        batteryReserve: 4,
-        batteryUtilisation: 0.85,
-        weight: 35,
-        historicalWeight: 1
-      }
+      Smart_Target: false,
+      GE_API: "",
+      SOLCASTAPI:"",
+      SOLCASTSITEID:"",
+      SOLCASTSITEID2:"",
+      PALM_WINTER: "01,02,03,10,11,12",
+      PALM_SHOULDER: "04,05,09",
+      PALM_MIN_SOC_TARGET: 25,
+      PALM_MAX_SOC_TARGET: 45,
+      PALM_BATT_RESERVE: 4,
+      PALM_BATT_UTILISATION: 0.85,
+      PALM_WEIGHT: 35,
+      LOAD_HIST_WEIGHT: 1
+    }),
+    evc: useStorage('evc', {
+      evc_enable: false,
+      evc_ip_address: "",
+      evc_self_run_timer: 10,
+      evc_import_max_current: 60
     })
   })
 })
@@ -94,7 +98,7 @@ export const useCard = defineStore('card', {
             label: 'Number Of Inverters',
             items: [1, 2, 3],
             parent: 'inverter',
-            key: 'numberOfInverters'
+            key: 'NUMINVERTORS'
           }
         },
         {
@@ -103,7 +107,7 @@ export const useCard = defineStore('card', {
             label: 'Number Of Batteries',
             items: [1, 2, 3],
             parent: 'inverter',
-            key: 'numberOfBatteries'
+            key: 'numBatteries'
           }
         },
         {
@@ -111,9 +115,25 @@ export const useCard = defineStore('card', {
           options: {
             label: 'IP Address',
             parent: 'inverter',
-            key: 'inverterIpAddress'
+            key: 'invertorIP'
           }
-        }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Is this Invertor an AIO?',
+            parent: 'inverter',
+            key: 'isAIO'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Is this Invertor on "old firmware"?',
+            parent: 'inverter',
+            key: 'isAC'
+          }
+        },
       ]
     },
     mqtt: {
@@ -121,11 +141,19 @@ export const useCard = defineStore('card', {
       subtitle: 'Setup the MQTT broker that stores information about your incoming inverter data',
       fields: [
         {
+          type: 'checkbox',
+          options: {
+            label: 'Enable',
+            parent: 'mqtt',
+            key: 'MQTT_Output'
+          }
+        },
+        {
           type: 'text',
           options: {
             label: 'IP Address',
             parent: 'mqtt',
-            key: 'address'
+            key: 'MQTT_Address'
           }
         },
         {
@@ -133,7 +161,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Username',
             parent: 'mqtt',
-            key: 'username'
+            key: 'MQTT_Username'
           }
         },
         {
@@ -141,7 +169,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Password',
             parent: 'mqtt',
-            key: 'password'
+            key: 'MQTT_Password'
           }
         },
         {
@@ -149,7 +177,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Topic',
             parent: 'mqtt',
-            key: 'topic'
+            key: 'MQTT_Topic'
           }
         },
         {
@@ -157,15 +185,15 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Port',
             parent: 'mqtt',
-            key: 'port'
+            key: 'MQTT_Port'
           }
         },
         {
           type: 'checkbox',
           options: {
-            label: 'Output',
+            label: 'Retain',
             parent: 'mqtt',
-            key: 'output'
+            key: 'MQTT_Retain'
           }
         }
       ]
@@ -175,11 +203,19 @@ export const useCard = defineStore('card', {
       subtitle: 'Setup your InfluxDB instance',
       fields: [
         {
+          type: 'checkbox',
+          options: {
+            label: 'Output',
+            parent: 'influx',
+            key: 'Influx_Output'
+          }
+        },
+        {
           type: 'text',
           options: {
             label: 'URL',
             parent: 'influx',
-            key: 'url'
+            key: 'influxURL'
           }
         },
         {
@@ -187,7 +223,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Token',
             parent: 'influx',
-            key: 'token'
+            key: 'influxToken'
           }
         },
         {
@@ -195,7 +231,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Bucket',
             parent: 'influx',
-            key: 'bucket'
+            key: 'influxBucket'
           }
         },
         {
@@ -203,15 +239,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Org',
             parent: 'influx',
-            key: 'org'
-          }
-        },
-        {
-          type: 'checkbox',
-          options: {
-            label: 'Output',
-            parent: 'influx',
-            key: 'output'
+            key: 'influxOrg'
           }
         }
       ]
@@ -221,19 +249,19 @@ export const useCard = defineStore('card', {
       subtitle: 'Setup your Home Assistant instance',
       fields: [
         {
-          type: 'text',
+          type: 'checkbox',
           options: {
-            label: 'Device Prefix',
+            label: 'Auto Discovery',
             parent: 'homeAssistant',
-            key: 'devicePrefix'
+            key: 'HA_Auto_D'
           }
         },
         {
           type: 'text',
           options: {
-            label: 'Python Path',
+            label: 'Device Prefix',
             parent: 'homeAssistant',
-            key: 'pythonPath'
+            key: 'ha_device_prefix'
           }
         }
       ]
@@ -243,11 +271,19 @@ export const useCard = defineStore('card', {
       subtitle: 'Setup your Tariffs',
       fields: [
         {
+          type: 'checkbox',
+          options: {
+            label: 'Dynamic',
+            parent: 'tariffs',
+            key: 'dynamic_tariff'
+          }
+        },
+        {
           type: 'text',
           options: {
             label: 'Export Rate',
             parent: 'tariffs',
-            key: 'exportRate'
+            key: 'export_rate'
           }
         },
         {
@@ -255,7 +291,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Day Rate',
             parent: 'tariffs',
-            key: 'day.rate'
+            key: 'day_rate'
           }
         },
         {
@@ -263,7 +299,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Day Start',
             parent: 'tariffs',
-            key: 'day.start'
+            key: 'day_rate_start'
           }
         },
         {
@@ -271,7 +307,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Night Rate',
             parent: 'tariffs',
-            key: 'night.rate'
+            key: 'night_rate'
           }
         },
         {
@@ -279,15 +315,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Night Start',
             parent: 'tariffs',
-            key: 'night.start'
-          }
-        },
-        {
-          type: 'checkbox',
-          options: {
-            label: 'Dynamic',
-            parent: 'tariffs',
-            key: 'dynamic'
+            key: 'night_rate_start'
           }
         }
       ]
@@ -299,25 +327,17 @@ export const useCard = defineStore('card', {
         {
           type: 'text',
           options: {
-            label: 'Host IP',
-            parent: 'miscellaneous',
-            key: 'hostIp'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Cache Location',
-            parent: 'miscellaneous',
-            key: 'cacheLocation'
-          }
-        },
-        {
-          type: 'text',
-          options: {
             label: 'Timezone',
             parent: 'miscellaneous',
-            key: 'timezone'
+            key: 'TZ'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Log Level',
+            parent: 'miscellaneous',
+            key: 'Log_Level'
           }
         },
         {
@@ -325,29 +345,77 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Print Raw',
             parent: 'miscellaneous',
-            key: 'printRaw'
+            key: 'Print_Raw_Registers'
+          }
+        },{
+          type: 'checkbox',
+          options: {
+            label: 'Self Run',
+            parent: 'miscellaneous',
+            key: 'self_run'
           }
         },
         {
-          type: 'checkbox',
+          type: 'text',
           options: {
-            label: 'HA Auto Discovery',
+            label: 'Self Run Loop Timer',
             parent: 'miscellaneous',
-            key: ' haAutoD'
+            key: 'self_run_timer'
           }
-        }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Queue Retries',
+            parent: 'miscellaneous',
+            key: 'queue_retries'
+          }
+        },
+        {
+          type: 'select',
+          options: {
+            label: 'Smoothing',
+            parent: 'miscellaneous',
+            items: ["high", "medium", "low","none"],
+            key: 'data_smoother'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Cache Location',
+            parent: 'miscellaneous',
+            key: 'cache_location'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Timezone',
+            parent: 'miscellaneous',
+            key: 'TZ'
+          }
+        },
       ]
     },
     web: {
       title: 'Web',
-      subtitle: 'Setup Any Web variables',
+      subtitle: 'Web Dashboard',
       fields: [
         {
           type: 'checkbox',
           options: {
             label: 'Dashboard',
             parent: 'web',
-            key: 'dashboard'
+            key: 'Web_Dash'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Host IP',
+            parent: 'web',
+            key: 'Host_IP'
           }
         },
         {
@@ -355,59 +423,53 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Port',
             parent: 'web',
-            key: 'port'
-          }
-        }
-      ]
-    },
-    keys: {
-      title: 'Keys',
-      subtitle: 'Setup Any Keys',
-      fields: [
-        {
-          type: 'text',
-          options: {
-            label: 'GivEnergy',
-            parent: 'keys',
-            key: 'givenergy'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'SolCast API Key',
-            parent: 'keys',
-            key: 'solcast.apiKey'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'SolCast Site ID 1',
-            parent: 'keys',
-            key: 'solcast.siteIdOne'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'SolCast Site ID 2',
-            parent: 'keys',
-            key: 'solcast.siteIdTwo'
+            key: 'Web_Dash_Port'
           }
         }
       ]
     },
     palm: {
       title: 'Palm',
-      subtitle: 'Setup your Palm variables',
+      subtitle: 'Setup your Smart Target variables',
       fields: [
+        ,{
+          type: 'checkbox',
+          options: {
+            label: 'Enable',
+            parent: 'palm',
+            key: 'Smart_Target'
+          }
+        },
         {
           type: 'text',
           options: {
-            label: 'Smoothing',
+            label: 'GivEnergy API',
             parent: 'palm',
-            key: 'smoothing'
+            key: 'GE_API'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'SolCast API Key',
+            parent: 'palm',
+            key: 'Solcast_API'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'SolCast Site ID 1',
+            parent: 'palm',
+            key: 'Solcast_SiteID'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'SolCast Site ID 2',
+            parent: 'palm',
+            key: 'Solcast_SiteID2'
           }
         },
         {
@@ -415,7 +477,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Winter',
             parent: 'palm',
-            key: 'settings.winter'
+            key: 'PALM_WINTER'
           }
         },
         {
@@ -423,7 +485,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Shoulder',
             parent: 'palm',
-            key: 'settings.shoulder'
+            key: 'PALM_SHOULDER'
           }
         },
         {
@@ -431,7 +493,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Minimum SoC Target',
             parent: 'palm',
-            key: 'settings.minSocTarget'
+            key: 'PALM_MIN_SOC_TARGET'
           }
         },
         {
@@ -439,7 +501,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Maximum SoC Target',
             parent: 'palm',
-            key: 'settings.maxSocTarget'
+            key: 'PALM_MAX_SOC_TARGET'
           }
         },
         {
@@ -447,7 +509,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Battery Reserve',
             parent: 'palm',
-            key: 'settings.batteryReserve'
+            key: 'PALM_BATT_RESERVE'
           }
         },
         {
@@ -455,7 +517,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Battery Utilisation',
             parent: 'palm',
-            key: 'settings.batteryUtilisation'
+            key: 'PALM_BATT_UTILISATION'
           }
         },
         {
@@ -463,7 +525,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Weight',
             parent: 'palm',
-            key: 'settings.weight'
+            key: 'PALM_WEIGHT'
           }
         },
         {
@@ -471,7 +533,45 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Historical Weight',
             parent: 'palm',
-            key: 'settings.historicalWeight'
+            key: 'LOAD_HIST_WEIGHT'
+          }
+        }
+      ]
+    },
+    evc: {
+      title: 'EVC',
+      subtitle: 'Setup Any Web variables',
+      fields: [
+        {
+          type: 'checkbox',
+          options: {
+            label: 'EVC Enable',
+            parent: 'evc',
+            key: 'evc_enable'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'EVC IP',
+            parent: 'evc',
+            key: 'evc_ip_address'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Timer',
+            parent: 'evc',
+            key: 'evc_self_run_timer'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Max Import Current',
+            parent: 'evc',
+            key: 'evc_import_max_current'
           }
         }
       ]

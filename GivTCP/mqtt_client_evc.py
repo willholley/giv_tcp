@@ -65,6 +65,16 @@ def on_message(client, userdata, message):
         elif command=="setCurrentLimit":
             writecommand=message.payload.decode("utf-8")
             evc.setCurrentLimit(int(writecommand))
+        elif command=="setImportCap":
+            writecommand=message.payload.decode("utf-8")
+            evc.setImportCap(writecommand)
+        elif command=="setChargingMode":
+            writecommand=message.payload.decode("utf-8")
+            evc.setChargingMode(writecommand)
+        elif command=="setMaxSessionEnergy":
+            writecommand=message.payload.decode("utf-8")
+            evc.setChargingMode(int(writecommand))
+            
     except:
         e = sys.exc_info()
         logger.error("MQTT.OnMessage Exception: "+str(e))
