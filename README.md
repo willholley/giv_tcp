@@ -81,11 +81,17 @@ All that is required for config are the IP address and the self run timer. Setti
 
 Most controls are self explanatory but some require clarification on their function:
 
-Plug and Go: When turned on the vehicle will start to charge as soon as it is plugged in. When off charging will commence when triggered by RFID card or "Charge Control"
+#### Plug and Go: 
+When turned on the vehicle will start to charge as soon as it is plugged in. When off charging will commence when triggered by RFID card or "Charge Control"
 
-Charge Control: This starts and stops vehicle charging, when "Plug and Go" is on.
+#### Charge Control:
+This starts and stops vehicle charging, when "Plug and Go" is on.
 
-Charging Mode: Mimcs the cloud based "modes" of charging.
+#### Charging Mode:
+Mimcs the cloud based "modes" of charging.
+
 Grid- Charges at current set by "Charge Limit", regardless of what energy is available (typically will pull from Grid)
+
 Solar- Modulates the Charge Limit based on the amount of "excess solar" available after serving the current house Load. This requires minimum of 1.4kW (6A) excess as required by the EVSE spec.
+
 Hybrid- This will modulate Charge Limit to top up a base 6A grid charge with any excess solar energy. Similar to Solar but uses a constant 6A from Grid plus additional solar energy on top.
