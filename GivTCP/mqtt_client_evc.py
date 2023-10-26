@@ -73,7 +73,7 @@ def on_message(client, userdata, message):
             evc.setChargingMode(writecommand)
         elif command=="setMaxSessionEnergy":
             writecommand=message.payload.decode("utf-8")
-            evc.setChargingMode(int(writecommand))
+            evc.setMaxSessionEnergy(int(writecommand))
             
     except:
         e = sys.exc_info()

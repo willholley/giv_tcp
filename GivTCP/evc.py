@@ -320,15 +320,18 @@ def setChargeMode(mode):
         logger.error("Error controlling EVC: "+str(e))
 
 def setChargeControl(mode):
-    logger.info("Setting Charge control to: "+ mode)
-    val=GivLUT.charge_control.index(mode)
-    logger.info("numeric value "+str(val)+ " sent to EVC")
-    try:
-        client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-        client.write_registers(95,val)
-    except:
-        e=sys.exc_info()
-        logger.error("Error controlling EVC: "+str(e))
+    if mode in GivLUT.charge_control:
+        logger.info("Setting Charge control to: "+ mode)
+        val=GivLUT.charge_control.index(mode)
+        logger.info("numeric value "+str(val)+ " sent to EVC")
+        try:
+            client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+            client.write_registers(95,val)
+        except:
+            e=sys.exc_info()
+            logger.error("Error controlling EVC: "+str(e))
+    else:
+        logger.error("Invalid selection for Charge Control ("+str(mode)+")")
 
 def setCurrentLimit(val):
     #Check limit is between 6 and MAX SAFE LIMIT
@@ -365,7 +368,7 @@ def chargeMode():
                     hybridmode()
                 elif evcRegCache['Charger']['Charging_Mode']=="Solar":
                     solarmode()
-            if evcRegCache['Charger']['Charge_Session_Energy']>evcRegCache['Charger']['Max_Session_Energy'] and evcRegCache['Charger']['Charge_Control']=="Start":
+            if not evcRegCache['Charger']['Max_Session_Energy']==0 and evcRegCache['Charger']['Charge_Session_Energy']>evcRegCache['Charger']['Max_Session_Energy'] and evcRegCache['Charger']['Charge_Control']=="Start":
                 setChargeControl("Stop")
         time.sleep(60)
     
@@ -435,7 +438,7 @@ def setMaxSessionEnergy(val):
 
 def setImportCap(val):
     if exists(EVCLut.regcache):
-        logger.info("Setting Charging Mode to: "+str(val))
+        logger.info("Setting Import Cap to: "+str(val))
         with open(EVCLut.regcache, 'rb') as inp:
             evcRegCache= pickle.load(inp)
         evcRegCache['Charger']['Import_Cap']=val
@@ -444,16 +447,18 @@ def setImportCap(val):
                 pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
 
 def setChargingMode(mode):
-    if exists(EVCLut.regcache):
-        logger.info("Setting Charging Mode to: "+str(mode))
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        evcRegCache['Charger']['Charging_Mode']=mode
-        with cacheLock:
-            with open(EVCLut.regcache, 'wb') as outp:
-                pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
-        chargeMode()    # Run an initial call when changing modes
-
+    if mode in GivLUT.charging_mode:
+        if exists(EVCLut.regcache):
+            logger.info("Setting Charging Mode to: "+str(mode))
+            with open(EVCLut.regcache, 'rb') as inp:
+                evcRegCache= pickle.load(inp)
+            evcRegCache['Charger']['Charging_Mode']=mode
+            with cacheLock:
+                with open(EVCLut.regcache, 'wb') as outp:
+                    pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
+            chargeMode()    # Run an initial call when changing modes
+    else:
+        logger.error("Invalid selection for Charge Mode ("+str(mode)+")")
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:
