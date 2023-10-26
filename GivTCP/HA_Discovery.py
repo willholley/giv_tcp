@@ -211,6 +211,9 @@ class HAMQTT():
             # If its a rate then change to Watts
             if "SOC" in str(topic).lower():
                 tempObj['unit_of_meas']="%"
+                tempObj['min']=4
+                tempObj['max']=100
+                tempObj['mode']="slider"
             elif "limit" in str(topic).lower():   #if EVC current
                 tempObj['unit_of_meas']="A"
                 tempObj['min']=6
@@ -220,6 +223,11 @@ class HAMQTT():
                 tempObj['unit_of_meas']="W"
                 tempObj['min']=0
                 tempObj['max']=HAMQTT.getinvbatmax()
+                tempObj['mode']="slider"
+            elif "max_session_energy" in str(topic).lower():
+                tempObj['unit_of_meas']="kWh"
+                tempObj['min']=0
+                tempObj['max']=100
                 tempObj['mode']="slider"
             else:
                 tempObj['unit_of_meas']="%"

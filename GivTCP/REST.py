@@ -40,6 +40,10 @@ def getAll():
 def reboot():
     return wr.rebootinverter()
 
+@giv_api.route('/restart', methods=['GET'])
+def restart():
+    return wr.rebootAddon
+
 #Publish last cached Invertor Data
 @giv_api.route('/readData', methods=['GET'])
 def rdData():

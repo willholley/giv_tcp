@@ -204,8 +204,8 @@ logger.critical("GivTCP isAddon: "+str(isAddon))
 #rqdash=subprocess.Popen(["/usr/local/bin/rq-dashboard","-u redis://127.0.0.1:6379"])
 #logger.critical("Running RQ Dashboard on port 9181")
 
-#vueConfig=subprocess.Popen(["npm", "run", "dev","-- --host"],cwd="/app/config_frontend")
-#logger.critical("Running Config Frontend")
+vueConfig=subprocess.Popen(["npm", "run", "dev","-- --host"],cwd="/app/config_frontend")
+logger.critical("Running Config Frontend")
 
 ##########################################################################################################
 #

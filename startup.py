@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from genericpath import exists
 import os, pickle, subprocess, logging,shutil, shlex, schedule
 from time import sleep
@@ -7,8 +7,10 @@ import zoneinfo
 import sys
 import requests
 from GivTCP.findInvertor import findInvertor
+from GivTCP.findEVC import findEVC
 import givenergy_modbus.model.inverter
 from givenergy_modbus.client import GivEnergyClient
+from pymodbus.client.sync import ModbusTcpClient
 
 selfRun={}
 mqttClient={}
@@ -28,6 +30,18 @@ logging.getLogger("givenergy_modbus").setLevel(logging.CRITICAL)
 
 def palm_job():
     subprocess.Popen(["/usr/local/bin/python3","/app/GivTCP_1/palm_soc.py"])
+
+def validateEVC(HOST):
+    logger.info("Validating "+str(HOST))
+    try:
+        client = ModbusTcpClient(HOST)
+        regs = client.read_holding_registers(97,6).registers
+        systime=datetime(regs[0],regs[1],regs[2],regs[3],regs[4],regs[5]).replace(tzinfo=timezone.utc).isoformat()
+        return True
+    except:
+        e=sys.exc_info()
+        logger.info(e)
+        return False
 
 def getInvDeets(HOST):
     try:
@@ -115,11 +129,32 @@ if len(networks)>0:
     inverterStats={}
     invList={}
     list={}
+    evclist={}
     logger.critical("Scanning network for inverters...")
     try:
         for subnet in networks:
             if networks[subnet]:
                 count=0
+                # Get EVC Details
+                while len(evclist)<=0:
+                    if count<2:
+                        logger.info("EVC- Scanning network ("+str(count+1)+"):"+str(networks[subnet]))
+                        evclist=findEVC(networks[subnet])
+                        if len(evclist)>0: break
+                        count=count+1
+                    else:
+                        break
+                if evclist:
+                    poplist=[]
+                    for evc in evclist:
+                        if validateEVC(evclist[evc]):
+                            logger.info("GivEVC found at: "+str(evclist[evc]))
+                        else:
+                            logger.info(evclist[evc]+" is not an EVC")
+                            poplist.append(evc)
+                    for pop in poplist:
+                        evclist.pop(pop)    #remove the unknown modbus device(s)
+                # Get Inverter Details
                 while len(list)<=0:
                     if count<2:
                         logger.info("Scanning network ("+str(count+1)+"):"+str(networks[subnet]))
@@ -129,7 +164,7 @@ if len(networks)>0:
                     else:
                         break
                 if list:
-                    logger.info(str(len(list))+" Inverters found on "+str(networks[subnet])+" - "+str(list))
+                    logger.debug(str(len(list))+" Inverters found on "+str(networks[subnet])+" - "+str(list))
                     invList.update(list)
                     for inv in invList:
                         deets={}
@@ -145,6 +180,8 @@ if len(networks)>0:
                                     Stats['Model']=deets[2]
                                     Stats['Generation']=deets[1]
                                     inverterStats[inv]=Stats
+                                else:
+                                    logger.error("Unable to interrogate inverter to get base details")
                                 count=count+1
                             else:
                                 break
@@ -174,8 +211,8 @@ logger.critical("Running Redis")
 #rqdash=subprocess.Popen(["/usr/local/bin/rq-dashboard","-u redis://127.0.0.1:6379"])
 #logger.critical("Running RQ Dashboard on port 9181")
 
-vueConfig=subprocess.Popen(["npm", "run", "dev","-- --host"],cwd="/app/config_frontend")
-logger.critical("Running Config Frontend")
+#vueConfig=subprocess.Popen(["npm", "run", "dev","-- --host"],cwd="/app/config_frontend")
+#logger.critical("Running Config Frontend")
 
 ##########################################################################################################
 #
@@ -326,10 +363,15 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
         selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "self_run2"])
 
     if os.getenv('EVC_ENABLE')=="True" and inv==1:  #only run it once
-        logger.critical ("Running EVC read loop every "+str(os.getenv('EVC_SELF_RUN_TIMER'))+"s")
-        evcSelfRun=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
-        logger.critical ("Subscribing MQTT Broker for EVC control")
-        mqttClientEVC=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client_evc.py"])
+        if not os.getenv('EVC_IP_ADDRESS')=="":
+            logger.critical ("Running EVC read loop every "+str(os.getenv('EVC_SELF_RUN_TIMER'))+"s")
+            evcSelfRun=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
+            logger.critical ("Subscribing MQTT Broker for EVC control")
+            mqttClientEVC=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client_evc.py"])
+            evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
+            logger.critical ("Setting chargeMode loop to manage different charge modes every 60s")
+        else:
+            logger.critical("EVC IP is missing from config. Please update and restart GivTCP")
 
     if os.getenv('MQTT_OUTPUT')=="True" or isAddon:
         logger.critical ("Subscribing MQTT Broker for control")
@@ -398,6 +440,16 @@ while True:
         os.chdir(PATH)
         logger.critical ("Restarting EVC read loop every "+str(os.getenv('EVC_SELF_RUN_TIMER'))+"s")
         selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
+    if os.getenv('EVC_ENABLE')==True and not evcSelfRun.poll()==None:
+        logger.error("EVC Self Run loop process died. restarting...")
+        os.chdir(PATH)
+        logger.critical ("Restarting EVC read loop every "+str(os.getenv('EVC_SELF_RUN_TIMER'))+"s")
+        evcSelfRun=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
+    if os.getenv('EVC_ENABLE')==True and not evcChargeModeLoop.poll()==None:
+        logger.error("EVC Self Run loop process died. restarting...")
+        os.chdir(PATH)
+        logger.critical ("Restarting EVC chargeMode loop every 60s")
+        evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
 
     #Run jobs for smart target
     schedule.run_pending()

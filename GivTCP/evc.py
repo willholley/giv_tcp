@@ -381,8 +381,8 @@ def hybridmode():
         with open(GivLUT.regcache, 'rb') as inp:
             invRegCache= pickle.load(inp)
         sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
-        spareCurrent=int(min(sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage'],0)+6)   #Spare current cannot be negative
-        if not spareCurrent==evcRegCache['Charger']['Current_L1']:
+        spareCurrent=int(max((sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']),0)+6)   #Spare current cannot be negative
+        if not spareCurrent==evcRegCache['Charger']['Charge_Limit']:
             logger.info("Topping up min charge with Solar curent ("+str(spareCurrent-6)+"A), setting EVC charge to: "+str(spareCurrent)+"A")
             setCurrentLimit(spareCurrent)
 
@@ -405,7 +405,7 @@ def solarmode():
                 setChargeControl("Start")
                 setCurrentLimit(spareCurrent)
         else:
-            if not evcRegCache['Charger']['Control_Charge']=="Stop":
+            if not evcRegCache['Charger']['Charge_Control']=="Stop":
                 logger.info("Solar excess dropped to below 6A, stopping charge")
                 setChargeControl("Stop")
 
@@ -420,7 +420,7 @@ def importcap():
         evccurrent=float(evcRegCache['Charger']['Current_L1'])
         if importcurrent>GiV_Settings.evc_import_max_current:
             excess=importcurrent-GiV_Settings.evc_import_max_current
-            newcurrent=int(max(6,evccurrent-excess))
+            newcurrent=int(max(6,evccurrent-excess))    #newcurrent must be at least 6A
             logger.info("Import current exceeded ("+str(excess)+"), reducing EVC charge to: "+str(newcurrent)+"A")
             setCurrentLimit(newcurrent)
 
