@@ -32,7 +32,7 @@ def palm_job():
     subprocess.Popen(["/usr/local/bin/python3","/app/GivTCP_1/palm_soc.py"])
 
 def validateEVC(HOST):
-    logger.info("Validating "+str(HOST))
+    logger.debug("Validating "+str(HOST))
     try:
         client = ModbusTcpClient(HOST)
         regs = client.read_holding_registers(97,6).registers
@@ -124,7 +124,7 @@ sleep(2)        # Sleep to allow port scanning se-ocket to close
 
 if len(networks)>0:
 # For each interface scan for inverters
-    logger.info("Networks available for scanning are: "+str(networks))
+    logger.debug("Networks available for scanning are: "+str(networks))
     Stats={}
     inverterStats={}
     invList={}
@@ -138,7 +138,7 @@ if len(networks)>0:
                 # Get EVC Details
                 while len(evclist)<=0:
                     if count<2:
-                        logger.info("EVC- Scanning network ("+str(count+1)+"):"+str(networks[subnet]))
+                        logger.debug("EVC- Scanning network ("+str(count+1)+"):"+str(networks[subnet]))
                         evclist=findEVC(networks[subnet])
                         if len(evclist)>0: break
                         count=count+1
@@ -148,7 +148,7 @@ if len(networks)>0:
                     poplist=[]
                     for evc in evclist:
                         if validateEVC(evclist[evc]):
-                            logger.info("GivEVC found at: "+str(evclist[evc]))
+                            logger.critical("GivEVC found at: "+str(evclist[evc]))
                         else:
                             logger.info(evclist[evc]+" is not an EVC")
                             poplist.append(evc)
@@ -157,7 +157,7 @@ if len(networks)>0:
                 # Get Inverter Details
                 while len(list)<=0:
                     if count<2:
-                        logger.info("Scanning network ("+str(count+1)+"):"+str(networks[subnet]))
+                        logger.debug("INV- Scanning network ("+str(count+1)+"):"+str(networks[subnet]))
                         list=findInvertor(networks[subnet])
                         if len(list)>0: break
                         count=count+1
@@ -197,13 +197,13 @@ if len(networks)>0:
 else:
     logger.error("Unable to get host details from Supervisor\Container")
 
-logger.critical("GivTCP isAddon: "+str(isAddon))
+logger.debug("GivTCP isAddon: "+str(isAddon))
 
 if not os.path.exists(str(os.getenv("CACHELOCATION"))):
     os.makedirs(str(os.getenv("CACHELOCATION")))
-    logger.critical("No config directory exists, so creating it...")
+    logger.debug("No config directory exists, so creating it...")
 else:
-    logger.critical("Config directory already exists")
+    logger.debug("Config directory already exists")
 
 redis=subprocess.Popen(["/usr/bin/redis-server","/app/redis.conf"])
 logger.critical("Running Redis")
@@ -233,16 +233,16 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
         shutil.copytree("/app/GivTCP", PATH)
         shutil.copytree("/app/GivEnergy-Smart-Home-Display-givtcp", PATH2)
     if not exists(PATH+"/settings.json"):
-        logger.info("Copying in a template settings.json")
+        logger.debug("Copying in a template settings.json")
         shutil.copyfile("/app/settings.json",PATH+"/settings.json")
     else:
-        logger.info("Settings.json already exists")
+        logger.debug("Settings.json already exists")
     # Remove old settings file
     if exists(PATH+"/settings.py"):
         os.remove(PATH+"/settings.py")
     FILENAME=""
     # create settings file
-    logger.critical ("Recreating settings.py for invertor "+str(inv))
+    logger.debug("Recreating settings.py for invertor "+str(inv))
     with open(PATH+"/settings.py", 'w') as outp:
         outp.write("class GiV_Settings:\n")
         outp.write("    invertorIP=\""+str(os.getenv("INVERTOR_IP_"+str(inv),""))+"\"\n")
@@ -313,19 +313,19 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
     #  Always delete lockfiles and FCRunning etc... but only delete pkl if too old?
 
     if exists(os.getenv("CACHELOCATION")+"/regCache_"+str(inv)+".pkl"):
-        logger.critical("Removing old invertor data cache")
+        logger.debug("Removing old invertor data cache")
         os.remove(str(os.getenv("CACHELOCATION"))+"/regCache_"+str(inv)+".pkl")
     if exists(PATH+"/.lockfile"):
-        logger.critical("Removing old .lockfile")
+        logger.debug("Removing old .lockfile")
         os.remove(PATH+"/.lockfile")
     if exists(PATH+"/.FCRunning"):
-        logger.critical("Removing old .FCRunning")
+        logger.debug("Removing old .FCRunning")
         os.remove(PATH+"/.FCRunning")
     if exists(PATH+"/.FERunning"):
-        logger.critical("Removing old .FERunning")
+        logger.debug("Removing old .FERunning")
         os.remove(PATH+"/.FERunning")
     if exists(os.getenv("CACHELOCATION")+"/battery_"+str(inv)+".pkl"):
-        logger.critical("Removing old battery data cache")
+        logger.debug("Removing old battery data cache")
         os.remove(str(os.getenv("CACHELOCATION"))+"/battery_"+str(inv)+".pkl")
     if exists(os.getenv("CACHELOCATION")+"/rateData_"+str(inv)+".pkl"):
         if "TZ" in os.environ:
@@ -334,10 +334,10 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
             timezone=zoneinfo.ZoneInfo(key="Europe/London")
         modDay= datetime.fromtimestamp(os.path.getmtime(os.getenv("CACHELOCATION")+"/rateData_"+str(inv)+".pkl")).date()
         if modDay<datetime.now(timezone).date():
-            logger.critical("Old rate data cache not updated today, so deleting")
+            logger.debug("Old rate data cache not updated today, so deleting")
             os.remove(str(os.getenv("CACHELOCATION"))+"/rateData_"+str(inv)+".pkl")
         else:
-            logger.critical("Rate Data exisits but is from today so keeping it")
+            logger.debug("Rate Data exisits but is from today so keeping it")
 
 
 ########### Run the various processes needed #############
@@ -385,7 +385,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
     os.chdir(PATH2)
     if os.getenv('WEB_DASH')=="True":
         # Create app.json
-        logger.critical ("Creating web dashboard config")
+        logger.debug("Creating web dashboard config")
         with open(PATH2+"/app.json", 'w') as outp:
             outp.write("{\n")
             outp.write("\"givTcpHostname\": \""+os.getenv('HOSTIP')+":6345\",")
