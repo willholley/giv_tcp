@@ -75,6 +75,10 @@ export const useTcpStore = defineStore('givtcp-form', {
       evc_ip_address: "",
       evc_self_run_timer: 10,
       evc_import_max_current: 60
+    }),
+    restart: useStorage('restart',{
+      restart:false,
+      hasRestarted:null
     })
   })
 })
@@ -574,6 +578,36 @@ export const useCard = defineStore('card', {
             key: 'evc_import_max_current'
           }
         }
+      ]
+    },
+    restart:{
+      title:"Finished Setup",
+      subtitle:"Restart Container to apply changes",
+      fields:[
+        {
+          type: 'button',
+          options: {
+            label: 'Restart Container',
+            parent: 'restart',
+            key: 'restart',
+            message:useTcpStore().restart.hasRestarted != null ? useTcpStore().restart.hasRestarted ? "Container Restarted Successfully" : "Container Failed to Restart. Try Restarting Manually" : '',
+            onClick:async ()=>{
+              const store = useTcpStore()
+              try{
+                var host = window.location.protocol + "//" + window.location.hostname+":6345/restart"
+                //var host = "http://127.0.0.1:6345/restart"
+              const res = await fetch(host)
+              if(res.ok){
+                store.restart.hasRestarted = true
+              }else{
+                store.restart.hasRestarted = false
+              }
+            } catch(e){
+              store.restart.hasRestarted = false
+            }
+            }
+          }
+        },
       ]
     }
   })

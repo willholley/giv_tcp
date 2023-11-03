@@ -5,6 +5,7 @@ from flask import Flask, request, send_from_directory
 from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
+import evc as evc
 import config_dash as cfdash
 from GivLUT import GivQueue, GivLUT
 import os
@@ -21,11 +22,11 @@ CORS(giv_api)
 
 @giv_api.route('/', methods=['GET', 'POST'])
 def root():
-  return send_from_directory('/app/config_frontend/dist/', 'index.html')
+  return send_from_directory('/app/config_frontend/dist', 'index.html')
 
 @giv_api.route('/config')
 def get_config_page():
-  return send_from_directory('/app/config_frontend/dist/', 'index.html')
+  return send_from_directory('/app/config_frontend/dist', 'index.html')
 #    if request.method=="GET":
 #        return cfdash.get_config()
 #    if request.method=="POST":
@@ -42,7 +43,7 @@ def reboot():
 
 @giv_api.route('/restart', methods=['GET'])
 def restart():
-    return wr.rebootAddon
+    return wr.rebootAddon()
 
 #Publish last cached Invertor Data
 @giv_api.route('/readData', methods=['GET'])
@@ -208,6 +209,43 @@ def editFileData():
     json.dump(data, file,indent=4)
     file.close()
     return data
+
+@giv_api.route('/setImportCap', methods=['POST'])
+def impCap():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setImportCap(payload)
+
+@giv_api.route('/setCurrentLimit', methods=['POST'])
+def currLimit():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setCurrentLimit(payload)
+
+@giv_api.route('/setChargeControl', methods=['POST'])
+def chrgeControl():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setChargeControl(payload)
+
+@giv_api.route('/setChargeMode', methods=['POST'])
+def chrgMode():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setChargeMode(payload)
+
+@giv_api.route('/setChargingMode', methods=['POST'])
+def chrgingMode():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setChargingMode(payload)
+
+@giv_api.route('/setMaxSessionEnergy', methods=['POST'])
+def maxSession():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setMaxSessionEnergy(payload)
+
+@giv_api.route('/getEVCCache', methods=['GET'])
+def gtEVCChce():
+    payload = request.get_json(silent=True, force=True)
+    return evc.getEVCCache()
+
+
 
 if __name__ == "__main__":
     giv_api.run()

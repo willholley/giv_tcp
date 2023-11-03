@@ -1,7 +1,7 @@
 # set base image (host OS)
 FROM python:rc-alpine
 
-RUN apk --no-cache add mosquitto
+RUN apk add mosquitto
 RUN apk add curl
 RUN apk add --update npm
 RUN npm install -g serve
@@ -11,16 +11,23 @@ RUN apk add musl-utils
 RUN apk add xsel
 RUN apk add redis
 RUN apk add npm
-
+RUN apk add nginx && mkdir -p /run/nginx
 
 # set the working directory in the container
 WORKDIR /app
 
 # copy the dependencies file to the working directory
 COPY requirements.txt .
-
-# install dependencies
 RUN pip install -r requirements.txt
+
+COPY givtcp-vuejs/package.json ./config_frontend/package.json
+
+RUN cd /app/config_frontend && npm install
+COPY givtcp-vuejs ./config_frontend
+RUN cd /app/config_frontend && npm run build
+
+COPY ingress.conf /etc/nginx/http.d/
+RUN rm /etc/nginx/http.d/default.conf
 
 # copy the content of the local src directory to the working directory
 COPY GivTCP/ ./GivTCP
@@ -28,14 +35,10 @@ COPY GivEnergy-Smart-Home-Display-givtcp/ ./GivEnergy-Smart-Home-Display-givtcp
 COPY givenergy_modbus/ /usr/local/lib/python3.10/site-packages/givenergy_modbus
 
 COPY startup.py startup.py
-#COPY startup_3.py startup_3.py
+COPY startup_3.py startup_3.py
 COPY redis.conf redis.conf
 COPY settings.json /app/settings.json
-
-#COPY givtcp-vuejs/package.json ./config_frontend/package.json
-#RUN cd /app/config_frontend && npm install
-#COPY givtcp-vuejs ./config_frontend
-#RUN cd /app/config_frontend && npm run build
+COPY index.html /app/index.html
 
 ENV NUMINVERTORS=1
 ENV INVERTOR_IP_1=""
@@ -106,6 +109,6 @@ ENV EVC_IP_ADDRESS=""
 ENV EVC_SELF_RUN_TIMER=5
 
 
-EXPOSE 6345 1883 3000 5173 6379 9181
+EXPOSE 1883 6379 8099
 
 CMD ["python3", "/app/startup.py"]

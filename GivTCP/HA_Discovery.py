@@ -209,25 +209,31 @@ class HAMQTT():
             tempObj['options']=options
         elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="number":
             # If its a rate then change to Watts
-            if "SOC" in str(topic).lower():
+            item=str(topic).split("/")[-1]
+            if "soc" in str(item).lower():
                 tempObj['unit_of_meas']="%"
                 tempObj['min']=4
                 tempObj['max']=100
                 tempObj['mode']="slider"
-            elif "limit" in str(topic).lower():   #if EVC current
+            elif "limit" in str(item).lower():   #if EVC current
                 tempObj['unit_of_meas']="A"
                 tempObj['min']=6
                 tempObj['max']=32
                 tempObj['mode']="slider"
-            elif "charge" in str(topic).lower():
-                tempObj['unit_of_meas']="W"
+            elif "cap" in str(item).lower():   #if EVC current
+                tempObj['unit_of_meas']="A"
                 tempObj['min']=0
-                tempObj['max']=HAMQTT.getinvbatmax()
+                tempObj['max']=100
                 tempObj['mode']="slider"
-            elif "max_session_energy" in str(topic).lower():
+            elif "energy" in str(item).lower():
                 tempObj['unit_of_meas']="kWh"
                 tempObj['min']=0
                 tempObj['max']=100
+                tempObj['mode']="slider"
+            elif "charge" in str(item).lower():
+                tempObj['unit_of_meas']="W"
+                tempObj['min']=0
+                tempObj['max']=HAMQTT.getinvbatmax()
                 tempObj['mode']="slider"
             else:
                 tempObj['unit_of_meas']="%"

@@ -1167,6 +1167,7 @@ def rebootAddon():
     result = requests.post(url,
           headers={'Content-Type':'application/json',
                    'Authorization': 'Bearer {}'.format(access_token)})
+    return json.dumps(result)
 
 def getSavedBatteryReservePercentage():
     saved_battery_reserve=4

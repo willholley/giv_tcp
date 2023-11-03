@@ -214,6 +214,8 @@ logger.critical("Running Redis")
 #vueConfig=subprocess.Popen(["npm", "run", "dev","-- --host"],cwd="/app/config_frontend")
 #logger.critical("Running Config Frontend")
 
+subprocess.Popen(["nginx","-g","daemon off;error_log /dev/stdout debug;"])
+
 ##########################################################################################################
 #
 #

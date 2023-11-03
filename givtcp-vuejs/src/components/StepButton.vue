@@ -3,7 +3,7 @@
     <v-btn v-if="storeStep.step > -1" @click="storeStep.step = storeStep.step - 1">
       Previous
     </v-btn>
-    <v-btn v-if="storeStep.step < 8" @click="storeStep.step = storeStep.step + 1"> Next </v-btn>
+    <v-btn v-if="storeStep.step < 9" @click="storeStep.step = storeStep.step + 1"> Next </v-btn>
         <v-snackbar
       v-model="snackbar"
       :color="message === 'Success' ? '#4fbba9' : 'red'"
@@ -56,7 +56,19 @@ export default {
           ...this.storeTCP.evc
         }
         var host = window.location.protocol + "//" + window.location.hostname+":6345/settings"
-        const getResponse = await fetch(host)
+        //var host = "http://127.0.0.1:6345/settings"
+        const setResponse = await fetch(host,{
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json"
+        },
+        body:JSON.stringify(data)
+      })
+      if(setResponse.ok){
+       this.snackbar = true
+       this.message = `Success`
+       var host = window.location.protocol + "//" + window.location.hostname+":6345/settings"
+       const getResponse = await fetch(host)
 
         const getJSON = {...await getResponse.json()}
 
@@ -64,7 +76,6 @@ export default {
           this.snackbar = true
           this.message = `Server Error: ${setResponse.statusText}`
         }
-
 
         Object.keys(data).map((key)=>{
           if(key in this.storeTCP.web){
@@ -89,26 +100,13 @@ export default {
             return
           }
         })
-      var host = window.location.protocol + "//" + window.location.hostname+":6345/settings"
-      console.log("JSON data being sent is: "+JSON.stringify(data))
-      const setResponse = await fetch(host,{
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify(data)
-      })
-      if(setResponse.ok){
-       this.snackbar = true
-       this.message = `Success`
       }else{
         this.snackbar = true
         this.message = `Server Error: ${setResponse.statusText}`
       }
         }catch(e){
           this.snackbar = true
-          this.message = `Error: ${e.name}`
-          console.log("Error was: "+e)
+          this.message = `Error: ${e}`
         }
     },
     deep:true

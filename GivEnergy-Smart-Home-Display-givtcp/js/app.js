@@ -11,14 +11,14 @@ class App {
         me.givTcpHostname = null;
         me.solarRate = null;
         me.exportRate = null;
-
+        var host = window.location.protocol + "//" + window.location.hostname+":6345"
         // Fetch the settings from `app.json`
         fetch("./app.json")
             .then(response => {
                 return response.json();
             })
             .then(data => {
-                me.givTcpHostname = data.givTcpHostname;
+                me.givTcpHostname = host;
                 me.solarRate = data.solarRate;
                 me.exportRate = data.exportRate;
 
@@ -47,7 +47,7 @@ class App {
     fetchData() {
         const me = this;
 
-        fetch(`http://${me.givTcpHostname}/readData`, {
+        fetch(`${me.givTcpHostname}/readData`, {
             mode: 'cors',
             headers: {
                 'Access-Control-Allow-Origin': 'localhost:63342'

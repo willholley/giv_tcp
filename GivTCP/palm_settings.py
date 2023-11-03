@@ -28,7 +28,7 @@ class GE:
     # Modify url with system name in place of CExxxxxx and paste API key generated on GivEnergy web portal in place of xxxx
     url = "https://api.givenergy.cloud/v1/inverter/"+GiV_Settings.serial_number+"/"
 #    key = str(os.getenv('GEAPI'))
-    key = str(GiV_Settings.GEAPI)
+    key = str(GiV_Settings.GE_API)
     
     # Most users will not need to touch that many of the pre-configured settings below
     

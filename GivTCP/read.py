@@ -174,7 +174,7 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         power_output['PV_Current_String_1'] = GEInv.i_pv1*10
         power_output['PV_Current_String_2'] = GEInv.i_pv2*10
         power_output['Grid_Voltage'] = GEInv.v_ac1
-        power_output['Grid_Current'] = GEInv.i_ac1*10 
+        power_output['Grid_Current'] = GEInv.i_grid_port 
 
         # Grid Power
         logger.debug("Getting Grid Power")
@@ -504,7 +504,7 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         timeslots['Charge_start_time_slot_1'] = GEInv.charge_slot_1[0].isoformat()
         timeslots['Charge_end_time_slot_1'] = GEInv.charge_slot_1[1].isoformat()
         try:
-            if inverterModel.generation == "Gen 2" or inverterModel.generation == "Gen 3":
+            if inverterModel.model == "AIO" or (inverterModel.generation == "Gen 3" and int(GEInv.arm_firmware_version)>302):   #10 slots only apply to AIO and new fw on Gen 3
                 timeslots['Charge_start_time_slot_2'] = GEInv.charge_slot_2[0].isoformat()
                 timeslots['Charge_end_time_slot_2'] = GEInv.charge_slot_2[1].isoformat()
                 timeslots['Charge_start_time_slot_3'] = GEInv.charge_slot_3[0].isoformat()

@@ -72,13 +72,22 @@ class GivEnergyClient:
                 inverter_registers, plant.inverter_rc, slave_address=0x31, sleep_between_queries=sleep_between_queries
             )
             _logger.debug("Inverter is normal so using the 0x31 slave_address")
-        for i, battery_rc in enumerate(plant.batteries_rcs):
-            self.fetch_register_pages(
-                {InputRegister: [60]},
-                battery_rc,
-                slave_address=0x32 + i,
-                sleep_between_queries=sleep_between_queries,
-            )
+        if isAIO:
+            for i, battery_rc in enumerate(plant.batteries_rcs):
+                self.fetch_register_pages(
+                    {InputRegister: [60]},
+                    battery_rc,
+                    slave_address=0x32 + i,
+                    sleep_between_queries=sleep_between_queries,
+                )
+        else:
+            for i, battery_rc in enumerate(plant.batteries_rcs):
+                self.fetch_register_pages(
+                    {InputRegister: [60]},
+                    battery_rc,
+                    slave_address=0x32 + i,
+                    sleep_between_queries=sleep_between_queries,
+                )
 
     def get_inverter_stats(self):
         try:

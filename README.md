@@ -71,11 +71,11 @@ GivTCP collects all inverter and battery data and creates a nested data structur
 
 ## GivEnergy Electric Vehicle Charger
 
-From version 2.4 onwards GivTCP incorporates control and monitoring of the GE charger. Connecting via local modbus it can monitor real-time stats and provide simple control features.
+From version 2.4 onwards GivTCP incorporates control and monitoring of the GE charger. Connecting via local modbus it can monitor real-time stats and provide simple control features. With the EVC cloud conrol does not use the modbus protocol, so there is minimal opportunity for changes to reflect in the official app/cloud portal. Particularly the Charging modes, which are merely mimiced in GivEVC
 
 ## Configuration
 
-All that is required for config are the IP address and the self run timer. Setting EVC_EABLE to True will turn on the function.
+All that is required for config are the IP address and the self run timer. Setting EVC_ENABLE to True will turn on the function.
 
 ## Control
 
@@ -98,3 +98,9 @@ Modulates the Charge Limit based on the amount of "excess solar" available after
 
 #### Hybrid
 This will modulate Charge Limit to top up a base 6A grid charge with any excess solar energy. Similar to Solar but uses a constant 6A from Grid plus additional solar energy on top.
+
+### Max Session Energy
+This will cap the maximum energy delivered to the vehicle in a single charge session. Setting this to 0kWh disables this setting.
+
+### Import Cap
+This will monitor the Grid current from the first GivTCP inverter and if it is within 5% of the Import Cap setting it will reduce EVC Charge current to stay 10% under the import Cap. Setting this to 0A disables this setting.

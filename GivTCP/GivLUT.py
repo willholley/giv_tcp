@@ -326,7 +326,7 @@ class GivLUT:
         "Charge_End_Time":GEType("sensor","timestamp","","","",False,False,False),
         "System_Time":GEType("sensor","timestamp","","","",False,False,False),
         "Charging_Mode":GEType("select","","setChargingMode","","",False,False,False),
-        "Import_Cap":GEType("switch","","setImportCap","","",False,False,False),
+        "Import_Cap":GEType("number","","setImportCap","","",False,False,False),
         "Max_Session_Energy":GEType("number","","setMaxSessionEnergy","","",False,False,False),
         }
     time_slots=[
