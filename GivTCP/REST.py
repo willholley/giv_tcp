@@ -136,7 +136,7 @@ def tmpPauseDischrg():
         else:
             logger.error("Force Charge is not currently running")
     else:
-        return wr.tempPauseCharge(payload)
+        return wr.tempPauseDischarge(payload)
 
 @giv_api.route('/tempPauseCharge', methods=['POST'])
 def tmpPauseChrg():

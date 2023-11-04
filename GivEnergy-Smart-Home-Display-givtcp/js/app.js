@@ -190,14 +190,10 @@ class App {
             minutes = '0' + minutes;
         }
 
-        let suffix = 'am';
-
-        if (hours > 12) {
-            hours -= 12;
-            suffix = 'pm';
-        } else if (hours === 0) {
-            hours = 12;
-        }
+        const suffix = (hours < 12) ? 'am': 'pm';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        minutes = minutes < 10 ? '0' + minutes : minutes;
 
         clock.text(`${hours}:${minutes}${suffix}`);
     }
