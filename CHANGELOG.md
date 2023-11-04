@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.4.0] - 2023-11-04
+### Fixed
+- Enhanced Startup script with better uto discovery of Inverters and EVC
+- PR #119 thanks to @gcoan
+- Enable long term stats PR #103 thanks to @ajcollins
+
+### Added
+- GiVEVC: Ability to connect to GivEnergy EV Chargers. Monitoring and control (see Readme)
+- GivTCP version published in MQTT
+- GUI for configuration (not yet released)
+- Nginx proxy to combine all web frontends via single port (8099)
+  - REST can also be found at IPADDRESS:8099/REST1/ and REST2/ etc... for each inverter
+  - Web dashboard can be accessed at IPADDRESS:8099/dashboard
+- PALM 1.1.0 updated
+
 ## [2.3.3] - 2023-08-06
 ### Fixed
 - Fixed PALM error
