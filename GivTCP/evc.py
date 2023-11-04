@@ -312,7 +312,7 @@ def getEVCCache():
             evcRegCache= pickle.load(inp)
         return json.dumps(evcRegCache)
     else:
-        return json.dumps("No EVC data found")
+        return json.dumps("No EVC data found",indent=4)
 
 def setChargeMode(mode):
     if mode=="enable":

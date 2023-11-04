@@ -102,11 +102,11 @@ class GE:
 
     # Start time for Overnight Charge
 #    start_time = os.getenv('NIGHTRATESTART')
-    start_time = GiV_Settings.NIGHTRATESTART
+    start_time = GiV_Settings.night_rate_start
 
     # End time for Overnight Charge
 #    end_time = os.getenv('DAYRATESTART')
-    end_time = GiV_Settings.DAYRATESTART
+    end_time = GiV_Settings.day_rate_start
 
 
 # SolCast PV forecast generator. Up to two arrays are supported with a forecast for each
