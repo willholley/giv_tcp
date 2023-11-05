@@ -88,7 +88,7 @@ class GivEnergyObj:
         self.soc: int = 0
         self.base_load = stgs.GE.base_load
         self.tgt_soc: int = 100
-        self.cmd_list = stgs.GE_Command_list['data']
+        self.cmd_list = stgs.GE.Command_list['data']
         self.plot = [""] * 5
 
         logger.debug("Valid inverter commands:")

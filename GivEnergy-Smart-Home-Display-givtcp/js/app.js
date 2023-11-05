@@ -186,10 +186,6 @@ class App {
         let hours = date.getHours();
         let minutes = date.getMinutes();
 
-        if (minutes < 10) {
-            minutes = '0' + minutes;
-        }
-
         const suffix = (hours < 12) ? 'am': 'pm';
         hours = hours % 12;
         hours = hours ? hours : 12;

@@ -3,12 +3,13 @@
 
 import palm_settings as stgs
 from palm_utils import GivEnergyObj, SolcastObj, t_to_mins
+import time
 
 # Debug switch (if True) is used to run palm_Soc outside the HA environment for test purpses
 DEBUG_SW = False
 if DEBUG_SW:
     import logging
-    import time
+
 else:
     import write as wr  # pylint: disable=import-error
     from GivLUT import GivLUT, GivQueue  # pylint: disable=import-error

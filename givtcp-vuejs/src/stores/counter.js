@@ -3,12 +3,24 @@ import { useStorage } from '@vueuse/core'
 
 export const useTcpStore = defineStore('givtcp-form', {
   state: () => ({
-    inverter: useStorage('inverter', {
+    inverter1: useStorage('inverter1', {
       NUMINVERTORS: 1,
-      invertorIP: "",
-      numBatteries: 1,
-      isAIO: false,
-      isAC: false
+      invertorIP1: "",
+      numBatteries1: 1,
+      isAIO1: false,
+      isAC1: false
+    }),
+    inverter2: useStorage('inverter2', {
+      invertorIP2: "",
+      numBatteries2: 1,
+      isAIO2: false,
+      isAC2: false
+    }),
+    inverter3: useStorage('inverter3', {
+      invertorIP3: "",
+      numBatteries3: 1,
+      isAIO3: false,
+      isAC3: false
     }),
     mqtt: useStorage('mqtt', {
       MQTT_Output: false,
@@ -93,7 +105,7 @@ export const useStep = defineStore('step', {
 export const useCard = defineStore('card', {
   state: () => ({
     inverter: {
-      title: 'Inverter',
+      title: 'Inverter 1',
       subtitle: 'Setup your inverter configurations',
       fields: [
         {
@@ -111,7 +123,7 @@ export const useCard = defineStore('card', {
             label: 'Number Of Batteries',
             items: [1, 2, 3],
             parent: 'inverter',
-            key: 'numBatteries'
+            key: 'numBatteries1'
           }
         },
         {
@@ -119,7 +131,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'IP Address',
             parent: 'inverter',
-            key: 'invertorIP'
+            key: 'invertorIP1'
           }
         },
         {
@@ -127,7 +139,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Is this Invertor an AIO?',
             parent: 'inverter',
-            key: 'isAIO'
+            key: 'isAIO1'
           }
         },
         {
@@ -135,7 +147,85 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Is this Invertor on "old firmware"?',
             parent: 'inverter',
-            key: 'isAC'
+            key: 'isAC1'
+          }
+        },
+      ]
+    },
+    inverter: {
+      title: 'Inverter 2',
+      subtitle: 'Setup your inverter configurations',
+      fields: [
+        {
+          type: 'select',
+          options: {
+            label: 'Number Of Batteries',
+            items: [1, 2, 3],
+            parent: 'inverter',
+            key: 'numBatteries2'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'IP Address',
+            parent: 'inverter',
+            key: 'invertorIP2'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Is this Invertor an AIO?',
+            parent: 'inverter',
+            key: 'isAIO2'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Is this Invertor on "old firmware"?',
+            parent: 'inverter',
+            key: 'isAC2'
+          }
+        },
+      ]
+    },
+    inverter: {
+      title: 'Inverter 3',
+      subtitle: 'Setup your inverter configurations',
+      fields: [
+        {
+          type: 'select',
+          options: {
+            label: 'Number Of Batteries',
+            items: [1, 2, 3],
+            parent: 'inverter',
+            key: 'numBatteries3'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'IP Address',
+            parent: 'inverter',
+            key: 'invertorIP3'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Is this Invertor an AIO?',
+            parent: 'inverter',
+            key: 'isAIO3'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Is this Invertor on "old firmware"?',
+            parent: 'inverter',
+            key: 'isAC3'
           }
         },
       ]

@@ -305,7 +305,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
             outp.write("    Debug_File_Location=\""+os.getenv("CACHELOCATION")+"/log_inv_"+str(inv)+".log\"\n")
         outp.write("    inverter_num=\""+str(inv)+"\"\n")
 
-        outp.write("    GE_API=\""+str(os.getenv("CACHELOCATION")+"\"\n"))
+        outp.write("    GE_API=\""+str(os.getenv("GEAPI")+"\"\n"))
         outp.write("    PALM_WINTER=\""+str(os.getenv("PALM_WINTER")+"\"\n"))
         outp.write("    PALM_SHOULDER=\""+str(os.getenv("PALM_SHOULDER")+"\"\n"))
         outp.write("    PALM_MIN_SOC_TARGET=\""+str(os.getenv("PALM_MIN_SOC_TARGET")+"\"\n"))
@@ -316,6 +316,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
         outp.write("    SOLCASTSITEID=\""+str(os.getenv("SOLCASTSITEID")+"\"\n"))
         outp.write("    SOLCASTSITEID2=\""+str(os.getenv("SOLCASTSITEID2")+"\"\n"))
         outp.write("    PALM_WEIGHT=\""+str(os.getenv("PALM_WEIGHT")+"\"\n"))
+        outp.write("    LOAD_HIST_WEIGHT=\""+str(os.getenv("LOAD_HIST_WEIGHT")+"\"\n"))
 
         outp.write("    evc_enable=\""+os.getenv("EVC_ENABLE")+"\"\n")
         outp.write("    evc_ip_address=\""+os.getenv("EVC_IP_ADDRESS")+"\"\n")

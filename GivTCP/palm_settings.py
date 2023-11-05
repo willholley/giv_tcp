@@ -107,6 +107,8 @@ class GE:
     # End time for Overnight Charge
 #    end_time = os.getenv('DAYRATESTART')
     end_time = GiV_Settings.day_rate_start
+    Command_list={}
+    Command_list['data']=""
 
 
 # SolCast PV forecast generator. Up to two arrays are supported with a forecast for each

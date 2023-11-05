@@ -3,7 +3,7 @@
     <v-btn v-if="storeStep.step > -1" @click="storeStep.step = storeStep.step - 1">
       Previous
     </v-btn>
-    <v-btn v-if="storeStep.step < 9" @click="storeStep.step = storeStep.step + 1"> Next </v-btn>
+    <v-btn v-if="storeStep.step < 11" @click="storeStep.step = storeStep.step + 1"> Next </v-btn>
         <v-snackbar
       v-model="snackbar"
       :color="message === 'Success' ? '#4fbba9' : 'red'"
@@ -47,7 +47,9 @@ export default {
         const data = {
           ...this.storeTCP.web,
           ...this.storeTCP.mqtt,
-          ...this.storeTCP.inverter,
+          ...this.storeTCP.inverter1,
+          ...this.storeTCP.inverter2,
+          ...this.storeTCP.inverter3,
           ...this.storeTCP.influx,
           ...this.storeTCP.homeAssistant,
           ...this.storeTCP.tariffs,
@@ -82,8 +84,12 @@ export default {
             this.storeTCP.web[key] = getJSON[key]
           }else if(key in this.storeTCP.mqtt){
             this.storeTCP.mqtt[key] = getJSON[key]
-          }else if(key in this.storeTCP.inverter){
-            this.storeTCP.inverter[key] = getJSON[key]
+          }else if(key in this.storeTCP.inverter1){
+            this.storeTCP.inverter1[key] = getJSON[key]
+          }else if(key in this.storeTCP.inverter2){
+            this.storeTCP.inverter2[key] = getJSON[key]
+          }else if(key in this.storeTCP.inverter3){
+            this.storeTCP.inverter3[key] = getJSON[key]
           }else if(key in this.storeTCP.influx){
             this.storeTCP.influx[key] = getJSON[key]
           }else if(key in this.storeTCP.homeAssistant){
