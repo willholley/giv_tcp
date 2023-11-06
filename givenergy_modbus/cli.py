@@ -43,10 +43,12 @@ def main(ctx, host, log_level):
 @main.command()
 @click.pass_context
 @click.option('-b', '--batteries', type=int, default=1)
-def dump_registers(ctx, batteries):
+@click.option('-i', '--aio', is_flag=True, default=False)
+@click.option('-c', '--ac', is_flag=True, default=False)
+def dump_registers(ctx, batteries, aio, ac):
     """Dump out raw register data for use in debugging."""
     plant = Plant(number_batteries=batteries)
-    ctx.obj['CLIENT'].refresh_plant(plant=plant, full_refresh=True)
+    ctx.obj['CLIENT'].refresh_plant(plant=plant, isAIO=aio, isAC=ac, full_refresh=True)
     inverter_json = plant.inverter_rc.to_json()
     inverter = Inverter.from_orm(plant.inverter_rc)
 
@@ -121,25 +123,25 @@ def set_battery_discharge_mode_demand(ctx):  # noqa: D103
 
 
 @main.command()
-@click.option('-s', '--start', type=click.DateTime(formats=['%H:%m']), required=True)
-@click.option('-e', '--end', type=click.DateTime(formats=['%H:%m']), required=True)
+@click.option('-s', '--start', type=click.DateTime(formats=['%H:%M']), required=True)
+@click.option('-e', '--end', type=click.DateTime(formats=['%H:%M']), required=True)
 @click.pass_context
-@is_documented_by(GivEnergyClient.set_charge_slot_1)
+@is_documented_by(GivEnergyClient.set_charge_slot)
 def set_charge_slot_1(ctx, start, end):  # noqa: D103
     _logger.info(start)
     _logger.info(end)
-    ctx.obj['CLIENT'].set_charge_slot_1((start, end))
+    ctx.obj['CLIENT'].set_charge_slot(1, (start, end))
 
 
 @main.command()
 @click.option('-s', '--start', type=click.DateTime(formats=['%H:%M', '%H%M']), required=True)
 @click.option('-e', '--end', type=click.DateTime(formats=['%H:%M', '%H%M']), required=True)
 @click.pass_context
-@is_documented_by(GivEnergyClient.set_charge_slot_2)
+@is_documented_by(GivEnergyClient.set_charge_slot)
 def set_charge_slot_2(ctx, start: datetime.datetime, end: datetime.datetime):  # noqa: D103
     _logger.info(start.time())
     _logger.info(end.time())
-    ctx.obj['CLIENT'].set_charge_slot_2((start, end))
+    ctx.obj['CLIENT'].set_charge_slot(2, (start, end))
 
 
 @main.command()
