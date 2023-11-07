@@ -70,7 +70,7 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         multi_output['Last_Updated_Time'] = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
         multi_output['status'] = "online"
         multi_output['Time_Since_Last_Update'] = 0
-        multi_output['GivTCP_Version']= "2.3.153"
+        multi_output['GivTCP_Version']= "2.4.1"
     except:
         e = sys.exc_info()
         consecFails(e)
