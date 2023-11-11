@@ -48,9 +48,10 @@ logger = logging.getLogger(__name__)
 # ...
 # v0.10.0   21/Jun/23 Added multi-day averaging for usage calcs
 # v1.0.0    15/Jul/23 Random start time, Solcast data correction, IO compatibility, 48-hour fcast
-# v1.1.0    06/Aug/23 Split out generic functions as palm_utils.py (this file), remove random start time (add comment in settings instead) 
+# v1.1.0    06/Aug/23 Split out generic functions as palm_utils.py, remove randomised start time
+# v1.1.0a   11/Nov/23 Fixed resume operation after daytime charging, bugfix for chart generation
 
-PALM_VERSION = "v1.1.0"
+PALM_VERSION = "v1.1.0a"
 # -*- coding: utf-8 -*-
 # pylint: disable=logging-not-lazy
 # pylint: disable=consider-using-f-string
@@ -87,8 +88,8 @@ class GivEnergyObj:
         self.consumption: int = 0
         self.soc: int = 0
         self.base_load = stgs.GE.base_load
-        self.tgt_soc: int = 100
-        self.cmd_list = stgs.GE.Command_list['data']
+        self.tgt_soc = 100
+        self.cmd_list = stgs.GE_Command_list['data']
         self.plot = [""] * 5
 
         logger.debug("Valid inverter commands:")
@@ -227,7 +228,7 @@ class GivEnergyObj:
         i: int = 0
         while i < len(stgs.GE.load_hist_weight):
             if stgs.GE.load_hist_weight[i] > 0:
-                logger.debug("Processing load history for day -"+ str(i + 1))
+                logger.info("Processing load history for day -"+ str(i + 1))
                 load_hist_array = get_load_hist_day(i)
                 j = 0
                 while j < 48:
@@ -237,7 +238,7 @@ class GivEnergyObj:
                 total_weight += stgs.GE.load_hist_weight[i]
                 logger.debug(str(acc_load)+ " total weight: "+ str(total_weight))
             else:
-                logger.debug("Skipping load history for day -"+ str(i + 1)+ " (weight <= 0)")
+                logger.info("Skipping load history for day -"+ str(i + 1)+ " (weight <= 0)")
             i += 1
 
         # Avoid DIV/0 if config file contains incorrect weightings
@@ -250,7 +251,7 @@ class GivEnergyObj:
         while i < 48:
             self.base_load[i] = round(acc_load[i]/total_weight, 1)
             i += 1
-        logger.debug("Load Calc Summary: "+ str(self.base_load))
+        logger.info("Load Calc Summary: "+ str(self.base_load))
 
     def set_mode(self, cmd: str):
         """Configures inverter operating mode"""
@@ -289,10 +290,10 @@ class GivEnergyObj:
                     logger.error(error)
                     return
                 if resp.status_code != 201:
-                    logger.debug("Invalid response: "+ str(resp.status_code))
+                    logger.info("Invalid response: "+ str(resp.status_code))
                     return
 
-            logger.debug("Setting Register "+ str(register)+ " ("+ str(cmd_name) + ") to "+
+            logger.info("Setting Register "+ str(register)+ " ("+ str(cmd_name) + ") to "+
                         str(value)+ "   Response: "+ str(resp))
 
             time.sleep(3)  # Allow data on GE server to settle
@@ -318,7 +319,7 @@ class GivEnergyObj:
 
             returned_cmd = json.loads(resp.content.decode('utf-8'))['data']['value']
             if str(returned_cmd) == str(value):
-                logger.debug("Successful register read: "+ str(register)+ " = "+ str(returned_cmd))
+                logger.info("Successful register read: "+ str(register)+ " = "+ str(returned_cmd))
             else:
                 logger.error("Readback failed on GivEnergy API... Expected " +
                     str(value) + ", Read: "+ str(returned_cmd))
@@ -362,6 +363,7 @@ class GivEnergyObj:
         elif cmd == "resume":
             set_inverter_register("72", "3000")
             set_inverter_register("73", "3000")
+            self.set_mode("set_soc")
 
         elif cmd == "test":
             logger.debug("Test set_mode")
@@ -396,8 +398,8 @@ class GivEnergyObj:
             wgt_50 = weight - 10
         wgt_90 = max(0, weight - 50)
 
-        logger.debug("")
-        logger.debug("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
+        logger.info("")
+        logger.info("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
             "Day", "Hour", "Charge", "Cons", "Gen", "SoC"))
 
         # Definitions for export of SoC forecast in chart form
@@ -450,7 +452,7 @@ class GivEnergyObj:
                 elif i > end_charge_period:  # Charging after overnight boost
                     max_charge = max(max_charge, batt_charge[i])
 
-                logger.debug("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
+                logger.info("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
                     day, t_to_hrs(i * 30), round(batt_charge[i], 2), round(total_load, 2),
                     round(est_gen, 2), int(100 * batt_charge[i] / batt_max_charge)))
 
@@ -469,9 +471,9 @@ class GivEnergyObj:
         # low_soc is the minimum SoC target. Provide more buffer capacity in shoulder months
         # when load is likely to be more variable, e.g. heating
         if stgs.pg.month in stgs.GE.shoulder:
-            low_soc = stgs.GE.max_soc_target
+            low_soc = int(stgs.GE.max_soc_target)
         else:
-            low_soc = stgs.GE.min_soc_target
+            low_soc = int(stgs.GE.min_soc_target)
 
         max_charge_pc = max_charge_pcnt[0]
         min_charge_pc = min_charge_pcnt[0]
@@ -503,7 +505,7 @@ class GivEnergyObj:
                 if day == 1 and i == 0:
                     diff = plot_y2[48] - plot_y1[49]
                 if plot_y1[day*48 + i + 1] + diff > 100:  # Correct for SoC > 100%
-                    diff = 100 - plot_y1[day*48 + i]
+                    diff = 100 - plot_y1[day*48 + i + 1]  # Bugfix v1.1.0a
                 plot_y2.append(plot_y1[day*48 + i + 1] + diff)
                 i += 1
             day += 1
@@ -580,15 +582,15 @@ class SolcastObj:
             return
 
         if stgs.Solcast.url_sw != "":  # Two arrays are specified
-            logger.debug("url_sw = '"+str(stgs.Solcast.url_sw)+"'")
+            logger.info("url_sw = '"+str(stgs.Solcast.url_sw)+"'")
             result, solcast_data_2 = get_solcast(stgs.Solcast.url_sw)
             if not result:
                 logger.warning("Error; Problem with Solcast data, using previous values (if any)")
                 return
         else:
-            logger.debug("No second array")
+            logger.info("No second array")
 
-        logger.debug("Successful Solcast download.")
+        logger.info("Successful Solcast download.")
 
         # Combine forecast for PV arrays & align data with day boundaries
         pv_est10 = [0] * 10080
@@ -596,15 +598,17 @@ class SolcastObj:
         pv_est90 = [0] * 10080
 
         if stgs.Solcast.url_sw != "":  # Two arrays are specified
-            forecast_lines = min(len(solcast_data_1['forecasts']), len(solcast_data_2['forecasts'])) - 1
+            forecast_lines = min(len(solcast_data_1['forecasts']), \
+                len(solcast_data_2['forecasts'])) - 1
         else:
             forecast_lines = len(solcast_data_1['forecasts']) - 1
         interval = int(solcast_data_1['forecasts'][0]['period'][2:4])
-        solcast_offset = t_to_mins(solcast_data_1['forecasts'][0]['period_end'][11:16]) - interval - 60
+        solcast_offset = t_to_mins(solcast_data_1['forecasts'][0]['period_end'][11:16]) \
+            - interval - 60
 
         # Check for BST and convert to local time to align with GivEnergy data
         if time.strftime("%z", time.localtime()) == "+0100":
-            logger.debug("Applying BST offset to Solcast data")
+            logger.info("Applying BST offset to Solcast data")
             solcast_offset += 60
 
         i = solcast_offset
@@ -664,11 +668,11 @@ class SolcastObj:
             i += 1
 
         timestamp = time.strftime("%d-%m-%Y %H:%M:%S", time.localtime())
-        logger.debug("PV Estimate 10% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
+        logger.info("PV Estimate 10% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
             str(self.pv_est10_30[0:47])+ str(self.pv_est10_day[0:6]))
-        logger.debug("PV Estimate 50% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
+        logger.info("PV Estimate 50% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
             str(self.pv_est50_30[0:47])+ str(self.pv_est50_day[0:6]))
-        logger.debug("PV Estimate 90% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
+        logger.info("PV Estimate 90% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
             str(self.pv_est90_30[0:47])+ str(self.pv_est90_day[0:6]))
 
 # End of SolcastObj() class definition
