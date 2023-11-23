@@ -119,7 +119,7 @@ if __name__ == '__main__':
     GivTCP_write_soc(inverter.compute_tgt_soc(pv_forecast, PV_WEIGHT, True))
 
     # Send plot data to logfile in CSV format
-    logger.info("SoC Chart Data - Start")
+    logger.info("SoC Chart Data - Start. Paste these lines into a spreadsheet to create a plot of SoC")
     i = 0
     while i < 5:
         logger.info(inverter.plot[i])
