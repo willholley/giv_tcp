@@ -215,7 +215,7 @@ i=0
 while len(inverterStats)==0:
     inverterStats=findinv(networks)
     i=i+1
-    if i==3: 
+    if i==3 or len(inverterStats)>0: 
         break
     else:
         logger.info("Searching for Inverters again")

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [2.4.1] - 2023-11-05
 ### Fixed
+- PALM Fix for index error
+- lib fix for non-standard time registers
+- tweaks to startup and inverter discovery
+
+## [2.4.1] - 2023-11-05
+### Fixed
 - Fixed settigs error (LOAD_HIST_WEIGHT) for PALM
 
 ## [2.4.0] - 2023-11-04
