@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.4.2] - 2023-11-24
+### Fixed
+- Fix for no networks found in inverter scanning
+- Fix AIO -> "All in One" for timeslot checking
+
 ## [2.4.2] - 2023-11-23
 ### Fixed
 - PALM Fix for index error

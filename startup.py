@@ -66,6 +66,7 @@ def getInvDeets(HOST):
         return None
 
 def findinv(networks):
+    inverterStats={}
     if len(networks)>0:
     # For each interface scan for inverters
         logger.debug("Networks available for scanning are: "+str(networks))
@@ -215,7 +216,7 @@ i=0
 while len(inverterStats)==0:
     inverterStats=findinv(networks)
     i=i+1
-    if i==3 or len(inverterStats)>0: 
+    if i==3: 
         break
     else:
         logger.info("Searching for Inverters again")

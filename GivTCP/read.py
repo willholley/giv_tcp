@@ -505,7 +505,7 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         timeslots['Charge_start_time_slot_1'] = GEInv.charge_slot_1[0].isoformat()
         timeslots['Charge_end_time_slot_1'] = GEInv.charge_slot_1[1].isoformat()
         try:
-            if inverterModel.model == "AIO" or (inverterModel.generation == "Gen 3" and int(GEInv.arm_firmware_version)>302):   #10 slots only apply to AIO and new fw on Gen 3
+            if inverterModel.model == "All in One" or (inverterModel.generation == "Gen 3" and int(GEInv.arm_firmware_version)>302):   #10 slots only apply to AIO and new fw on Gen 3
                 timeslots['Charge_start_time_slot_2'] = GEInv.charge_slot_2[0].isoformat()
                 timeslots['Charge_end_time_slot_2'] = GEInv.charge_slot_2[1].isoformat()
                 timeslots['Charge_start_time_slot_3'] = GEInv.charge_slot_3[0].isoformat()
