@@ -31,7 +31,7 @@ RUN rm /etc/nginx/http.d/default.conf
 
 # copy the content of the local src directory to the working directory
 COPY GivTCP/ ./GivTCP
-COPY GivEnergy-Smart-Home-Display-givtcp/ ./GivEnergy-Smart-Home-Display-givtcp
+COPY WebDashboard/ ./WebDashboard
 COPY givenergy_modbus/ /usr/local/lib/python3.10/site-packages/givenergy_modbus
 
 COPY startup.py startup.py
