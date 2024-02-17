@@ -423,7 +423,8 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
 if os.getenv('WEB_DASH')=="True":
     # Create app.json
     logger.debug("Creating web dashboard config")
-    with open("WebDashboard/app.json", 'w') as outp:
+    os.chdir("/app/WebDashboard")
+    with open("app.json", 'w') as outp:
         outp.write("{\n")
         outp.write("  \"givTcpHosts\": [")
 
@@ -473,7 +474,7 @@ while True:
             gunicorn[inv]=subprocess.Popen(command)
     if os.getenv('WEB_DASH') == True and not webDash.poll() == None:
         logger.error("Web Dashboard process died. Restarting...")
-        os.chdir("WebDashboard")
+        os.chdir("/app/WebDashboard")
         WDPORT = int(os.getenv('WEB_DASH_PORT'))
         logger.critical("Serving Web Dashboard from port " + str(WDPORT))
         command = shlex.split("/usr/bin/node /usr/local/bin/serve -p " + str(WDPORT))
