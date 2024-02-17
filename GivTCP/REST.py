@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # version 2021.12.22
 from os.path import exists
-from flask import Flask, request, send_from_directory
+from flask import Flask, json as flask_json, request, send_from_directory
 from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
@@ -9,16 +9,15 @@ import evc as evc
 import config_dash as cfdash
 from GivLUT import GivQueue, GivLUT
 import os
-import json
+import json as std_json
 from settings import GiV_Settings
 
 logger = GivLUT.logger
 
 #set-up Flask details
 giv_api = Flask(__name__)
-CORS(giv_api)
-
 jsonResponseType = { 'Content-Type': 'application/json; charset=utf-8' }
+CORS(giv_api)
 
 #Proxy Read Functions
 
@@ -197,18 +196,18 @@ def swRates():
 def getFileData():
     file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'r')
     #file = open(os.path.dirname(__file__) + '/settings.json', 'r')
-    data = json.load(file)
+    data = std_json.load(file)
     file.close()
     return data
 
 @giv_api.route('/settings', methods=['POST'])
 def editFileData():
     file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'r')
-    data = json.load(file)
+    data = std_json.load(file)
     file.close()
     data.update(request.get_json(silent=True, force=True))
     file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'w')
-    json.dump(data, file,indent=4)
+    std_json.dump(data, file,indent=4)
     file.close()
     return data
 
