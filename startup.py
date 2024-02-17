@@ -435,7 +435,7 @@ if os.getenv('WEB_DASH')=="True":
             else:
                 outp.write("  {\n")
             outp.write("    \"name\": \""+os.getenv('INVERTOR_NAME_'+str(inv))+"\",\n")
-            outp.write("    \"port\": \""+GUPORT+"\"\n")
+            outp.write("    \"port\": \""+str(GUPORT)+"\"\n")
             outp.write("  }\n")
 
         outp.write("  ],\n")
