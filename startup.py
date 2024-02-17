@@ -426,20 +426,20 @@ if os.getenv('WEB_DASH')=="True":
     os.chdir("/app/WebDashboard")
     with open("app.json", 'w') as outp:
         outp.write("{\n")
-        outp.write("  \"givTcpHosts\": [")
+        outp.write("  \"givTcpHosts\": [\n")
 
         for inv in range(1, int(os.getenv('NUMINVERTORS')) + 1):
             if inv > 1:
-                outp.write("  ,{")
+                outp.write("  ,{\n")
             else:
-                outp.write("  {")
-            outp.write("    \"name\": [{\""+os.getenv('INVERTOR_NAME_'+str(inv))+"\",")
-            outp.write("    \"host\": [{\""+os.getenv('HOSTIP')+":6345\"")
-            outp.write("  }")
+                outp.write("  {\n")
+            outp.write("    \"name\": \""+os.getenv('INVERTOR_NAME_'+str(inv))+"\",\n")
+            outp.write("    \"host\": \""+os.getenv('HOSTIP')+":6345\"\n")
+            outp.write("  }\n")
 
-        outp.write("  ],")
-        outp.write("  \"solarRate\": "+os.getenv('DAYRATE')+",")
-        outp.write("  \"exportRate\": "+os.getenv('EXPORTRATE')+"")
+        outp.write("  ],\n")
+        outp.write("  \"solarRate\": "+os.getenv('DAYRATE')+",\n")
+        outp.write("  \"exportRate\": "+os.getenv('EXPORTRATE')+"\n")
         outp.write("}")
     WDPORT=int(os.getenv('WEB_DASH_PORT'))
     logger.critical ("Serving Web Dashboard from port "+str(WDPORT))
