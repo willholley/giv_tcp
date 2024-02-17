@@ -429,12 +429,13 @@ if os.getenv('WEB_DASH')=="True":
         outp.write("  \"givTcpHosts\": [\n")
 
         for inv in range(1, int(os.getenv('NUMINVERTORS')) + 1):
+            GUPORT = 6344 + inv
             if inv > 1:
                 outp.write("  ,{\n")
             else:
                 outp.write("  {\n")
             outp.write("    \"name\": \""+os.getenv('INVERTOR_NAME_'+str(inv))+"\",\n")
-            outp.write("    \"host\": \""+os.getenv('HOSTIP')+":6345\"\n")
+            outp.write("    \"port\": \""+GUPORT+"\"\n")
             outp.write("  }\n")
 
         outp.write("  ],\n")
