@@ -15,7 +15,7 @@ from os.path import exists
 import os
 import math
 from rq import Retry
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 logging.getLogger("givenergy_modbus").setLevel(logging.CRITICAL)
 logging.getLogger("rq.worker").setLevel(logging.CRITICAL)
