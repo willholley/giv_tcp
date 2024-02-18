@@ -971,11 +971,11 @@ def ratecalcs(multi_output, multi_output_old):
         rate_data['Night_Energy_Total_kWh'] = 0
 
     if GiV_Settings.dynamic_tariff == False:     ## If we use externally triggered rates then don't do the time check but assume the rate files are set elsewhere (default to Day if not set)
-        now = datetime.datetime.now(GivLUT.timezone)
-        if night_start <= now < day_start:
-            open(GivLUT.nightRateRequest, 'w').close()
-        else:
+        if dayRateStart.hour == datetime.datetime.now(GivLUT.timezone).hour and dayRateStart.minute == datetime.datetime.now(GivLUT.timezone).minute:
             open(GivLUT.dayRateRequest, 'w').close()
+        elif nightRateStart.hour == datetime.datetime.now(GivLUT.timezone).hour and nightRateStart.minute == datetime.datetime.now(GivLUT.timezone).minute:
+            open(GivLUT.nightRateRequest, 'w').close()
+        # Otherwise check to see if dynamic trigger has been received to change rate type
 
     if exists(GivLUT.nightRateRequest):
         os.remove(GivLUT.nightRateRequest)
