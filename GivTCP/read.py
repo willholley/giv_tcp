@@ -913,14 +913,8 @@ def ratecalcs(multi_output, multi_output_old):
     rate_data = {}
     dayRateStart = datetime.datetime.strptime(GiV_Settings.day_rate_start, '%H:%M')
     nightRateStart = datetime.datetime.strptime(GiV_Settings.night_rate_start, '%H:%M')
-    night_start = datetime.datetime.combine(datetime.datetime.now(GivLUT.timezone).date(),
-                                            nightRateStart.time()).replace(tzinfo=GivLUT.timezone)
-
-    # If night rate starts before midnight, change "night start" to the prior day rather than current day
-    if nightRateStart > dayRateStart:
-        night_start = night_start - datetime.timedelta(days=1)
-
-    logger.debug("Night Start= " + datetime.datetime.strftime(night_start, '%c'))
+    night_start = datetime.datetime.combine(datetime.datetime.now(GivLUT.timezone).date(),nightRateStart.time()).replace(tzinfo=GivLUT.timezone)
+    logger.debug("Night Start= "+datetime.datetime.strftime(night_start, '%c'))
     day_start = datetime.datetime.combine(datetime.datetime.now(GivLUT.timezone).date(),dayRateStart.time()).replace(tzinfo=GivLUT.timezone)
     logger.debug("Day Start= "+datetime.datetime.strftime(day_start, '%c'))
     import_energy = multi_output['Energy']['Total']['Import_Energy_Total_kWh']
