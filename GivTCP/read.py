@@ -919,8 +919,6 @@ def ratecalcs(multi_output, multi_output_old):
     logger.debug("Day Start= "+datetime.datetime.strftime(day_start, '%c'))
     import_energy = multi_output['Energy']['Total']['Import_Energy_Total_kWh']
     import_energy_old = multi_output_old['Energy']['Total']['Import_Energy_Total_kWh']
-    export_energy = multi_output['Energy']['Total']['Export_Energy_Total_kWh']
-    export_energy_old = multi_output_old['Energy']['Total']['Export_Energy_Total_kWh']
 
     # check if pickle data exists:
     if exists(GivLUT.ratedata):
@@ -948,10 +946,8 @@ def ratecalcs(multi_output, multi_output_old):
         rate_data['Night_Energy_Total_kWh'] = 0
     if not('Day_Energy_Total_kWh' in rate_data):
         rate_data['Day_Energy_Total_kWh'] = 0
-    if not('Export_Income' in rate_data):
-        rate_data['Export_Income'] = 0.00
 
-    # Always update rates from new setting
+# Always update rates from new setting
     rate_data['Export_Rate'] = GiV_Settings.export_rate
     rate_data['Day_Rate'] = GiV_Settings.day_rate
     rate_data['Night_Rate'] = GiV_Settings.night_rate
@@ -967,7 +963,6 @@ def ratecalcs(multi_output, multi_output_old):
         rate_data['Night_Start_Energy_kWh'] = import_energy
         rate_data['Day_Energy_Total_kWh'] = 0
         rate_data['Night_Energy_Total_kWh'] = 0
-        rate_data['Export_Income'] = 0.00
 
     if GiV_Settings.dynamic_tariff == False:     ## If we use externally triggered rates then don't do the time check but assume the rate files are set elsewhere (default to Day if not set)
         if dayRateStart.hour == datetime.datetime.now(GivLUT.timezone).hour and dayRateStart.minute == datetime.datetime.now(GivLUT.timezone).minute:
@@ -980,7 +975,7 @@ def ratecalcs(multi_output, multi_output_old):
         os.remove(GivLUT.nightRateRequest)
         if not exists(GivLUT.nightRate):
             #Save last total from todays dayrate so far
-            rate_data['Day_Energy_Total_kWh'] = rate_data['Day_Energy_kWh']       # save current day energy at the end of the slot
+            rate_data['Day_Energy_Total_kWh']=rate_data['Day_Energy_kWh']       # save current day energy at the end of the slot
             logger.info("Saving current energy stats at start of night rate tariff (Dynamic)")
             rate_data['Night_Start_Energy_kWh'] = import_energy-rate_data['Night_Energy_Total_kWh']     #offset current night energy from current energy to combine into a single slot
             open(GivLUT.nightRate, 'w').close()
@@ -990,13 +985,13 @@ def ratecalcs(multi_output, multi_output_old):
     elif exists(GivLUT.dayRateRequest):
         os.remove(GivLUT.dayRateRequest)
         if not exists(GivLUT.dayRate):
-            rate_data['Night_Energy_Total_kWh'] = rate_data['Night_Energy_kWh']   # save current night energy at the end of the slot
+            rate_data['Night_Energy_Total_kWh']=rate_data['Night_Energy_kWh']   # save current night energy at the end of the slot
             logger.info("Saving current energy stats at start of day rate tariff (Dynamic)")
             rate_data['Day_Start_Energy_kWh'] = import_energy-rate_data['Day_Energy_Total_kWh']     # offset current day energy from current energy to combine into a single slot
             open(GivLUT.dayRate, 'w').close()
             if exists(GivLUT.nightRate):
                 logger.debug(".nightRate exists so deleting it")
-                os.remove(GivLUT.nightRate)  
+                os.remove(GivLUT.nightRate)
 
     if not exists(GivLUT.nightRate) and not exists(GivLUT.dayRate): #Default to Day if not previously set
         logger.info("No day/Night rate info so reverting to day")
@@ -1011,31 +1006,31 @@ def ratecalcs(multi_output, multi_output_old):
         rate_data['Current_Rate'] = GiV_Settings.night_rate
         logger.debug("Setting Rate to Night")
 
-    # If more energy has been imported, calculate the difference in energy imported
-    if import_energy > import_energy_old:
+
+    # now calc the difference for each value between the correct start pickle and now
+    if import_energy>import_energy_old: # Only run if there has been more import
         logger.debug("Imported more energy so calculating current tariff costs: "+str(import_energy_old)+" -> "+str(import_energy))
-        energy_difference = float(import_energy) - float(import_energy_old)
+
+#        if night_start <= datetime.datetime.now(GivLUT.timezone) < day_start:
         if exists(GivLUT.nightRate):
             logger.debug("Current Tariff is Night, calculating stats...")
-            rate_data['Night_Energy_kWh'] += float(energy_difference)
-            rate_data['Night_Cost'] += float(energy_difference) * float(GiV_Settings.night_rate)
+            # Add change in energy this slot to previous rate_data
+            rate_data['Night_Energy_kWh'] = import_energy-rate_data['Night_Start_Energy_kWh']
+            logger.debug("Night_Energy_kWh=" +str(import_energy)+" - "+str(rate_data['Night_Start_Energy_kWh']))
+            rate_data['Night_Cost'] = float(rate_data['Night_Energy_kWh'])*float(GiV_Settings.night_rate)
+            logger.debug("Night_Cost= "+str(rate_data['Night_Energy_kWh'])+"kWh x £"+str(float(GiV_Settings.night_rate))+"/kWh = £"+str(rate_data['Night_Cost']))
             rate_data['Current_Rate'] = GiV_Settings.night_rate
         else:
             logger.debug("Current Tariff is Day, calculating stats...")
-            rate_data['Day_Energy_kWh'] += float(energy_difference)
-            rate_data['Day_Cost'] += float(energy_difference) * float(GiV_Settings.day_rate)
+            rate_data['Day_Energy_kWh'] = import_energy-rate_data['Day_Start_Energy_kWh']
+            logger.debug("Day_Energy_kWh=" + str(import_energy)+" - "+str(rate_data['Day_Start_Energy_kWh']))
+            rate_data['Day_Cost'] = float(rate_data['Day_Energy_kWh'])*float(GiV_Settings.day_rate)
+            logger.debug("Day_Cost= "+str(rate_data['Day_Energy_kWh'])+"kWh x £"+str(float(GiV_Settings.day_rate))+"/kWh = £"+str(rate_data['Day_Cost']))
             rate_data['Current_Rate'] = GiV_Settings.day_rate
+
         if (multi_output['Energy']['Today']['Load_Energy_Today_kWh']) != 0:
             rate_data['Import_ppkwh_Today'] = round((rate_data['Day_Cost']+rate_data['Night_Cost'])/(multi_output['Energy']['Today']['Import_Energy_Today_kWh']), 3)
             logger.debug("Import_ppkwh_Today= (£"+str(rate_data['Day_Cost'])+" + £"+str(rate_data['Night_Cost'])+") \ "+str(multi_output['Energy']['Today']['Load_Energy_Today_kWh'])+"kWh = £"+str(rate_data['Import_ppkwh_Today'])+"/kWh")
-
-    # If more energy has been exported, calculate the difference in energy exported
-    if export_energy > export_energy_old:
-        logger.debug("Exported more energy so calculating current export income: "+str(export_energy_old)+" -> "+str(export_energy))
-        energy_difference = float(export_energy) - float(export_energy_old)
-        rate_data['Export_Energy_kWh'] += float(energy_difference)
-        rate_data['Export_Income'] += float(energy_difference) * float(GiV_Settings.export_rate)
-        rate_data['Export_Rate'] = GiV_Settings.export_rate
 
     multi_output['Energy']['Rates'] = rate_data
 
