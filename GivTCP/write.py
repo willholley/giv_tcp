@@ -1147,12 +1147,30 @@ def switchRate(payload):
         logger.error(temp['result'])
         return json.dumps(temp)
     try:
-        if payload.lower()=="day":
+        if payload.lower() == "day":
             open(GivLUT.dayRateRequest, 'w').close()
-            logger.info ("Setting dayRate via external trigger")
-        else:
+            logger.info("Setting dayRate via external trigger")
+        elif payload.lower() == "night":
             open(GivLUT.nightRateRequest, 'w').close()
-            logger.info ("Setting nightRate via external trigger")
+            logger.info("Setting nightRate via external trigger")
+        else:
+            logger.info("Setting day or night via external trigger, along with custom unit rates")
+            if "export_rate" in payload:
+                GiV_Settings.export_rate = float(payload['export_rate'])
+                logger.info("Setting export rate to " + str(GiV_Settings.export_rate))
+            if "day_rate" in payload:
+                GiV_Settings.day_rate = float(payload['day_rate'])
+                logger.info("Setting day rate to " + str(GiV_Settings.day_rate))
+            if "night_rate" in payload:
+                GiV_Settings.night_rate = float(payload['night_rate'])
+                logger.info("Setting night rate to " + str(GiV_Settings.night_rate))
+            if "rate" in payload:
+                if payload["rate"].lower() == "day":
+                    open(GivLUT.dayRateRequest, 'w').close()
+                    logger.info("Setting dayRate via external trigger")
+                elif payload["rate"].lower() == "night":
+                    open(GivLUT.nightRateRequest, 'w').close()
+                    logger.info("Setting nightRate via external trigger")
     except:
         e = sys.exc_info()
         temp['result']="Setting Rate failed: " + str(e) 
