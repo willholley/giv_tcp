@@ -1147,13 +1147,14 @@ def switchRate(payload):
         logger.error(temp['result'])
         return json.dumps(temp)
     try:
-        if payload.lower() == "day":
-            open(GivLUT.dayRateRequest, 'w').close()
-            logger.info("Setting dayRate via external trigger")
-        elif payload.lower() == "night":
-            open(GivLUT.nightRateRequest, 'w').close()
-            logger.info("Setting nightRate via external trigger")
-        else:
+        if isinstance(payload, str):
+            if payload.lower() == "day":
+                open(GivLUT.dayRateRequest, 'w').close()
+                logger.info("Setting dayRate via external trigger")
+            elif payload.lower() == "night":
+                open(GivLUT.nightRateRequest, 'w').close()
+                logger.info("Setting nightRate via external trigger")
+        elif isinstance(payload, dict):
             logger.info("Setting day or night via external trigger, along with custom unit rates")
             if "export_rate" in payload:
                 GiV_Settings.export_rate = float(payload['export_rate'])
