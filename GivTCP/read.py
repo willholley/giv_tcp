@@ -983,9 +983,9 @@ def ratecalcs(multi_output, multi_output_old):
         os.remove(GivLUT.nightRateRequest)
         if not exists(GivLUT.nightRate):
             #Save last total from todays dayrate so far
-            #rate_data['Day_Energy_Total_kWh']=rate_data['Day_Energy_kWh']       # save current day energy at the end of the slot
-            #logger.info("Saving current energy stats at start of night rate tariff (Dynamic)")
-            #rate_data['Night_Start_Energy_kWh'] = import_energy-rate_data['Night_Energy_Total_kWh']     #offset current night energy from current energy to combine into a single slot
+            rate_data['Day_Energy_Total_kWh'] = rate_data['Day_Energy_kWh']       # save current day energy at the end of the slot
+            logger.info("Saving current energy stats at start of night rate tariff (Dynamic)")
+            rate_data['Night_Start_Energy_kWh'] = import_energy-rate_data['Night_Energy_Total_kWh']     #offset current night energy from current energy to combine into a single slot
             open(GivLUT.nightRate, 'w').close()
             if exists(GivLUT.dayRate):
                 logger.debug(".dayRate exists so deleting it")
@@ -993,9 +993,9 @@ def ratecalcs(multi_output, multi_output_old):
     elif exists(GivLUT.dayRateRequest):
         os.remove(GivLUT.dayRateRequest)
         if not exists(GivLUT.dayRate):
-            #rate_data['Night_Energy_Total_kWh']=rate_data['Night_Energy_kWh']   # save current night energy at the end of the slot
-            #logger.info("Saving current energy stats at start of day rate tariff (Dynamic)")
-            #rate_data['Day_Start_Energy_kWh'] = import_energy-rate_data['Day_Energy_Total_kWh']     # offset current day energy from current energy to combine into a single slot
+            rate_data['Night_Energy_Total_kWh'] = rate_data['Night_Energy_kWh']   # save current night energy at the end of the slot
+            logger.info("Saving current energy stats at start of day rate tariff (Dynamic)")
+            rate_data['Day_Start_Energy_kWh'] = import_energy-rate_data['Day_Energy_Total_kWh']     # offset current day energy from current energy to combine into a single slot
             open(GivLUT.dayRate, 'w').close()
             if exists(GivLUT.nightRate):
                 logger.debug(".nightRate exists so deleting it")
