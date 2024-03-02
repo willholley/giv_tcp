@@ -280,6 +280,8 @@ class GivLUT:
         "Day_Rate":GEType("sensor","money","",0,maxRate,True,False,False),
         "Current_Rate":GEType("sensor","money","",0,maxRate,True,False,False),
         "Current_Rate_Type":GEType("select","","switchRate","","",True,False,False),
+        "Export_Energy_kWh": GEType("sensor", "energy", "", 0, maxTodayEnergy, False, False, False),
+        "Export_Income":GEType("sensor","money","",0,maxCost,True,False,False),
         "Export_Rate":GEType("sensor","money","",0,maxRate,True,False,False),
         "Import_ppkwh_Today":GEType("sensor","money","",0,maxRate,True,False,False),
         "Battery_Value":GEType("sensor","money","",0,maxCost,True,False,False),

@@ -948,8 +948,6 @@ def ratecalcs(multi_output, multi_output_old):
         rate_data['Night_Energy_Total_kWh'] = 0
     if not('Day_Energy_Total_kWh' in rate_data):
         rate_data['Day_Energy_Total_kWh'] = 0
-    if not('Export_Energy_Total_kWh' in rate_data):
-        rate_data['Export_Energy_Total_kWh'] = 0
     if not('Export_Income' in rate_data):
         rate_data['Export_Income'] = 0.00
 
@@ -969,7 +967,6 @@ def ratecalcs(multi_output, multi_output_old):
         rate_data['Night_Start_Energy_kWh'] = import_energy
         rate_data['Day_Energy_Total_kWh'] = 0
         rate_data['Night_Energy_Total_kWh'] = 0
-        rate_data['Export_Energy_Total_kWh'] = export_energy
         rate_data['Export_Income'] = 0.00
 
     if GiV_Settings.dynamic_tariff == False:     ## If we use externally triggered rates then don't do the time check but assume the rate files are set elsewhere (default to Day if not set)
@@ -1017,15 +1014,15 @@ def ratecalcs(multi_output, multi_output_old):
     # If more energy has been imported, calculate the difference in energy imported
     if import_energy > import_energy_old:
         logger.debug("Imported more energy so calculating current tariff costs: "+str(import_energy_old)+" -> "+str(import_energy))
-        energy_difference = import_energy - import_energy_old
+        energy_difference = float(import_energy) - float(import_energy_old)
         if exists(GivLUT.nightRate):
             logger.debug("Current Tariff is Night, calculating stats...")
-            rate_data['Night_Energy_kWh'] += energy_difference
+            rate_data['Night_Energy_kWh'] += float(energy_difference)
             rate_data['Night_Cost'] += float(energy_difference) * float(GiV_Settings.night_rate)
             rate_data['Current_Rate'] = GiV_Settings.night_rate
         else:
             logger.debug("Current Tariff is Day, calculating stats...")
-            rate_data['Day_Energy_kWh'] += energy_difference
+            rate_data['Day_Energy_kWh'] += float(energy_difference)
             rate_data['Day_Cost'] += float(energy_difference) * float(GiV_Settings.day_rate)
             rate_data['Current_Rate'] = GiV_Settings.day_rate
         if (multi_output['Energy']['Today']['Load_Energy_Today_kWh']) != 0:
@@ -1035,8 +1032,8 @@ def ratecalcs(multi_output, multi_output_old):
     # If more energy has been exported, calculate the difference in energy exported
     if export_energy > export_energy_old:
         logger.debug("Exported more energy so calculating current export income: "+str(export_energy_old)+" -> "+str(export_energy))
-        energy_difference = export_energy - export_energy_old
-        rate_data['Export_Energy_kWh'] += energy_difference
+        energy_difference = float(export_energy) - float(export_energy_old)
+        rate_data['Export_Energy_kWh'] += float(energy_difference)
         rate_data['Export_Income'] += float(energy_difference) * float(GiV_Settings.export_rate)
         rate_data['Export_Rate'] = GiV_Settings.export_rate
 
