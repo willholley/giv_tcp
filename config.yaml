@@ -68,7 +68,6 @@ options:
   TZ: "Europe/London"
   WEB_DASH: False
   WEB_DASH_PORT: 3000
-  HOSTIP: "homeassistant.local"
   CACHELOCATION: "/config/GivTCP"
   DATASMOOTHER: "medium"
   SMARTTARGET: False
