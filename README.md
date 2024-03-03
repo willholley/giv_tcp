@@ -67,6 +67,18 @@ GivTCP collects all inverter and battery data and creates a nested data structur
 | getCache      | Retrieves data from the local cache returns it without publishing to MQTT etc...   | /getCache |
 | RunAll        | Runs both getData and pubFromPickle to refresh data and then publish               | /runAll   |
 
+## Web Dashboard
+
+You can enable the built-in web dashboard if you'd like a way to visualise data for your inverter(s). For more details
+please see the [ReadMe file in the separate repository](https://github.com/DanielGallo/GivEnergy-Smart-Home-Display/).
+
+![Dashboard-Example-Landscape.png](graphics/Dashboard-Example-Landscape.png)
+
+The web dashboard is able to summarise data for a single inverter, or multiple inverters in either a single-phase 
+or three-phase environment.
+
+If you have any issues or feedback regarding the web dashboard, please post a question or issue [here](https://github.com/DanielGallo/GivEnergy-Smart-Home-Display/issues).
+
 # GivEVC
 
 ## GivEnergy Electric Vehicle Charger
