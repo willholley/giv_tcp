@@ -46,15 +46,17 @@ class HAMQTT():
 
     def publish_discovery(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			#create flag in class
-        client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+        client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION1,"GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
         rootTopic=str(GiV_Settings.MQTT_Topic+"/"+SN+"/")
         if HAMQTT.MQTTCredentials:
             client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
+        client.host=GivMQTT.MQTT_Address
+        client.port=GivMQTT.MQTT_Port
         try:
             client.on_connect=HAMQTT.on_connect     			#bind call back function
             client.loop_start()
             logger.debug("Connecting to broker: "+ HAMQTT.MQTT_Address)
-            client.connect(HAMQTT.MQTT_Address,port=HAMQTT.MQTT_Port)
+            #client.connect(HAMQTT.MQTT_Address,port=HAMQTT.MQTT_Port)
             while not client.connected_flag:        			#wait in loop
                 logger.debug("In wait loop")
                 time.sleep(0.2)

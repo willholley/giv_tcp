@@ -11,6 +11,8 @@ import time
 from os.path import exists
 import pickle,os
 from GivLUT import GivLUT, GivQueue
+from givenergy_modbus_async.client.client import Client
+from givenergy_modbus_async.client import commands
 from givenergy_modbus.client import GivEnergyClient
 from rq import Retry
 from mqtt import GivMQTT
@@ -32,7 +34,6 @@ def updateControlMQTT(entity,value):
     GivMQTT.single_MQTT_publish(Topic,str(value))
     return
 
-
 def sct(target):
     temp={}
     try:
@@ -47,7 +48,10 @@ def sct(target):
 def sct2(target,slot):
     temp={}
     try:
-        client.enable_charge_target_2(target,slot)
+        if GiV_Settings.isAIO:
+            client.enable_charge_target_2(target,slot,True)
+        else:
+            client.enable_charge_target_2(target,slot,False)
         updateControlMQTT("Charge_Target_SOC_"+str(slot),target)
         temp['result']="Setting Charge Target "+str(slot) + " was a success"
     except:
@@ -305,6 +309,7 @@ def sds(payload):
         temp['result']="Setting Discharge Slot "+str(payload['slot'])+" failed: " + str(e)
     logger.info(temp['result'])    
     return json.dumps(temp)
+
 def sdss(payload):
     temp={}
     try:
@@ -675,6 +680,8 @@ def setDischargeSlot(payload):
     temp={}
     if type(payload) is not dict: payload=json.loads(payload)
     if 'dischargeToPercent' in payload.keys():
+        pload={}
+        pload['reservePercent']=payload['dischargeToPercent']
         result=setBatteryReserve(payload)
     try:
         strt=datetime.strptime(payload['start'],"%H:%M")

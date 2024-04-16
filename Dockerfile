@@ -22,9 +22,9 @@ RUN pip install -r requirements.txt
 
 COPY givtcp-vuejs/package.json ./config_frontend/package.json
 
-RUN cd /app/config_frontend && npm install
-COPY givtcp-vuejs ./config_frontend
-RUN cd /app/config_frontend && npm run build
+#RUN cd /app/config_frontend && npm install
+#COPY givtcp-vuejs ./config_frontend
+#RUN cd /app/config_frontend && npm run build
 
 COPY ingress.conf /etc/nginx/http.d/
 RUN rm /etc/nginx/http.d/default.conf
@@ -65,7 +65,7 @@ ENV MQTT_RETAIN=False
 ENV LOG_LEVEL="Info"
 ENV PRINT_RAW=True
 ENV SELF_RUN=True
-ENV SELF_RUN_LOOP_TIMER=5
+ENV SELF_RUN_LOOP_TIMER=30
 ENV INFLUX_OUTPUT=False
 ENV INFLUX_URL=""
 ENV INFLUX_TOKEN=""

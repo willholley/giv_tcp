@@ -74,7 +74,9 @@ def on_message(client, userdata, message):
         elif command=="setMaxSessionEnergy":
             writecommand=message.payload.decode("utf-8")
             evc.setMaxSessionEnergy(int(writecommand))
-            
+        elif command=="setSystemTime":
+            writecommand=message.payload.decode("utf-8")
+            evc.setDateTime(writecommand)
     except:
         e = sys.exc_info()
         logger.error("MQTT.OnMessage Exception: "+str(e))

@@ -28,22 +28,6 @@ if GiV_Settings.MQTT_Topic=='':
 else:
     MQTT_Topic=GiV_Settings.MQTT_Topic
 
-logger.critical("Connecting to MQTT broker for control- "+str(GiV_Settings.MQTT_Address))
-#loop till serial number has been found
-count=0          # 09-July-2023  set start point
-
-while not hasattr(GiV_Settings,'serial_number'):
-    time.sleep(5)
-    #del sys.modules['settings.GiV_Settings']
-    importlib.reload(settings)
-    from settings import GiV_Settings
-    count=count + 1      # 09-July-2023  previous +1 only simply reset value to 1 so loop was infinite
-    if count==20:
-        logger.error("No serial_number found in MQTT queue. MQTT Control not available.")
-        break
-if hasattr(GiV_Settings,'serial_number'):
-    logger.debug("Serial Number retrieved: "+GiV_Settings.serial_number)
-
 def isfloat(num):
     try:
         float(num)
@@ -97,6 +81,10 @@ def on_message(client, userdata, message):
         elif command=="setChargeTarget":
             writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
             wr.setChargeTarget(writecommand)
+        elif command=="setChargeTarget1":
+            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=1
+            wr.setChargeTarget2(writecommand)
         elif command=="setChargeTarget2":
             writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
             writecommand['slot']=2
@@ -388,15 +376,31 @@ def on_connect(client, userdata, flags, rc):
     else:
         logger.error("Bad connection Returned code= "+str(rc))
 
+logger.critical("Connecting to MQTT broker for control- "+str(GiV_Settings.MQTT_Address))
+#loop till serial number has been found
+count=0          # 09-July-2023  set start point
 
-client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance)+"_Control")
-mqtt.Client.connected_flag=False        			#create flag in class
-if MQTTCredentials:
-    client.username_pw_set(MQTT_Username,MQTT_Password)
-client.on_connect=on_connect     			        #bind call back function
-client.on_message=on_message                        #bind call back function
-#client.loop_start()
+while not hasattr(GiV_Settings,'serial_number'):
+    time.sleep(5)
+    #del sys.modules['settings.GiV_Settings']
+    importlib.reload(settings)
+    from settings import GiV_Settings
+    count=count + 1      # 09-July-2023  previous +1 only simply reset value to 1 so loop was infinite
+    if count==20:
+        break
+if hasattr(GiV_Settings,'serial_number'):
+    logger.debug("Serial Number retrieved: "+GiV_Settings.serial_number)
 
-logger.debug ("Connecting to broker(sub): "+ MQTT_Address)
-client.connect(MQTT_Address,port=MQTT_Port)
-client.loop_forever()
+    client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance)+"_Control")
+    mqtt.Client.connected_flag=False        			#create flag in class
+    if MQTTCredentials:
+        client.username_pw_set(MQTT_Username,MQTT_Password)
+    client.on_connect=on_connect     			        #bind call back function
+    client.on_message=on_message                        #bind call back function
+    #client.loop_start()
+
+    logger.debug ("Connecting to broker(sub): "+ MQTT_Address)
+    client.connect(MQTT_Address,port=MQTT_Port)
+    client.loop_forever()
+else:
+    logger.error("No serial_number found in MQTT queue. MQTT Control not available. Double check logs for connection errors and restart GivTCP or ensure correct AIO/firmware settings")

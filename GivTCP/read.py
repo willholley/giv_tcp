@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 # version 2022.08.01
 from threading import Lock
-from givenergy_modbus.model.inverter import Model
+from givenergy_modbus_async import model
+from givenergy_modbus_async.model.inverter import Model, Generation
 import sys
 from pickletools import read_uint1
 import json
@@ -16,8 +17,9 @@ import os
 import math
 from rq import Retry
 from datetime import timedelta
+import asyncio
 
-logging.getLogger("givenergy_modbus").setLevel(logging.CRITICAL)
+logging.getLogger("givenergy_modbus_async").setLevel(logging.CRITICAL) 
 logging.getLogger("rq.worker").setLevel(logging.CRITICAL)
 
 sys.path.append(GiV_Settings.default_path)
@@ -28,10 +30,14 @@ logger = GivLUT.logger
 
 cacheLock = Lock()
 
-def inverterData(fullrefresh):
+def inverterData(fullrefresh, Async: bool=False):
     temp={}
+    # grab serial_number if it exists
     try:
-        plant = GivClient.getData(fullrefresh)
+        if Async:
+            plant=asyncio.run(GivClient.getDataAsync(fullrefresh))
+        else:
+            plant = GivClient.getData(fullrefresh)
         Inv = plant.inverter
         Bat = plant.batteries
     except:
@@ -48,29 +54,31 @@ def getData(fullrefresh):  # Read from Inverter put in cache
     multi_output = {}
     result = {}
     temp = {}
-    
     logger.debug("----------------------------Starting----------------------------")
     logger.debug("Getting All Registers")
 
     # Connect to inverter and load data
     try:
         logger.debug("Connecting to: " + GiV_Settings.invertorIP)
-        plant=GivQueue.q.enqueue(inverterData,fullrefresh,retry=Retry(max=GiV_Settings.queue_retries, interval=2))   
-        while plant.result is None and plant.exc_info is None:
-            time.sleep(0.1)
-        if "ERROR" in plant.result:
-            raise Exception ("Garbage or failed inverter Response: "+ str(plant.result))
-        GEInv=plant.result[0]
-        GEBat=plant.result[1]
+#        plant=GivQueue.q.enqueue(inverterData,fullrefresh,retry=Retry(max=GiV_Settings.queue_retries, interval=2))   
+#        while plant.result is None and plant.exc_info is None:
+#            time.sleep(0.1)
+#        if "ERROR" in plant.result:
+#            raise Exception ("Garbage or failed inverter Response: "+ str(plant.result))
+#        GEInv=plant.result[0]
+#        GEBat=plant.result[1]
 
-#        plant=inverterData(True)
-#        GEInv=plant[0]
-#        GEBat=plant[1]
+        plant=inverterData(True, True) #Run using async library
+        if "ERROR" in plant:
+            print (plant)
+            raise Exception ("Garbage or failed inverter Response: "+ str(plant))
+        GEInv=plant[0]
+        GEBat=plant[1]
        
         multi_output['Last_Updated_Time'] = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
         multi_output['status'] = "online"
         multi_output['Time_Since_Last_Update'] = 0
-        multi_output['GivTCP_Version']= "2.4.1"
+        multi_output['GivTCP_Version']= "2.4.62"
     except:
         e = sys.exc_info()
         consecFails(e)
@@ -83,28 +91,32 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         logger.debug("Beginning parsing of Inverter data")
         inverterModel= InvType
         # Determine inverter Model and max charge rate first...
-
-        genint=math.floor(int(GEInv.arm_firmware_version)/100)
-
-        inverterModel.model=GEInv.inverter_model
-        inverterModel.generation=GEInv.inverter_generation
-        inverterModel.phase=GEInv.inverter_phases
-        inverterModel.invmaxrate=GEInv.inverter_maxpower
+      
+        #inverterModel.model=GEInv.inverter_model
+        inverterModel.model=GEInv.model   #Async
+        #inverterModel.generation=GEInv.inverter_generation
+        inverterModel.generation=GEInv.generation
+        #inverterModel.phase=GEInv.inverter_phases
+        inverterModel.phase=GEInv.num_phases
+        #inverterModel.invmaxrate=GEInv.inverter_maxpower
+        inverterModel.invmaxrate=GEInv.inverter_max_power
 
         if GEInv.device_type_code=="8001":  # if AIO
-            batteryCapacity=GEInv.battery_nominal_capacity*307
+            #batteryCapacity=GEInv.battery_nominal_capacity*307
+            batteryCapacity=GEInv.battery_capacity*307
         else:
-            batteryCapacity=GEInv.battery_nominal_capacity*51.2
+            #batteryCapacity=GEInv.battery_nominal_capacity*51.2
+            batteryCapacity=GEInv.battery_capacity*51.2
 
-        if inverterModel.generation == 'Gen 1':
-            if inverterModel.model == "AC":
+        if inverterModel.generation == Generation.GEN1:
+            if inverterModel.model == Model.AC:
                 maxBatChargeRate=3000
-            elif inverterModel.model == "All in One":
+            elif inverterModel.model == Model.ALL_IN_ONE:
                 maxBatChargeRate=6000
             else:
                 maxBatChargeRate=2600
         else:
-            if inverterModel.model == "AC":
+            if inverterModel.model == Model.AC:
                 maxBatChargeRate=5000
             else:
                 maxBatChargeRate=3600
@@ -122,7 +134,7 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         energy_total_output['PV_Energy_Total_kWh'] = GEInv.e_pv_total
         energy_total_output['AC_Charge_Energy_Total_kWh'] = GEInv.e_inverter_in_total
 
-        if inverterModel.model == "Hybrid":
+        if inverterModel.model == Model.HYBRID:
             energy_total_output['Load_Energy_Total_kWh'] = round((energy_total_output['Invertor_Energy_Total_kWh']-energy_total_output['AC_Charge_Energy_Total_kWh']) -
                                                                  (energy_total_output['Export_Energy_Total_kWh']-energy_total_output['Import_Energy_Total_kWh']), 2)
         else:
@@ -141,7 +153,7 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         energy_today_output['Invertor_Energy_Today_kWh'] = GEInv.e_inverter_out_day
         energy_today_output['Self_Consumption_Energy_Today_kWh'] = round(energy_today_output['PV_Energy_Today_kWh'], 2)-round(energy_today_output['Export_Energy_Today_kWh'], 2)
 
-        if inverterModel.model == "Hybrid":
+        if inverterModel.model == Model.HYBRID:
             energy_today_output['Load_Energy_Today_kWh'] = round((energy_today_output['Invertor_Energy_Today_kWh']-energy_today_output['AC_Charge_Energy_Today_kWh']) -
                                                                  (energy_today_output['Export_Energy_Today_kWh']-energy_today_output['Import_Energy_Today_kWh']), 2)
         else:
@@ -264,9 +276,9 @@ def getData(fullrefresh):  # Read from Inverter put in cache
  
         # Energy Stats
         logger.debug("Getting Battery Energy Data")
-        energy_today_output['Battery_Charge_Energy_Today_kWh'] = GEInv.e_battery_charge_day
-        energy_today_output['Battery_Discharge_Energy_Today_kWh'] = GEInv.e_battery_discharge_day
-        energy_today_output['Battery_Throughput_Today_kWh'] = GEInv.e_battery_charge_day+GEInv.e_battery_discharge_day
+        energy_today_output['Battery_Charge_Energy_Today_kWh'] = GEInv.e_battery_charge_today
+        energy_today_output['Battery_Discharge_Energy_Today_kWh'] = GEInv.e_battery_discharge_today
+        energy_today_output['Battery_Throughput_Today_kWh'] = GEInv.e_battery_charge_today+GEInv.e_battery_discharge_today
         energy_total_output['Battery_Throughput_Total_kWh'] = GEInv.e_battery_throughput_total
         if GEInv.e_battery_charge_total == 0 and GEInv.e_battery_discharge_total == 0 and not GiV_Settings.numBatteries==0:  # If no values in "nomal" registers then grab from back up registers - for some f/w versions
             energy_total_output['Battery_Charge_Energy_Total_kWh'] = GEBat[0].e_battery_charge_total_2
@@ -444,6 +456,8 @@ def getData(fullrefresh):  # Read from Inverter put in cache
                 power_output['Charge_Time_Remaining'] = 0
                 #power_output['Charge_Time_Remaining'] = datetime.datetime.now().replace(tzinfo=GivLUT.timezone).isoformat()
         power_output['Battery_Power'] = Battery_power
+        power_output['Battery_Voltage'] = GEInv.v_battery
+        power_output['Battery_Current'] = GEInv.i_battery
         power_output['Charge_Power'] = charge_power
         power_output['Discharge_Power'] = discharge_power
         power_output['Grid_Frequency'] = GEInv.f_ac1
@@ -498,48 +512,49 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         ######## Grab Timeslots ########
         timeslots = {}
         logger.debug("Getting TimeSlot data")
-        timeslots['Discharge_start_time_slot_1'] = GEInv.discharge_slot_1[0].isoformat()
-        timeslots['Discharge_end_time_slot_1'] = GEInv.discharge_slot_1[1].isoformat()
-        timeslots['Discharge_start_time_slot_2'] = GEInv.discharge_slot_2[0].isoformat()
-        timeslots['Discharge_end_time_slot_2'] = GEInv.discharge_slot_2[1].isoformat()
-        timeslots['Charge_start_time_slot_1'] = GEInv.charge_slot_1[0].isoformat()
-        timeslots['Charge_end_time_slot_1'] = GEInv.charge_slot_1[1].isoformat()
+        timeslots['Discharge_start_time_slot_1'] = GEInv.discharge_slot_1.start.isoformat()
+        timeslots['Discharge_end_time_slot_1'] = GEInv.discharge_slot_1.end.isoformat()
+        timeslots['Discharge_start_time_slot_2'] = GEInv.discharge_slot_2.start.isoformat()
+        timeslots['Discharge_end_time_slot_2'] = GEInv.discharge_slot_2.end.isoformat()
+        timeslots['Charge_start_time_slot_1'] = GEInv.charge_slot_1.start.isoformat()
+        timeslots['Charge_end_time_slot_1'] = GEInv.charge_slot_1.end.isoformat()
         try:
-            if inverterModel.model == "All in One" or (inverterModel.generation == "Gen 3" and int(GEInv.arm_firmware_version)>302):   #10 slots only apply to AIO and new fw on Gen 3
-                timeslots['Charge_start_time_slot_2'] = GEInv.charge_slot_2[0].isoformat()
-                timeslots['Charge_end_time_slot_2'] = GEInv.charge_slot_2[1].isoformat()
-                timeslots['Charge_start_time_slot_3'] = GEInv.charge_slot_3[0].isoformat()
-                timeslots['Charge_end_time_slot_3'] = GEInv.charge_slot_3[1].isoformat()
-                timeslots['Charge_start_time_slot_4'] = GEInv.charge_slot_4[0].isoformat()
-                timeslots['Charge_end_time_slot_4'] = GEInv.charge_slot_4[1].isoformat()
-                timeslots['Charge_start_time_slot_5'] = GEInv.charge_slot_5[0].isoformat()
-                timeslots['Charge_end_time_slot_5'] = GEInv.charge_slot_5[1].isoformat()
-                timeslots['Charge_start_time_slot_6'] = GEInv.charge_slot_6[0].isoformat()
-                timeslots['Charge_end_time_slot_6'] = GEInv.charge_slot_6[1].isoformat()
-                timeslots['Charge_start_time_slot_7'] = GEInv.charge_slot_7[0].isoformat()
-                timeslots['Charge_end_time_slot_7'] = GEInv.charge_slot_7[1].isoformat()
-                timeslots['Charge_start_time_slot_8'] = GEInv.charge_slot_8[0].isoformat()
-                timeslots['Charge_end_time_slot_8'] = GEInv.charge_slot_8[1].isoformat()
-                timeslots['Charge_start_time_slot_9'] = GEInv.charge_slot_9[0].isoformat()
-                timeslots['Charge_end_time_slot_9'] = GEInv.charge_slot_9[1].isoformat()
-                timeslots['Charge_start_time_slot_10'] = GEInv.charge_slot_10[0].isoformat()
-                timeslots['Charge_end_time_slot_10'] = GEInv.charge_slot_10[1].isoformat()
-                timeslots['Discharge_start_time_slot_3'] = GEInv.discharge_slot_3[0].isoformat()
-                timeslots['Discharge_end_time_slot_3'] = GEInv.discharge_slot_3[1].isoformat()
-                timeslots['Discharge_start_time_slot_4'] = GEInv.discharge_slot_4[0].isoformat()
-                timeslots['Discharge_end_time_slot_4'] = GEInv.discharge_slot_4[1].isoformat()
-                timeslots['Discharge_start_time_slot_5'] = GEInv.discharge_slot_5[0].isoformat()
-                timeslots['Discharge_end_time_slot_5'] = GEInv.discharge_slot_5[1].isoformat()
-                timeslots['Discharge_start_time_slot_6'] = GEInv.discharge_slot_6[0].isoformat()
-                timeslots['Discharge_end_time_slot_6'] = GEInv.discharge_slot_6[1].isoformat()
-                timeslots['Discharge_start_time_slot_7'] = GEInv.discharge_slot_7[0].isoformat()
-                timeslots['Discharge_end_time_slot_7'] = GEInv.discharge_slot_7[1].isoformat()
-                timeslots['Discharge_start_time_slot_8'] = GEInv.discharge_slot_8[0].isoformat()
-                timeslots['Discharge_end_time_slot_8'] = GEInv.discharge_slot_8[1].isoformat()
-                timeslots['Discharge_start_time_slot_9'] = GEInv.discharge_slot_9[0].isoformat()
-                timeslots['Discharge_end_time_slot_9'] = GEInv.discharge_slot_9[1].isoformat()
-                timeslots['Discharge_start_time_slot_10'] = GEInv.discharge_slot_10[0].isoformat()
-                timeslots['Discharge_end_time_slot_10'] = GEInv.discharge_slot_10[1].isoformat()
+            if inverterModel.model == Model.ALL_IN_ONE or (inverterModel.generation == Generation.GEN3 and int(GEInv.arm_firmware_version)>302):   #10 slots only apply to AIO and new fw on Gen 3
+                timeslots['Charge_start_time_slot_2'] = GEInv.charge_slot_2.start.isoformat()
+                timeslots['Charge_end_time_slot_2'] = GEInv.charge_slot_2.end.isoformat()
+                timeslots['Charge_start_time_slot_3'] = GEInv.charge_slot_3.start.isoformat()
+                timeslots['Charge_end_time_slot_3'] = GEInv.charge_slot_3.end.isoformat()
+                timeslots['Charge_start_time_slot_4'] = GEInv.charge_slot_4.start.isoformat()
+                timeslots['Charge_end_time_slot_4'] = GEInv.charge_slot_4.end.isoformat()
+                timeslots['Charge_start_time_slot_5'] = GEInv.charge_slot_5.start.isoformat()
+                timeslots['Charge_end_time_slot_5'] = GEInv.charge_slot_5.end.isoformat()
+                timeslots['Charge_start_time_slot_6'] = GEInv.charge_slot_6.start.isoformat()
+                timeslots['Charge_end_time_slot_6'] = GEInv.charge_slot_6.end.isoformat()
+                timeslots['Charge_start_time_slot_7'] = GEInv.charge_slot_7.start.isoformat()
+                timeslots['Charge_end_time_slot_7'] = GEInv.charge_slot_7.end.isoformat()
+                timeslots['Charge_start_time_slot_8'] = GEInv.charge_slot_8.start.isoformat()
+                timeslots['Charge_end_time_slot_8'] = GEInv.charge_slot_8.end.isoformat()
+                timeslots['Charge_start_time_slot_9'] = GEInv.charge_slot_9.start.isoformat()
+                timeslots['Charge_end_time_slot_9'] = GEInv.charge_slot_9.end.isoformat()
+                timeslots['Charge_start_time_slot_10'] = GEInv.charge_slot_10.start.isoformat()
+                timeslots['Charge_end_time_slot_10'] = GEInv.charge_slot_10.end.isoformat()
+                timeslots['Discharge_start_time_slot_3'] = GEInv.discharge_slot_3.start.isoformat()
+                timeslots['Discharge_end_time_slot_3'] = GEInv.discharge_slot_3.end.isoformat()
+                timeslots['Discharge_start_time_slot_4'] = GEInv.discharge_slot_4.start.isoformat()
+                timeslots['Discharge_end_time_slot_4'] = GEInv.discharge_slot_4.end.isoformat()
+                timeslots['Discharge_start_time_slot_5'] = GEInv.discharge_slot_5.start.isoformat()
+                timeslots['Discharge_end_time_slot_5'] = GEInv.discharge_slot_5.end.isoformat()
+                timeslots['Discharge_start_time_slot_6'] = GEInv.discharge_slot_6.start.isoformat()
+                timeslots['Discharge_end_time_slot_6'] = GEInv.discharge_slot_6.end.isoformat()
+                timeslots['Discharge_start_time_slot_7'] = GEInv.discharge_slot_7.start.isoformat()
+                timeslots['Discharge_end_time_slot_7'] = GEInv.discharge_slot_7.end.isoformat()
+                timeslots['Discharge_start_time_slot_8'] = GEInv.discharge_slot_8.start.isoformat()
+                timeslots['Discharge_end_time_slot_8'] = GEInv.discharge_slot_8.end.isoformat()
+                timeslots['Discharge_start_time_slot_9'] = GEInv.discharge_slot_9.start.isoformat()
+                timeslots['Discharge_end_time_slot_9'] = GEInv.discharge_slot_9.end.isoformat()
+                timeslots['Discharge_start_time_slot_10'] = GEInv.discharge_slot_10.start.isoformat()
+                timeslots['Discharge_end_time_slot_10'] = GEInv.discharge_slot_10.end.isoformat()
+                controlmode['Charge_Target_SOC_1'] = GEInv.charge_target_soc_1
                 controlmode['Charge_Target_SOC_2'] = GEInv.charge_target_soc_2
                 controlmode['Charge_Target_SOC_3'] = GEInv.charge_target_soc_3
                 controlmode['Charge_Target_SOC_4'] = GEInv.charge_target_soc_4
@@ -563,8 +578,9 @@ def getData(fullrefresh):  # Read from Inverter put in cache
             logger.debug("New Charge/Discharge timeslots don't exist for this model")
 
         try:
-            timeslots['Battery_pause_start_time_slot'] = GEInv.battery_pause_slot[0].isoformat()
-            timeslots['Battery_pause_end_time_slot'] = GEInv.battery_pause_slot[1].isoformat()
+############################            
+            timeslots['Battery_pause_start_time_slot'] = GEInv.battery_pause_slot.start.isoformat()
+            timeslots['Battery_pause_end_time_slot'] = GEInv.battery_pause_slot.end.isoformat()
         except:
             logger.debug("Battery Pause timeslots don't exist for this model")
 
@@ -577,7 +593,7 @@ def getData(fullrefresh):  # Read from Inverter put in cache
             batterytype = "Lead Acid"
         inverter['Battery_Type'] = batterytype
         inverter['Battery_Capacity_kWh'] = ((batteryCapacity)/1000)
-        inverter['Invertor_Serial_Number'] = GEInv.inverter_serial_number
+        inverter['Invertor_Serial_Number'] = GEInv.serial_number
         inverter['Modbus_Version'] = GEInv.modbus_version
         inverter['Invertor_Firmware'] = GEInv.arm_firmware_version
         inverter['Invertor_Time'] = GEInv.system_time.replace(tzinfo=GivLUT.timezone).isoformat()
@@ -596,49 +612,53 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         batteries2 = {}
         logger.debug("Getting Battery Details")
         for b in GEBat:
-            if b.battery_serial_number.upper().isupper():          # Check for empty battery object responses and only process if they are complete (have a serial number)
+            if b.serial_number.upper().isupper():          # Check for empty battery object responses and only process if they are complete (have a serial number)
                 logger.debug("Building battery output: ")
                 battery = {}
-                battery['Battery_Serial_Number'] = b.battery_serial_number
-                if b.battery_soc != 0:
-                    battery['Battery_SOC'] = b.battery_soc
-                elif b.battery_soc == 0 and 'multi_output_old' in locals():
-                    battery['Battery_SOC'] = multi_output_old['Battery_Details'][b.battery_serial_number]['Battery_SOC']
-                elif b.battery_soc == 0 and not 'multi_output_old' in locals():
+                battery['Battery_Serial_Number'] = b.serial_number
+                if b.soc != 0:
+                    battery['Battery_SOC'] = b.soc
+                elif b.soc == 0 and 'multi_output_old' in locals():
+                    battery['Battery_SOC'] = multi_output_old['Battery_Details'][b.serial_number]['Battery_SOC']
+                elif b.soc == 0 and not 'multi_output_old' in locals():
                     battery['Battery_SOC'] = 1
-                battery['Battery_Capacity'] = b.battery_full_capacity
-                battery['Battery_Design_Capacity'] = b.battery_design_capacity
-                battery['Battery_Remaining_Capacity'] = b.battery_remaining_capacity
+                battery['Battery_Capacity'] = b.cap_calibrated
+                battery['Battery_Design_Capacity'] = b.cap_design
+                battery['Battery_Remaining_Capacity'] = b.cap_remaining
                 battery['Battery_Firmware_Version'] = b.bms_firmware_version
-                battery['Battery_Cells'] = b.battery_num_cells
-                battery['Battery_Cycles'] = b.battery_num_cycles
-                battery['Battery_USB_present'] = b.usb_inserted
-                battery['Battery_Temperature'] = b.temp_bms_mos
-                battery['Battery_Voltage'] = b.v_battery_cells_sum
-                battery['Battery_Cell_1_Voltage'] = b.v_battery_cell_01
-                battery['Battery_Cell_2_Voltage'] = b.v_battery_cell_02
-                battery['Battery_Cell_3_Voltage'] = b.v_battery_cell_03
-                battery['Battery_Cell_4_Voltage'] = b.v_battery_cell_04
-                battery['Battery_Cell_5_Voltage'] = b.v_battery_cell_05
-                battery['Battery_Cell_6_Voltage'] = b.v_battery_cell_06
-                battery['Battery_Cell_7_Voltage'] = b.v_battery_cell_07
-                battery['Battery_Cell_8_Voltage'] = b.v_battery_cell_08
-                battery['Battery_Cell_9_Voltage'] = b.v_battery_cell_09
-                battery['Battery_Cell_10_Voltage'] = b.v_battery_cell_10
-                battery['Battery_Cell_11_Voltage'] = b.v_battery_cell_11
-                battery['Battery_Cell_12_Voltage'] = b.v_battery_cell_12
-                battery['Battery_Cell_13_Voltage'] = b.v_battery_cell_13
-                battery['Battery_Cell_14_Voltage'] = b.v_battery_cell_14
-                battery['Battery_Cell_15_Voltage'] = b.v_battery_cell_15
-                battery['Battery_Cell_16_Voltage'] = b.v_battery_cell_16
-                battery['Battery_Cell_1_Temperature'] = b.temp_battery_cells_1
-                battery['Battery_Cell_2_Temperature'] = b.temp_battery_cells_2
-                battery['Battery_Cell_3_Temperature'] = b.temp_battery_cells_3
-                battery['Battery_Cell_4_Temperature'] = b.temp_battery_cells_4
-                batteries2[b.battery_serial_number] = battery
-                logger.debug("Battery "+str(b.battery_serial_number)+" added")
+                battery['Battery_Cells'] = b.num_cells
+                battery['Battery_Cycles'] = b.num_cycles
+                battery['Battery_USB_present'] = b.usb_device_inserted
+                battery['Battery_Temperature'] = b.t_bms_mosfet
+                battery['Battery_Voltage'] = b.v_cells_sum
+                battery['Battery_Cell_1_Voltage'] = b.v_cell_01
+                battery['Battery_Cell_2_Voltage'] = b.v_cell_02
+                battery['Battery_Cell_3_Voltage'] = b.v_cell_03
+                battery['Battery_Cell_4_Voltage'] = b.v_cell_04
+                battery['Battery_Cell_5_Voltage'] = b.v_cell_05
+                battery['Battery_Cell_6_Voltage'] = b.v_cell_06
+                battery['Battery_Cell_7_Voltage'] = b.v_cell_07
+                battery['Battery_Cell_8_Voltage'] = b.v_cell_08
+                battery['Battery_Cell_9_Voltage'] = b.v_cell_09
+                battery['Battery_Cell_10_Voltage'] = b.v_cell_10
+                battery['Battery_Cell_11_Voltage'] = b.v_cell_11
+                battery['Battery_Cell_12_Voltage'] = b.v_cell_12
+                battery['Battery_Cell_13_Voltage'] = b.v_cell_13
+                battery['Battery_Cell_14_Voltage'] = b.v_cell_14
+                battery['Battery_Cell_15_Voltage'] = b.v_cell_15
+                battery['Battery_Cell_16_Voltage'] = b.v_cell_16
+                battery['Battery_Cell_1_Temperature'] = b.t_cells_01_04
+                battery['Battery_Cell_2_Temperature'] = b.t_cells_05_08
+                battery['Battery_Cell_3_Temperature'] = b.t_cells_09_12
+                battery['Battery_Cell_4_Temperature'] = b.t_cells_13_16
+                batteries2[b.serial_number] = battery
+                logger.debug("Battery "+str(b.serial_number)+" added")
             else:
                 logger.error("Battery Object empty so skipping")
+
+            batteries2['BMS_Temperature']=GEInv.temp_battery
+            batteries2['BMS_Voltage']=GEInv.v_battery
+            
 
         ######## Create multioutput and publish #########
         energy = {}
@@ -850,7 +870,7 @@ def updateFirstRun(SN):
                 logger.error("Could not access settings file to update EVC Serial Number")
                 break
         else:
-            logger.debug("Settings availble")
+            logger.debug("Settings available")
             #Create setting lockfile
             open(".settings_lockfile",'a').close()
 

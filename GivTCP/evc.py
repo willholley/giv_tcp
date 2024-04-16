@@ -89,6 +89,10 @@ def getEVC():
     multi_output={}
     try:
         client = ModbusTcpClient(GiV_Settings.evc_ip_address)
+        client.connect()
+        if not client.is_socket_open():
+            logger.error("Modbus connection failed, check EVC WiFi/LAN connection")
+            return output
         result = client.read_holding_registers(0,60)
         result2 = client.read_holding_registers(60,55)
         client.close()
@@ -148,8 +152,6 @@ def getEVC():
                 output['Max_Session_Energy']=0
             else:
                 output['Max_Session_Energy']=evcRegCache['Charger']['Max_Session_Energy']
-                
-                
         else:
             ts=datetime.datetime.now().replace(hour=regs[82],minute=regs[83],second=regs[84],microsecond=0)
             output['Charge_End_Time']=ts.replace(tzinfo=datetime.timezone.utc).isoformat()
@@ -168,12 +170,22 @@ def getEVC():
         else:
             output['Plug_and_Go']='disable'
 
-        output['System_Time']=datetime.datetime(regs[97],regs[98],regs[99],regs[100],regs[101],regs[102]).replace(tzinfo=datetime.timezone.utc).isoformat()
+        evcTime=datetime.datetime(regs[97],regs[98],regs[99],regs[100],regs[101],regs[102])
+        now=datetime.datetime.utcnow()
+        delta=now-evcTime
+
+        #if abs(delta.total_seconds())>90:
+        #    # Send system time update to EVC
+        #    logger.info("EVC Time is "+ str(delta.total_seconds()) +"s out from local time. Syncing time...")
+        #    setDateTime(now)
+        #    evcTime=now
+
+        output['System_Time']= evcTime.replace(tzinfo=datetime.timezone.utc).isoformat()
+
         td=datetime.timedelta(seconds=int(regs[79]))
         output['Charge_Session_Duration']=str(td)
         multi_output['Charger']=output
         # Save new data to Pickle
-
 
         with cacheLock:
             with open(EVCLut.regcache, 'wb') as outp:
@@ -488,6 +500,31 @@ def setChargingMode(mode):
             chargeMode(True)    # Run an initial call when changing modes
     else:
         logger.error("Invalid selection for Charge Mode ("+str(mode)+")")
+
+def setDateTime(sysTime):
+    temp={}
+    try:
+        if not isinstance(sysTime,datetime.datetime):
+            sysTime=datetime.strptime(sysTime,"%d/%m/%Y %H:%M:%S")   #format '12/11/2021 09:15:32'
+        logger.info("Setting EVC time to: "+sysTime.isoformat())
+        #Set Date and Time on inverter
+        try:
+            client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+            res=client.write_registers(97,2023)
+            res=client.write_registers(100,5)
+            #client.write_registers(99,11)
+            #client.write_registers(100,21)
+            #client.write_registers(101,5)
+            #client.write_registers(102,35)
+            logger.info("Time Set")
+        except:
+            e=sys.exc_info()
+            logger.error("Error Setting EVC Time: "+str(e))
+    except:
+        e = sys.exc_info()
+        temp['result']="Setting inverter DateTime failed: " + str(e) 
+        logger.error (temp['result'])
+    return json.dumps(temp)
 
 if __name__ == '__main__':
     if len(sys.argv) == 2:

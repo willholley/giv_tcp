@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+
+## [2.4.2] - 2023-11-24
+### Fixed
+- Removed recurring MQTT error message at Midnight (type error)
+### Added
+- New Battery Current and Voltage stats for AIO (in lieu of full battery stats)
+- 
 ## [2.4.2] - 2023-11-24
 ### Fixed
 - Fix for no networks found in inverter scanning

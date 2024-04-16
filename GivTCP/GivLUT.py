@@ -1,21 +1,77 @@
 """GivLUT: Various objects to interface to GivEnergy inverters """
+from givenergy_modbus_async.client.client import Client
+from givenergy_modbus.client import GivEnergyClient
+from settings import GiV_Settings
+from givenergy_modbus_async.model.plant import Plant
+from givenergy_modbus.model.plant import Plant
+import settings
+import importlib
+import os
 
 class GivClient:
     """Definition of GivEnergy client """
+
     def getData(fullrefresh: bool):
-        from givenergy_modbus.client import GivEnergyClient
-        from settings import GiV_Settings
-        from givenergy_modbus.model.plant import Plant
+        
         client= GivEnergyClient(host=GiV_Settings.invertorIP)
-        numbat=GiV_Settings.numBatteries
+        if GiV_Settings.isAIO:
+            numbat=0
+        else:
+            numbat=GiV_Settings.numBatteries
         plant=Plant(number_batteries=numbat)
-        client.refresh_plant(plant,GiV_Settings.isAIO,GiV_Settings.isAC,fullrefresh)
+        #If there is a serial_number use it
+        if hasattr(GiV_Settings,'serial_number'):
+            client.refresh_plant(plant,GiV_Settings.isAIO,GiV_Settings.isAC,fullrefresh,serial_number=GiV_Settings.serial_number)
+        else:
+            client.refresh_plant(plant,GiV_Settings.isAIO,GiV_Settings.isAC,fullrefresh)
         return plant
+    
+    async def getDataAsync(fullrefresh: bool):
+        from settings import GiV_Settings
+        """Polls Inverter in a loop and displays key inverter values in CLI as they come in."""
+        client = Client(host=GiV_Settings.invertorIP, port=8899)
+        await client.connect()
+     
+        if hasattr(GiV_Settings,"numBatteries") and hasattr(GiV_Settings,"addRegs"):
+            client.plant.number_batteries=GiV_Settings.numBatteries
+            client.plant.additional_holding_registers=GiV_Settings.addRegs
+        else:
+            await client.detect_plant()
+            #does detect_plant auto pop the plant variables?? 
+            #client.plant.number_batteries= client.plant.number_batteries
+
+            # Update settings file with detected data
+            script_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
+            rel_path = "settings.py"
+            abs_file_path = os.path.join(script_dir, rel_path)
+            isNB=False
+            isAR=False
+            with open(abs_file_path, "r") as f:
+                lines = f.readlines()
+            with open(abs_file_path, "w") as f:
+                for line in lines:
+                    if "numBatteries" in line:
+                        isNB = True
+                    if "addRegs" in line:
+                        isAR = True
+                    f.write(line)
+                if not isNB:
+                    f.writelines("    numBatteries= "+client.plant.number_batteries+"\n")
+                if not isAR:
+                    f.writelines("    addRegs= "+ str(client.plant.additional_holding_registers) +"\n")
+            #reload settings now
+            importlib.reload(settings)
+            from settings import GiV_Settings
+
+        if GiV_Settings.isAIO:
+            client.plant.number_batteries=0  
+        await client.refresh_plant(fullrefresh, number_batteries=client.plant.number_batteries, retries=3, timeout=3.0)
+        await client.close()
+        return client.plant
 
 class GivQueue:
     from redis import Redis
     from rq import Queue
-    from settings import GiV_Settings
     redis_connection = Redis(host='127.0.0.1', port=6379, db=0)
     q = Queue("GivTCP_"+str(GiV_Settings.givtcp_instance),connection=redis_connection)
 
@@ -142,6 +198,8 @@ class GivLUT:
         "AC_Charge_Power":GEType("sensor","power","",0,maxBatPower,True,False,False),
         "Self_Consumption_Power":GEType("sensor","power","",0,maxInvPower,True,False,False),
         "Battery_Power":GEType("sensor","power","",-maxBatPower,maxBatPower,True,False,False),
+        "Battery_Voltage":GEType("sensor","voltage","",0,550,True,False,False),
+        "Battery_Current":GEType("sensor","current","",-500,500,True,False,False),
         "Charge_Power":GEType("sensor","power","",0,maxBatPower,True,False,False),
         "Discharge_Power":GEType("sensor","power","",0,maxBatPower,True,False,False),
         "SOC":GEType("sensor","battery","",0,100,False,False,False),
@@ -220,6 +278,8 @@ class GivLUT:
         "Battery_USB_present":GEType("binary_sensor","","",0,2,True,False,False),
         "Battery_Temperature":GEType("sensor","temperature","",-maxTemp,maxTemp,True,True,False),
         "Battery_Voltage":GEType("sensor","voltage","",0,100,False,True,False),
+        "BMS_Temperature":GEType("sensor","temperature","",-maxTemp,maxTemp,True,True,False),
+        "BMS_Voltage":GEType("sensor","voltage","",0,100,False,True,False),
         "Battery_Cell_1_Voltage":GEType("sensor","voltage","",0,maxCellVoltage,False,True,False),
         "Battery_Cell_2_Voltage":GEType("sensor","voltage","",0,maxCellVoltage,False,True,False),
         "Battery_Cell_3_Voltage":GEType("sensor","voltage","",0,maxCellVoltage,False,True,False),
@@ -244,6 +304,7 @@ class GivLUT:
         "Battery_Power_Reserve":GEType("number","","setBatteryReserve",4,100,False,False,False),
         "Battery_Power_Cutoff":GEType("number","","setBatteryCutoff",4,100,False,False,False),
         "Target_SOC":GEType("number","","setChargeTarget",4,100,False,False,False),
+        "Charge_Target_SOC_1":GEType("number","","setChargeTarget1",4,100,False,False,False),
         "Charge_Target_SOC_2":GEType("number","","setChargeTarget2",4,100,False,False,False),
         "Charge_Target_SOC_3":GEType("number","","setChargeTarget3",4,100,False,False,False),
         "Charge_Target_SOC_4":GEType("number","","setChargeTarget4",4,100,False,False,False),

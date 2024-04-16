@@ -56,6 +56,7 @@ def getInvDeets(HOST):
     try:
         client=GivEnergyClient(host=HOST)
         stats=client.get_inverter_stats()
+        logger.debug("Deets retrieved from found Inverter are: "+str(stats))
         SN=stats[2]
         gen=givenergy_modbus.model.inverter.Generation.from_fw_version(stats[1])._value_
         model=givenergy_modbus.model.inverter.Model.from_device_type_code(stats[0])
@@ -64,6 +65,25 @@ def getInvDeets(HOST):
     except:
         logger.error("Gathering inverter details for " + str(HOST) + " failed.")
         return None
+    
+def isitoldfw(invstats):
+    '''Firmware Versions for each Model
+    AC coupled 5xx old, 2xx new. 28x, 29x beta
+    Gen1 4xx Old, 1xx New. 19x Beta
+    Gen 2 909+ New. 99x Beta   Schedule Pause only for Gen2+
+    Gen 3 303+ New 39x Beta    New has 10 slots
+    AIO 6xx New 69x Beta       ALL has 10 slots'''
+    if invstats['Model']=='AC' and int(invstats['Firmware'])>500:
+        return True
+    elif invstats['Model']=='All in One' and int(invstats['Firmware'])<600:
+        return True
+    elif invstats['Generation']=='Gen 1' and int(invstats['Firmware'])>400:
+        return True
+    elif invstats['Generation']=='Gen 2' and int(invstats['Firmware'])<909:
+        return True
+    elif invstats['Generation']=='Gen 3' and int(invstats['Firmware'])<303:
+        return True
+    return False
 
 def findinv(networks):
     inverterStats={}
@@ -126,6 +146,14 @@ def findinv(networks):
                                         Stats['Model']=deets[2]
                                         Stats['Generation']=deets[1]
                                         inverterStats[inv]=Stats
+                                        if isitoldfw(inverterStats[inv]):
+                                            logger.critical("This inverter IS on 'old firmware', ensure that the old firmware setting IS checked in the configuration")
+                                        else:
+                                            logger.critical("This inverter is on 'new firmware', ensure that the old firmware setting is NOT checked in the configuration")
+                                        if deets[2]=="All in One":
+                                            logger.critical("This inverter IS an AIO, ensure that the AIO setting IS checked in the configuration and NUMBATTERIES is set to 0")
+                                        else:
+                                            logger.critical("This inverter is NOT an AIO, ensure that the AIO setting is NOT checked")
                                     else:
                                         logger.error("Unable to interrogate inverter to get base details")
                                     count=count+1
@@ -209,7 +237,7 @@ else:
         e=sys.exc_info()
         logger.error("Could not get network info: "+ str(e))
 
-sleep(2)        # Sleep to allow port scanning se-ocket to close
+sleep(2)        # Sleep to allow port scanning socket to close
 
 inverterStats={}
 i=0
@@ -383,7 +411,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
 # Check if settings.py exists then start processes
 # Still need to run the below process per inverter
 #
-#
+##########################################################
 
 
 
@@ -436,7 +464,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
         command=shlex.split("/usr/bin/node /usr/local/bin/serve -p "+ str(WDPORT))
         webDash[inv]=subprocess.Popen(command)
 
-if str(os.getenv('SMARTTARGET'))=="True":
+if os.getenv('SMARTTARGET')==True:
     starttime= datetime.strftime(datetime.strptime(os.getenv('NIGHTRATESTART'),'%H:%M') - timedelta(hours=0, minutes=10),'%H:%M')
     logger.critical("Setting daily charge target forecast job to run at: "+starttime)
     schedule.every().day.at(starttime).do(palm_job)

@@ -5,7 +5,7 @@ from GivLUT import GivLUT
 from settings import GiV_Settings
 import sys
 #from HA_Discovery import HAMQTT
-from givenergy_modbus.model.inverter import Model
+from givenergy_modbus_async.model.inverter import Model
 
 logger = GivLUT.logger
 
@@ -59,17 +59,19 @@ class GivMQTT():
 
     def multi_MQTT_publish(rootTopic,array):                    #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			    #create flag in class
-        client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+        client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION1,"GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
         
         ##Check if first run then publish auto discovery message
         
         if GivMQTT.MQTTCredentials:
             client.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)
         try:
+            client.host=GivMQTT.MQTT_Address
+            client.port=GivMQTT.MQTT_Port
             client.on_connect=GivMQTT.on_connect     			#bind call back function
             client.loop_start()
             logger.debug ("Connecting to broker: "+ GivMQTT.MQTT_Address)
-            client.connect(GivMQTT.MQTT_Address,port=GivMQTT.MQTT_Port)
+            #client.connect()
             while not client.connected_flag:        			#wait in loop
                 logger.debug ("In wait loop")
                 time.sleep(0.2)
@@ -80,8 +82,8 @@ class GivMQTT():
                 for value in output:
                     if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
                         client.publish(value,output[value], retain=GivMQTT.MQTT_Retain)
-                    else:
-                        logger.error("MQTT error trying to send a "+ str(type(output[value]))+" to the MQTT broker for: "+str(value) + " - " + str(output[value]))
+                    #else:
+                    #    logger.error("MQTT error trying to send a "+ str(type(output[value]))+" to the MQTT broker for: "+str(value) + " - " + str(output[value]))
         except:
             e = sys.exc_info()
             logger.error("Error connecting to MQTT Broker: " + str(e))

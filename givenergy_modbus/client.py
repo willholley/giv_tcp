@@ -36,50 +36,59 @@ class GivEnergyClient:
         pages: Mapping[type[HoldingRegister | HoldingRegister_AC | InputRegister], Sequence[int]],
         register_cache: RegisterCache,
         slave_address: int = 0x31,
+        serial_number: str = "AB12345678",
         sleep_between_queries: float = DEFAULT_SLEEP,
     ) -> None:
         """Reload all inverter data from the device."""
         for register, base_registers in pages.items():
             for base_register in base_registers:
-                data = self.modbus_client.read_registers(register, base_register, 60, slave_address=slave_address)
-                register_cache.set_registers(register, data)
+                # Can we use this point to only add in register sets which exist (and remove need for "old firmware" config)
+                data = self.modbus_client.read_registers(register, base_register, 60, slave_address=slave_address, sn=serial_number)
+                if len(data)>0:
+                    register_cache.set_registers(register, data)
+                else:
+                    _logger.critical("This inverter doesn't have those registers available")
                 t.sleep(sleep_between_queries)
 
-    def refresh_plant(self, plant: Plant, isAIO: bool, isAC: bool, full_refresh: bool, sleep_between_queries=DEFAULT_SLEEP):
+    def refresh_plant(self, plant: Plant, isAIO: bool, isAC: bool, full_refresh: bool, serial_number: str="AB12345678", sleep_between_queries=DEFAULT_SLEEP):
         """Refresh the internal caches for a plant. Optionally refresh only data that changes frequently."""
         inverter_registers = {
             InputRegister: [0, 180],
         }
 
-        if full_refresh:
-            if isAC:
-                inverter_registers[HoldingRegister_AC] = [0, 60, 120]
-            else:
-                inverter_registers[HoldingRegister] = [0, 60, 120, 240, 300]
-
+        # Can we remove this if the try/catch in fetch_register_pages eliminates the need
+        #if full_refresh:
+        #    if isAC:
+        #        inverter_registers[HoldingRegister_AC] = [0, 60, 120]
+        #    else:
+        #        inverter_registers[HoldingRegister] = [0, 60, 120, 240, 300]
+        inverter_registers[HoldingRegister] = [0, 60, 120, 240, 300]
+        
         #How do I know which inverter I'm connecting to from inside the library...
         if isAIO:
             self.fetch_register_pages(
-                inverter_registers, plant.inverter_rc, slave_address=0x11, sleep_between_queries=sleep_between_queries
+                inverter_registers, plant.inverter_rc, slave_address=0x11, sleep_between_queries=sleep_between_queries,serial_number=serial_number
             )
             _logger.debug("Inverter is AIO so using the 0x11 slave_address")
         elif isAC:
             self.fetch_register_pages(
-                inverter_registers, plant.inverter_rc_ac, slave_address=0x31, sleep_between_queries=sleep_between_queries
+                inverter_registers, plant.inverter_rc_ac, slave_address=0x31, sleep_between_queries=sleep_between_queries,serial_number=serial_number
             )
         else:
             self.fetch_register_pages(
-                inverter_registers, plant.inverter_rc, slave_address=0x31, sleep_between_queries=sleep_between_queries
+                inverter_registers, plant.inverter_rc, slave_address=0x31, sleep_between_queries=sleep_between_queries,serial_number=serial_number
             )
             _logger.debug("Inverter is normal so using the 0x31 slave_address")
         if isAIO:
-            for i, battery_rc in enumerate(plant.batteries_rcs):
-                self.fetch_register_pages(
-                    {InputRegister: [60]},
-                    battery_rc,
-                    slave_address=0x32 + i,
-                    sleep_between_queries=sleep_between_queries,
-                )
+            #This is where we need the new battery register mapping
+            i=0 #This might need to change to get 
+            startAddr=60+(120*i)
+            self.fetch_register_pages(
+                {InputRegister: [startAddr]},
+                battery_rc,
+                slave_address=0x50 + i,
+                sleep_between_queries=sleep_between_queries,
+            )
         else:
             for i, battery_rc in enumerate(plant.batteries_rcs):
                 self.fetch_register_pages(
@@ -118,7 +127,7 @@ class GivEnergyClient:
             self.modbus_client.write_holding_register(HoldingRegister.ENABLE_CHARGE_TARGET, True)
             self.modbus_client.write_holding_register(HoldingRegister.CHARGE_TARGET_SOC, target_soc)
 
-    def enable_charge_target_2(self, target_soc: int, slot: int):
+    def enable_charge_target_2(self, target_soc: int, slot: int, isAIO: bool=False):
         """Sets inverter to stop charging when SOC reaches the desired level. Also referred to as "winter mode"."""
         if target_soc > 100:
             target_soc=100
@@ -130,7 +139,10 @@ class GivEnergyClient:
         else:
             self.modbus_client.write_holding_register(HoldingRegister.ENABLE_CHARGE_TARGET, True)
             if slot==1:
-                self.modbus_client.write_holding_register(HoldingRegister.CHARGE_TARGET_SOC, target_soc)
+                if isAIO:
+                    self.modbus_client.write_holding_register(HoldingRegister.CHARGE_TARGET_SOC_1, target_soc)
+                else:
+                    self.modbus_client.write_holding_register(HoldingRegister.CHARGE_TARGET_SOC, target_soc)
             if slot==2:
                 self.modbus_client.write_holding_register(HoldingRegister.CHARGE_TARGET_SOC_2, target_soc)
             if slot==3:
