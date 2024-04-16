@@ -120,7 +120,7 @@ def findinv(networks):
                                 if count<2:
                                     deets=getInvDeets(invList[inv])
                                     if deets:
-                                        logger.critical (f'Inverter {deets[0]} which is a {str(deets[1])} - {str(deets[2])} has been found at: {str(invList[inv])}')
+                                        logger.critical(f'Inverter {deets[0]} which is a {str(deets[1])} - {str(deets[2])} has been found at: {str(invList[inv])}')
                                         Stats['Serial_Number']=deets[0]
                                         Stats['Firmware']=deets[3]
                                         Stats['Model']=deets[2]
@@ -252,12 +252,10 @@ subprocess.Popen(["nginx","-g","daemon off;error_log /dev/stdout debug;"])
 for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
     logger.critical ("Setting up invertor: "+str(inv)+" of "+str(os.getenv('NUMINVERTORS')))
     PATH= "/app/GivTCP_"+str(inv)
-    PATH2= "/app/GivEnergy-Smart-Home-Display-givtcp_"+str(inv)
 
     # Create folder per instance
     if not exists(PATH):
         shutil.copytree("/app/GivTCP", PATH)
-        shutil.copytree("/app/GivEnergy-Smart-Home-Display-givtcp", PATH2)
     if not exists(PATH+"/settings.json"):
         logger.debug("Copying in a template settings.json")
         shutil.copyfile("/app/settings.json",PATH+"/settings.json")
@@ -420,21 +418,34 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
     logger.critical ("Starting Gunicorn on port "+str(GUPORT))
     command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
     gunicorn[inv]=subprocess.Popen(command)
-    
-    os.chdir(PATH2)
-    if os.getenv('WEB_DASH')=="True":
-        # Create app.json
-        logger.debug("Creating web dashboard config")
-        with open(PATH2+"/app.json", 'w') as outp:
-            outp.write("{\n")
-            outp.write("\"givTcpHostname\": \""+os.getenv('HOSTIP')+":6345\",")
-            outp.write("\"solarRate\": "+os.getenv('DAYRATE')+",")
-            outp.write("\"exportRate\": "+os.getenv('EXPORTRATE')+"")
-            outp.write("}")
-        WDPORT=int(os.getenv('WEB_DASH_PORT'))-1+inv
-        logger.critical ("Serving Web Dashboard from port "+str(WDPORT))
-        command=shlex.split("/usr/bin/node /usr/local/bin/serve -p "+ str(WDPORT))
-        webDash[inv]=subprocess.Popen(command)
+
+
+if os.getenv('WEB_DASH')=="True":
+    # Create app.json
+    logger.debug("Creating web dashboard config")
+    os.chdir("/app/WebDashboard")
+    with open("app.json", 'w') as outp:
+        outp.write("{\n")
+        outp.write("  \"givTcpHosts\": [\n")
+
+        for inv in range(1, int(os.getenv('NUMINVERTORS')) + 1):
+            GUPORT = 6344 + inv
+            if inv > 1:
+                outp.write("  ,{\n")
+            else:
+                outp.write("  {\n")
+            outp.write("    \"name\": \""+os.getenv('INVERTOR_NAME_'+str(inv))+"\",\n")
+            outp.write("    \"port\": \""+str(GUPORT)+"\"\n")
+            outp.write("  }\n")
+
+        outp.write("  ],\n")
+        outp.write("  \"solarRate\": "+os.getenv('DAYRATE')+",\n")
+        outp.write("  \"exportRate\": "+os.getenv('EXPORTRATE')+"\n")
+        outp.write("}")
+    WDPORT=int(os.getenv('WEB_DASH_PORT'))
+    logger.critical ("Serving Web Dashboard from port "+str(WDPORT))
+    command=shlex.split("/usr/bin/node /usr/local/bin/serve -p "+ str(WDPORT))
+    webDash=subprocess.Popen(command)
 
 if str(os.getenv('SMARTTARGET'))=="True":
     starttime= datetime.strftime(datetime.strptime(os.getenv('NIGHTRATESTART'),'%H:%M') - timedelta(hours=0, minutes=10),'%H:%M')
@@ -455,13 +466,6 @@ while True:
             os.chdir(PATH)
             logger.critical ("Resubscribing Mosquitto for control on port "+str(os.getenv('MQTT_PORT')))
             mqttClient[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client.py"])
-        if os.getenv('WEB_DASH')==True and not webDash[inv].poll()==None:
-            logger.error("Web Dashboard process died. Restarting...")
-            os.chdir(PATH2)
-            WDPORT=int(os.getenv('WEB_DASH_PORT'))+inv-1
-            logger.critical ("Serving Web Dashboard from port "+str(WDPORT))
-            command=shlex.split("/usr/bin/node /usr/local/bin/serve -p "+ str(WDPORT))
-            webDash[inv]=subprocess.Popen(command)
         if not gunicorn[inv].poll()==None:
             logger.error("REST API process died. Restarting...")
             os.chdir(PATH)
@@ -469,6 +473,13 @@ while True:
             logger.critical ("Starting Gunicorn on port "+str(GUPORT))
             command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
             gunicorn[inv]=subprocess.Popen(command)
+    if os.getenv('WEB_DASH') == True and not webDash.poll() == None:
+        logger.error("Web Dashboard process died. Restarting...")
+        os.chdir("/app/WebDashboard")
+        WDPORT = int(os.getenv('WEB_DASH_PORT'))
+        logger.critical("Serving Web Dashboard from port " + str(WDPORT))
+        command = shlex.split("/usr/bin/node /usr/local/bin/serve -p " + str(WDPORT))
+        webDash = subprocess.Popen(command)
     if os.getenv('MQTT_ADDRESS')=="127.0.0.1" and not mqttBroker.poll()==None:
         logger.error("MQTT Broker process died. Restarting...")
         os.chdir(PATH)

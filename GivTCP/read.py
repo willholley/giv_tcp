@@ -991,7 +991,7 @@ def ratecalcs(multi_output, multi_output_old):
             open(GivLUT.dayRate, 'w').close()
             if exists(GivLUT.nightRate):
                 logger.debug(".nightRate exists so deleting it")
-                os.remove(GivLUT.nightRate)  
+                os.remove(GivLUT.nightRate)
 
     if not exists(GivLUT.nightRate) and not exists(GivLUT.dayRate): #Default to Day if not previously set
         logger.info("No day/Night rate info so reverting to day")
@@ -1010,7 +1010,7 @@ def ratecalcs(multi_output, multi_output_old):
     # now calc the difference for each value between the correct start pickle and now
     if import_energy>import_energy_old: # Only run if there has been more import
         logger.debug("Imported more energy so calculating current tariff costs: "+str(import_energy_old)+" -> "+str(import_energy))
-    
+
 #        if night_start <= datetime.datetime.now(GivLUT.timezone) < day_start:
         if exists(GivLUT.nightRate):
             logger.debug("Current Tariff is Night, calculating stats...")

@@ -46,7 +46,7 @@ class HAMQTT():
 
     def publish_discovery(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			#create flag in class
-        client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+        client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
         rootTopic=str(GiV_Settings.MQTT_Topic+"/"+SN+"/")
         if HAMQTT.MQTTCredentials:
             client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)

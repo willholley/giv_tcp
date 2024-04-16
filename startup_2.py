@@ -275,7 +275,6 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
         logger.critical ("Creating web dashboard config")
         with open(PATH2+"/app.json", 'w') as outp:
             outp.write("{\n")
-            outp.write("\"givTcpHostname\": \""+os.getenv('HOSTIP')+":6345\",")
             outp.write("\"solarRate\": "+os.getenv('DAYRATE')+",")
             outp.write("\"exportRate\": "+os.getenv('EXPORTRATE')+"")
             outp.write("}")

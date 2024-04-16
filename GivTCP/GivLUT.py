@@ -73,10 +73,10 @@ class GivLUT:
     ppkwhtouch=".ppkwhtouch"
     schedule=".schedule"
     oldDataCount=GiV_Settings.cache_location+"/oldDataCount_"+str(GiV_Settings.givtcp_instance)+".pkl"
-    nightRate=GiV_Settings.cache_location+"/.nightRate"
-    dayRate=GiV_Settings.cache_location+"/.dayRate"
-    nightRateRequest=GiV_Settings.cache_location+"/.nightRateRequest"
-    dayRateRequest=GiV_Settings.cache_location+"/.dayRateRequest"
+    nightRate=GiV_Settings.cache_location+"/.nightRate_"+str(GiV_Settings.givtcp_instance)
+    dayRate=GiV_Settings.cache_location+"/.dayRate_"+str(GiV_Settings.givtcp_instance)
+    nightRateRequest=GiV_Settings.cache_location+"/.nightRateRequest_"+str(GiV_Settings.givtcp_instance)
+    dayRateRequest=GiV_Settings.cache_location+"/.dayRateRequest_"+str(GiV_Settings.givtcp_instance)
     invippkl=GiV_Settings.cache_location+"/invIPList.pkl"
 
 

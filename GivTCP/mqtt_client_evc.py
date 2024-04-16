@@ -93,7 +93,7 @@ def on_connect(client, userdata, flags, rc):
         logger.error("Bad connection Returned code= "+str(rc))
 
 
-client=mqtt.Client("GivEnergy_GivTCP_EVC_Control")
+client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, "GivEnergy_GivTCP_EVC_Control")
 mqtt.Client.connected_flag=False        			#create flag in class
 if MQTTCredentials:
     client.username_pw_set(MQTT_Username,MQTT_Password)
