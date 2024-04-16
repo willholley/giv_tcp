@@ -3,3 +3,8 @@
     url = https://github.com/DanielGallo/GivEnergy-Smart-Home-Display.git
     branch = master
     update = merge
+[submodule "givenergy modbus"]
+    path = givenergy_modbus_async
+    url = https://github.com/britkat1980/givenergy-modbus-async.git
+    branch = Dev-Branch
+    update = merge

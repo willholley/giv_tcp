@@ -391,7 +391,7 @@ while not hasattr(GiV_Settings,'serial_number'):
 if hasattr(GiV_Settings,'serial_number'):
     logger.debug("Serial Number retrieved: "+GiV_Settings.serial_number)
 
-    client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance)+"_Control")
+    client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance)+"_Control")
     mqtt.Client.connected_flag=False        			#create flag in class
     if MQTTCredentials:
         client.username_pw_set(MQTT_Username,MQTT_Password)
