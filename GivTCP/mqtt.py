@@ -37,7 +37,7 @@ class GivMQTT():
 
     def single_MQTT_publish(Topic,value):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			#create flag in class
-        client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+        client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
 
         if GivMQTT.MQTTCredentials:
             client.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)

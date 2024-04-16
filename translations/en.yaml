@@ -172,10 +172,6 @@ configuration:
     name: Path to Python
     description: >-
       Location of Python binaries. Leave alone unless you have a good reason to be changing this...
-  HOSTIP:
-    name: Home Assistant Local IP Address
-    description: >-
-      The local IP address of your Home Assistant server. You might need to change this if you are using GivTCP's web dashboard and the automatic settings are not working.
   TZ:
     name: Timezone
     description: >-

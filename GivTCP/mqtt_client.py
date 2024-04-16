@@ -391,13 +391,13 @@ while not hasattr(GiV_Settings,'serial_number'):
 if hasattr(GiV_Settings,'serial_number'):
     logger.debug("Serial Number retrieved: "+GiV_Settings.serial_number)
 
-    client=mqtt.Client("GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance)+"_Control")
-    mqtt.Client.connected_flag=False        			#create flag in class
-    if MQTTCredentials:
-        client.username_pw_set(MQTT_Username,MQTT_Password)
-    client.on_connect=on_connect     			        #bind call back function
-    client.on_message=on_message                        #bind call back function
-    #client.loop_start()
+client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance)+"_Control")
+mqtt.Client.connected_flag=False        			#create flag in class
+if MQTTCredentials:
+    client.username_pw_set(MQTT_Username,MQTT_Password)
+client.on_connect=on_connect     			        #bind call back function
+client.on_message=on_message                        #bind call back function
+#client.loop_start()
 
     logger.debug ("Connecting to broker(sub): "+ MQTT_Address)
     client.connect(MQTT_Address,port=MQTT_Port)

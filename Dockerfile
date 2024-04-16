@@ -31,7 +31,7 @@ RUN rm /etc/nginx/http.d/default.conf
 
 # copy the content of the local src directory to the working directory
 COPY GivTCP/ ./GivTCP
-COPY GivEnergy-Smart-Home-Display-givtcp/ ./GivEnergy-Smart-Home-Display-givtcp
+COPY WebDashboard/ ./WebDashboard
 COPY givenergy_modbus/ /usr/local/lib/python3.10/site-packages/givenergy_modbus
 
 COPY startup.py startup.py
@@ -79,7 +79,6 @@ ENV PYTHONPATH="/app"
 ENV DAYRATE=0.395
 ENV NIGHTRATE=0.155
 ENV EXPORTRATE=0.04
-ENV HOSTIP="192.168.2.10"
 ENV DYNAMICTARIFF=False
 ENV DAYRATESTART="04:30"
 ENV NIGHTRATESTART="00:30"
