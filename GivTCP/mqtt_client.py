@@ -47,6 +47,12 @@ def on_message(client, userdata, message):
         elif command=="setChargeRate":
             writecommand['chargeRate']=str(message.payload.decode("utf-8"))
             wr.setChargeRate(writecommand)
+        elif command=="setDischargeRateAC":
+            writecommand['dischargeRate']=str(message.payload.decode("utf-8"))
+            wr.setDischargeRateAC(writecommand)
+        elif command=="setChargeRateAC":
+            writecommand['chargeRate']=str(message.payload.decode("utf-8"))
+            wr.setChargeRateAC(writecommand)
         elif command=="rebootInverter":
             wr.rebootinverter()
         elif command=="rebootAddon":
@@ -296,6 +302,46 @@ def on_message(client, userdata, message):
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=10
             wr.setDischargeSlotEnd(payload)
+        elif command=="setDischargeTarget1":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=1
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget2":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=2
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget3":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=3
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget4":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=4
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget5":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=5
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget6":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=6
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget7":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=7
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget8":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=8
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget9":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=9
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget10":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=10
+            wr.setDischargeTarget(writecommand)
         elif command=="setPauseStart":
             payload['start']=message.payload.decode("utf-8")[:5]
             wr.setPauseStart(payload)
@@ -303,53 +349,53 @@ def on_message(client, userdata, message):
             payload['finish']=message.payload.decode("utf-8")[:5]
             wr.setPauseEnd(payload)
         elif command=="tempPauseDischarge":
-            if isfloat(message.payload.decode("utf-8")):
-                writecommand=float(message.payload.decode("utf-8"))
-                wr.tempPauseDischarge(writecommand)
-            elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
+            if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".tpdRunning"):
-                    jobid= str(open(".tpdRunning","r").readline())
+                    jobid= str(open(".tpdRunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
                     result=wr.cancelJob(jobid)
                 else:
                     logger.error("Temp Pause Charge is not currently running")
-        elif command=="tempPauseCharge":
-            if isfloat(message.payload.decode("utf-8")):
+            elif isfloat(message.payload.decode("utf-8")):
                 writecommand=float(message.payload.decode("utf-8"))
-                wr.tempPauseCharge(writecommand)
-            elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
+                wr.tempPauseDischarge(writecommand)
+        elif command=="tempPauseCharge":
+            if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".tpcRunning"):
-                    jobid= str(open(".tpcRunning","r").readline())
+                    jobid= str(open(".tpcRunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
                     result=wr.cancelJob(jobid)
                 else:
                     logger.error("Temp Pause Charge is not currently running")
-        elif command=="forceCharge":
-            if isfloat(message.payload.decode("utf-8")):
+            elif isfloat(message.payload.decode("utf-8")):
                 writecommand=float(message.payload.decode("utf-8"))
-                wr.forceCharge(writecommand)
-            elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
+                wr.tempPauseCharge(writecommand)
+        elif command=="forceCharge":
+            if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".FCRunning"):
-                    jobid= str(open(".FCRunning","r").readline())
+                    jobid= str(open(".FCRunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Force Charge: "+ str(jobid))
                     result=wr.cancelJob(jobid)
                 else:
                     logger.error("Force Charge is not currently running")
-        elif command=="forceExport":
-            if isfloat(message.payload.decode("utf-8")):
+            elif isfloat(message.payload.decode("utf-8")):
                 writecommand=float(message.payload.decode("utf-8"))
-                wr.forceExport(writecommand)
-            elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
+                wr.forceCharge(writecommand)
+        elif command=="forceExport":
+            if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".FERunning"):
-                    jobid= str(open(".FERunning","r").readline())
+                    jobid= str(open(".FERunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Force Export: "+ str(jobid))
                     result=wr.cancelJob(jobid)
                 else:
                     logger.error("Force Export is not currently running")
+            elif isfloat(message.payload.decode("utf-8")):
+                writecommand=float(message.payload.decode("utf-8"))
+                wr.forceExport(writecommand)
         elif command=="switchRate":
             writecommand=message.payload.decode("utf-8")
             wr.switchRate(writecommand)
@@ -366,15 +412,15 @@ def on_message(client, userdata, message):
     
     #Do something with the result??
 
-def on_connect(client, userdata, flags, rc):
-    if rc==0:
+def on_connect(client, userdata, flags, reason_code, properties):
+    if reason_code==0:
         client.connected_flag=True #set flag
-        logger.debug("connected OK Returned code="+str(rc))
+        logger.debug("connected OK Returned code="+str(reason_code))
         #Subscribe to the control topic for this inverter - relies on serial_number being present
         client.subscribe(MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
         logger.debug("Subscribing to "+MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
     else:
-        logger.error("Bad connection Returned code= "+str(rc))
+        logger.error("Bad connection Returned code= "+str(reason_code))
 
 logger.critical("Connecting to MQTT broker for control- "+str(GiV_Settings.MQTT_Address))
 #loop till serial number has been found

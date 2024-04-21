@@ -3,10 +3,11 @@ from givenergy_modbus_async.client.client import Client
 from givenergy_modbus.client import GivEnergyClient
 from settings import GiV_Settings
 from givenergy_modbus_async.model.plant import Plant
-from givenergy_modbus.model.plant import Plant
 import settings
 import importlib
 import os
+from os.path import exists
+import time
 
 class GivClient:
     """Definition of GivEnergy client """
@@ -28,6 +29,7 @@ class GivClient:
     
     async def getDataAsync(fullrefresh: bool):
         from settings import GiV_Settings
+        logger = GivLUT.logger
         """Polls Inverter in a loop and displays key inverter values in CLI as they come in."""
         client = Client(host=GiV_Settings.invertorIP, port=8899)
         await client.connect()
@@ -41,25 +43,42 @@ class GivClient:
             #client.plant.number_batteries= client.plant.number_batteries
 
             # Update settings file with detected data
+
+
             script_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
             rel_path = "settings.py"
             abs_file_path = os.path.join(script_dir, rel_path)
             isNB=False
             isAR=False
-            with open(abs_file_path, "r") as f:
-                lines = f.readlines()
-            with open(abs_file_path, "w") as f:
-                for line in lines:
-                    if "numBatteries" in line:
-                        isNB = True
-                    if "addRegs" in line:
-                        isAR = True
-                    f.write(line)
-                if not isNB:
-                    f.writelines("    numBatteries= "+client.plant.number_batteries+"\n")
-                if not isAR:
-                    f.writelines("    addRegs= "+ str(client.plant.additional_holding_registers) +"\n")
-            #reload settings now
+            while True:
+                if exists('.settings_lockfile'):
+                    logger.debug("Waiting for settings to be available")
+                    time.sleep(1)
+                    count=count+1
+                    if count==50:
+                        logger.error("Could not access settings file to update Serial Number")
+                        break
+                else:
+                    logger.debug("Settings available")
+                    #Create setting lockfile
+                    open(".settings_lockfile",'a').close()
+                    with open(abs_file_path, "r") as f:
+                        lines = f.readlines()
+                    with open(abs_file_path, "w") as f:
+                        for line in lines:
+                            if "numBatteries" in line:
+                                isNB = True
+                            if "addRegs" in line:
+                                isAR = True
+                            f.write(line)
+                        if not isNB:
+                            f.writelines("    numBatteries= "+client.plant.number_batteries+"\n")
+                        if not isAR:
+                            f.writelines("    addRegs= "+ str(client.plant.additional_holding_registers) +"\n")
+                    os.remove('.settings_lockfile')
+                    logger.debug("removing lockfile")
+                    break
+                    #reload settings now
             importlib.reload(settings)
             from settings import GiV_Settings
 
@@ -329,6 +348,8 @@ class GivLUT:
         "Enable_Discharge":GEType("switch","","enableDischarge","","",False,False,False),
         "Battery_Charge_Rate":GEType("number","","setChargeRate",0,10000,True,False,False),
         "Battery_Discharge_Rate":GEType("number","","setDischargeRate",0,10000,True,False,False),
+        "Battery_Charge_Rate_AC":GEType("number","","setChargeRateAC",0,100,True,False,False),
+        "Battery_Discharge_Rate_AC":GEType("number","","setDischargeRateAC",0,100,True,False,False),
         "Night_Start_Energy_kWh":GEType("sensor","energy","",0,maxTotalEnergy,False,False,False),
         "Night_Energy_kWh":GEType("sensor","energy","",0,maxTodayEnergy,False,False,False),
         "Night_Cost":GEType("sensor","money","",0,maxCost,True,False,False),
@@ -349,6 +370,10 @@ class GivLUT:
         "Temp_Pause_Charge":GEType("select","","tempPauseCharge","","",True,False,False),
         "Force_Charge":GEType("select","","forceCharge","","",True,False,False),
         "Force_Export":GEType("select","","forceExport","","",True,False,False),
+        "Temp_Pause_Discharge_Num":GEType("number","","tempPauseDischarge",0,250,True,False,False),
+        "Temp_Pause_Charge_Num":GEType("number","","tempPauseCharge",0,250,True,False,False),
+        "Force_Charge_Num":GEType("number","","forceCharge",0,250,True,False,False),
+        "Force_Export_Num":GEType("number","","forceExport",0,250,True,False,False),
         "Reboot_Invertor":GEType("switch","","rebootInverter","","",False,False,False),
         "Reboot_Addon":GEType("switch","","rebootAddon","","",False,False,False),
         "Discharge_Time_Remaining":GEType("sensor","","",0,1000,True,False,False),
@@ -418,7 +443,7 @@ class GivLUT:
 "23:00:00","23:01:00","23:02:00","23:03:00","23:04:00","23:05:00","23:06:00","23:07:00","23:08:00","23:09:00","23:10:00","23:11:00","23:12:00","23:13:00","23:14:00","23:15:00","23:16:00","23:17:00","23:18:00","23:19:00","23:20:00","23:21:00","23:22:00","23:23:00","23:24:00","23:25:00","23:26:00","23:27:00","23:28:00","23:29:00","23:30:00","23:31:00","23:32:00","23:33:00","23:34:00","23:35:00","23:36:00","23:37:00","23:38:00","23:39:00","23:40:00","23:41:00","23:42:00","23:43:00","23:44:00","23:45:00","23:46:00","23:47:00","23:48:00","23:49:00","23:50:00","23:51:00","23:52:00","23:53:00","23:54:00","23:55:00","23:56:00","23:57:00","23:58:00","23:59:00"
     ]
 
-    delay_times=["Normal","Running","Cancel","2","15","30","45","60","75","90","105","120","135","150","165","180"]
+    delay_times=["Normal","Running","Cancel","2","5","10","15","30","45","60","75","90","105","120","135","150","165","180"]
     modes=["Eco","Eco (Paused)","Timed Demand","Timed Export","Unknown"]
     rates=["Day","Night"]
     battery_pause_mode=["Disabled","PauseCharge","PauseDischarge","PauseBoth",]

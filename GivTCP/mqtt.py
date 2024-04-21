@@ -27,13 +27,13 @@ class GivMQTT():
     else:
         MQTT_Retain=False
 
-    def on_connect(client, userdata, flags, rc):
-        if rc==0:
+    def on_connect(client, userdata, flags, reason_code, properties):
+        if reason_code==0:
             client.connected_flag=True #set flag
-            logger.debug("connected OK Returned code="+str(rc))
+            logger.debug("connected OK Returned code="+str(reason_code))
             #client.subscribe(topic)
         else:
-            logger.error("Bad connection Returned code= "+str(rc))
+            logger.error("Bad connection Returned code= "+str(reason_code))
 
     def single_MQTT_publish(Topic,value):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			#create flag in class

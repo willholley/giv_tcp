@@ -81,10 +81,17 @@ def enableBatDisharge():
     payload = request.get_json(silent=True, force=True)
     return wr.enableDischarge(payload)
 
+### Should this include a slot number and use setChargeTarget2 ###
+
 @giv_api.route('/setChargeTarget', methods=['POST'])
 def setChrgTarget():
     payload = request.get_json(silent=True, force=True)
     return wr.setChargeTarget(payload)
+
+@giv_api.route('/setDischargeTarget', methods=['POST'])
+def setDischrgTarget():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setDischargeTarget(payload)
 
 @giv_api.route('/setBatteryReserve', methods=['POST'])
 def setBattReserve():
@@ -100,6 +107,13 @@ def setChrgeRate():
 def setDischrgeRate():
     payload = request.get_json(silent=True, force=True)
     return wr.setDischargeRate(payload)
+
+@giv_api.route('/setPauseSlot', methods=['POST'])
+def setPausSlot():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setPauseSlot(payload)
+
+### Should these now include a slot number as the input? ###
 
 @giv_api.route('/setChargeSlot1', methods=['POST'])
 def setChrgSlot1():
@@ -125,10 +139,11 @@ def setDischrgSlot2():
     payload['slot']=2
     return wr.setDischargeSlot(payload)
 
+
 @giv_api.route('/tempPauseDischarge', methods=['POST'])
 def tmpPauseDischrg():
     payload = request.get_json(silent=True, force=True)
-    if payload == "Cancel":
+    if payload == "Cancel" or payload == "0":
         if exists(".tpdRunning"):
             jobid= str(open(".tpdRunning","r").readline())
             logger.critical("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
@@ -141,7 +156,7 @@ def tmpPauseDischrg():
 @giv_api.route('/tempPauseCharge', methods=['POST'])
 def tmpPauseChrg():
     payload = request.get_json(silent=True, force=True)
-    if payload == "Cancel":
+    if payload == "Cancel" or payload == "0":
         if exists(".tpcRunning"):
             jobid= str(open(".tpcRunning","r").readline())
             logger.debug("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
@@ -155,7 +170,7 @@ def tmpPauseChrg():
 def frceChrg():
     payload = request.get_json(silent=True, force=True)
     #Check if Cancel then return the right function
-    if payload == "Cancel":
+    if payload == "Cancel" or payload == "0":
         if exists(".FCRunning"):
             jobid= str(open(".FCRunning","r").readline())
             logger.debug("Retrieved jobID to cancel Force Charge: "+ str(jobid))
@@ -167,7 +182,7 @@ def frceChrg():
 @giv_api.route('/forceExport', methods=['POST'])
 def frceExprt():
     payload = request.get_json(silent=True, force=True)
-    if payload == "Cancel":
+    if payload == "Cancel" or payload == "0":
         if exists(".FERunning"):
             jobid= str(open(".FERunning","r").readline())
             logger.debug("Retrieved jobID to cancel Force Export: "+ str(jobid))
@@ -180,6 +195,11 @@ def frceExprt():
 def setBattMode():
     payload = request.get_json(silent=True, force=True)
     return wr.setBatteryMode(payload)
+
+@giv_api.route('/setBatteryPauseMode', methods=['POST'])
+def setBattPausMode():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setBatteryPauseMode(payload)
 
 @giv_api.route('/setDateTime', methods=['POST'])
 def setDate():

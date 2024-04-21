@@ -5,7 +5,7 @@ import time
 import json
 import paho.mqtt.client as mqtt
 from settings import GiV_Settings
-from givenergy_modbus.model.inverter import Model
+from givenergy_modbus_async.model.inverter import Model
 from mqtt import GivMQTT
 from GivLUT import GivLUT
 from os.path import exists
@@ -36,17 +36,17 @@ class HAMQTT():
             return int(multi_output_old['Invertor_Details']['Invertor_Max_Bat_Rate'])
         return 5000
 
-    def on_connect(client, userdata, flags, rc):
-        if rc==0:
+    def on_connect(client, userdata, flags, reason_code, properties):
+        if reason_code==0:
             client.connected_flag=True #set flag
-            logger.debug("connected OK Returned code="+str(rc))
+            logger.debug("connected OK Returned code="+str(reason_code))
             #client.subscribe(topic)
         else:
-            logger.error("Bad connection Returned code= "+str(rc))
+            logger.error("Bad connection Returned code= "+str(reason_code))
 
     def publish_discovery(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         mqtt.Client.connected_flag=False        			#create flag in class
-        client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+        client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
         rootTopic=str(GiV_Settings.MQTT_Topic+"/"+SN+"/")
         if HAMQTT.MQTTCredentials:
             client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
@@ -227,8 +227,17 @@ class HAMQTT():
                 tempObj['min']=0
                 tempObj['max']=100
                 tempObj['mode']="slider"
+            elif "_num" in str(item).lower():   #if EVC current
+                tempObj['min']=0
+                tempObj['max']=240
+                tempObj['mode']="slider"
             elif "energy" in str(item).lower():
                 tempObj['unit_of_meas']="kWh"
+                tempObj['min']=0
+                tempObj['max']=100
+                tempObj['mode']="slider"
+            elif "charge_rate_ac" in str(item).lower():
+                tempObj['unit_of_meas']="%"
                 tempObj['min']=0
                 tempObj['max']=100
                 tempObj['mode']="slider"

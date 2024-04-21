@@ -84,15 +84,15 @@ def on_message(client, userdata, message):
     
     #Do something with the result??
 
-def on_connect(client, userdata, flags, rc):
-    if rc==0:
+def on_connect(client, userdata, flags, reason_code, properties):
+    if reason_code==0:
         client.connected_flag=True #set flag
-        logger.debug("connected OK Returned code="+str(rc))
+        logger.debug("connected OK Returned code="+str(reason_code))
         #Subscribe to the control topic for this inverter - relies on serial_number being present
         client.subscribe(MQTT_Topic+"/control/"+GiV_Settings.serial_number_evc+"/#")
         logger.debug("Subscribing to "+MQTT_Topic+"/control/"+GiV_Settings.serial_number_evc+"/#")
     else:
-        logger.error("Bad connection Returned code= "+str(rc))
+        logger.error("Bad connection Returned code= "+str(reason_code))
 
 
 client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_EVC_Control")

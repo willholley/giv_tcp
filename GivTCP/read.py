@@ -2,7 +2,7 @@
 # version 2022.08.01
 from threading import Lock
 from givenergy_modbus_async import model
-from givenergy_modbus_async.model.inverter import Model, Generation
+from givenergy_modbus_async.model.inverter import Model, Generation, Inverter
 import sys
 from pickletools import read_uint1
 import json
@@ -23,7 +23,6 @@ logging.getLogger("givenergy_modbus_async").setLevel(logging.CRITICAL)
 logging.getLogger("rq.worker").setLevel(logging.CRITICAL)
 
 sys.path.append(GiV_Settings.default_path)
-
 
 givLUT = GivLUT.entity_type
 logger = GivLUT.logger
@@ -54,6 +53,8 @@ def getData(fullrefresh):  # Read from Inverter put in cache
     multi_output = {}
     result = {}
     temp = {}
+    GEInv=Inverter()
+
     logger.debug("----------------------------Starting----------------------------")
     logger.debug("Getting All Registers")
 
@@ -68,7 +69,7 @@ def getData(fullrefresh):  # Read from Inverter put in cache
 #        GEInv=plant.result[0]
 #        GEBat=plant.result[1]
 
-        plant=inverterData(True, True) #Run using async library
+        plant=inverterData(fullrefresh, True) #Run using async library
         if "ERROR" in plant:
             print (plant)
             raise Exception ("Garbage or failed inverter Response: "+ str(plant))
@@ -102,11 +103,11 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         inverterModel.invmaxrate=GEInv.inverter_max_power
 
         if GEInv.device_type_code=="8001":  # if AIO
-            #batteryCapacity=GEInv.battery_nominal_capacity*307
-            batteryCapacity=GEInv.battery_capacity*307
+            batteryCapacity=GEInv.battery_nominal_capacity*307
+            #batteryCapacity=GEInv.battery_capacity*307
         else:
-            #batteryCapacity=GEInv.battery_nominal_capacity*51.2
-            batteryCapacity=GEInv.battery_capacity*51.2
+            batteryCapacity=GEInv.battery_nominal_capacity*51.2
+            #batteryCapacity=GEInv.battery_capacity*51.2
 
         if inverterModel.generation == Generation.GEN1:
             if inverterModel.model == Model.AC:
@@ -342,6 +343,8 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         # Get Charge/Discharge Active status
         discharge_rate = int(min((GEInv.battery_discharge_limit/100)*(batteryCapacity), inverterModel.batmaxrate))
         charge_rate = int(min((GEInv.battery_charge_limit/100)*(batteryCapacity), inverterModel.batmaxrate))
+        discharge_rate_ac = int(GEInv.battery_discharge_limit_ac)
+        charge_rate_ac = int(GEInv.battery_charge_limit_ac)
 
         # Calculate Mode
         logger.debug("Calculating Mode...")
@@ -373,18 +376,21 @@ def getData(fullrefresh):  # Read from Inverter put in cache
         controlmode['Battery_Power_Mode'] = batPowerMode
         controlmode['Target_SOC'] = target_soc
 
-        try:
+
+        if hasattr(GEInv,"local_control_mode"):
             controlmode['Local_control_mode'] = GivLUT.local_control_mode[int(GEInv.local_control_mode)]
+        if hasattr(GEInv,"pv_input_mode"):
             controlmode['PV_input_mode'] = GivLUT.pv_input_mode[int(GEInv.pv_input_mode)]
+        if hasattr(GEInv,"battery_pause_mode"):
             controlmode['Battery_pause_mode'] = GivLUT.battery_pause_mode[int(GEInv.battery_pause_mode)]
-        except:
-            logger.debug("New control modes don't exist for this model")
 
         controlmode['Enable_Charge_Schedule'] = charge_schedule
         controlmode['Enable_Discharge_Schedule'] = discharge_schedule
         controlmode['Enable_Discharge'] = discharge_enable
         controlmode['Battery_Charge_Rate'] = charge_rate
         controlmode['Battery_Discharge_Rate'] = discharge_rate
+        controlmode['Battery_Charge_Rate_AC'] = charge_rate_ac
+        controlmode['Battery_Discharge_Rate_AC'] = discharge_rate_ac
         controlmode['Active_Power_Rate']= GEInv.active_power_rate
         controlmode['Reboot_Invertor']="disable"
         controlmode['Reboot_Addon']="disable"
@@ -397,27 +403,46 @@ def getData(fullrefresh):  # Read from Inverter put in cache
             controlmode['Temp_Pause_Charge'] = "Normal"
             controlmode['Temp_Pause_Discharge'] = "Normal"
 
+### Implement Force number option here###
+
         if exists(".FCRunning"):
             logger.debug("Force Charge is Running")
             controlmode['Force_Charge'] = "Running"
+            #Get time left to run in mins and publish to number
+            minsremain=getJobFinish(".FCRunning")
+            logger.debug("Time remaining is" + str(minsremain))
+            controlmode['Force_Charge_Num']=int(minsremain)
         else:
             controlmode['Force_Charge'] = "Normal"
+            controlmode['Force_Charge_Num']=0
         if exists(".FERunning"):
             logger.debug("Force_Export is Running")
             controlmode['Force_Export'] = "Running"
+            minsremain=getJobFinish(".FERunning")
+            logger.debug("Time remaining is" + str(minsremain))
+            controlmode['Force_Export_Num']=int(minsremain)
         else:
             logger.debug("Force Export is not Running")
             controlmode['Force_Export'] = "Normal"
+            controlmode['Force_Export_Num']=0
         if exists(".tpcRunning"):
             logger.debug("Temp Pause Charge is Running")
             controlmode['Temp_Pause_Charge'] = "Running"
+            minsremain=getJobFinish(".tpcRunning")
+            logger.debug("Time remaining is" + str(minsremain))
+            controlmode['Temp_Pause_Charge_Num']=int(minsremain)
         else:
             controlmode['Temp_Pause_Charge'] = "Normal"
+            controlmode['Temp_Pause_Charge_Num']=0
         if exists(".tpdRunning"):
             logger.debug("Temp_Pause_Discharge is Running")
             controlmode['Temp_Pause_Discharge'] = "Running"
+            minsremain=getJobFinish(".tpdRunning")
+            logger.debug("Time remaining is" + str(minsremain))
+            controlmode['Temp_Pause_Discharge_Num']=int(minsremain)
         else:
             controlmode['Temp_Pause_Discharge'] = "Normal"
+            controlmode['Temp_Pause_Discharge_Num']=0
 
 
 ############  Battery Power Stats    ############
@@ -579,8 +604,8 @@ def getData(fullrefresh):  # Read from Inverter put in cache
 
         try:
 ############################            
-            timeslots['Battery_pause_start_time_slot'] = GEInv.battery_pause_slot.start.isoformat()
-            timeslots['Battery_pause_end_time_slot'] = GEInv.battery_pause_slot.end.isoformat()
+            timeslots['Battery_pause_start_time_slot'] = GEInv.battery_pause_slot_1.start.isoformat()
+            timeslots['Battery_pause_end_time_slot'] = GEInv.battery_pause_slot_1.end.isoformat()
         except:
             logger.debug("Battery Pause timeslots don't exist for this model")
 
@@ -861,7 +886,7 @@ def updateFirstRun(SN):
     #check for settings lockfile before
     count=0
     while True:
-        logger.debug("OPening settings for first run evc")
+        logger.debug("Opening settings for first run")
         if exists('.settings_lockfile'):
             logger.debug("Waiting for settings to be availble")
             time.sleep(1)
@@ -1201,6 +1226,18 @@ def calcBatteryValue(multi_output):
     multi_output['Energy']['Rates']['Battery_Value'] = batterystats['Battery_Value']
     multi_output['Energy']['Rates']['Battery_ppkwh'] = batterystats['Battery_ppkwh']
     return (multi_output)
+
+def getJobFinish(type: str):
+    with open(type, 'r') as f:
+        lines=f.readlines()
+    endtime=lines[1]
+    logger.debug("Finish hour= "+str(endtime[:2]))
+    logger.debug("Finish minute= "+str(endtime[-2:]))
+    finishdate= datetime.datetime.now().replace(hour=int(endtime[:2]),minute=int(endtime[-2:]))
+    logger.debug("Finishtime is: "+str(finishdate))
+    timeleft=int((finishdate - datetime.datetime.now()).total_seconds()/60)
+    logger.debug("Time remaining is" + str(timeleft))
+    return (timeleft)
 
 
 if __name__ == '__main__':
