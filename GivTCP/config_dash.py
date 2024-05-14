@@ -1,18 +1,16 @@
 # -*- coding: utf-8 -*-
 # version 2022.01.31
-"""Simple Config web form"""
-import os
+import sys, os, logging
 import pickle
 from os.path import exists
-from giv_lut import GivLUT
-from settings import GivSettings
+from GivLUT import GivLUT
+from settings import GiV_Settings
 
 def get_config():
-    """Retrieve settings from file and display"""
     if exists(GivLUT.regcache):      # if there is a cache then grab it
         with open(GivLUT.regcache, 'rb') as inp:
-            reg_cache_stack= pickle.load(inp)
-            multi_output_old=reg_cache_stack[4]
+            regCacheStack= pickle.load(inp)
+            multi_output_old=regCacheStack[4]
         serial_number=multi_output_old["Invertor_Details"]['Invertor_Serial_Number']
     else:
         serial_number="Unknown"
@@ -21,31 +19,32 @@ def get_config():
             <html>
             <body>
                 <p>GivTCP Config for Invertor: {serial_number}</p>'''
-    form='''
+    form=f'''
                 <form method="post" action="/config">'''
-    for attribute in vars(GivSettings):
+    for attribute in vars(GiV_Settings):
         if not attribute.startswith('__'):
             form=form+f'''
             <p><label for="{attribute}">{attribute}: </label>
-            <input name="{attribute}" id="{attribute}" 
-            value="{vars(GivSettings)[attribute]}"/></p>'''
+            <input name="{attribute}" id="{attribute}" value="{vars(GiV_Settings)[attribute]}"/></p>'''
     form=form+'''
         <p><input type="submit" value="Save Config" /></p>
         </form>'''
 
-    footer='''
+    footer=f'''
             </body>
         </html>'''
     html=head+form+footer
     return html
 
 def set_config(formdata):
-    """Take contents of web form and save to settings.py file"""""
+    #Accept input
+    
     inv=formdata["givtcp_instance"]
-    path= "/app/GivTCP_"+str(inv)
+#update the ENV
+    PATH= "/app/GivTCP_"+str(inv)
 
-    with open(path+"/settings.py", 'w', encoding='ascii') as outp:
-        outp.write("class GivSettings:\n")
+    with open(PATH+"/settings.py", 'w') as outp:
+        outp.write("class GiV_Settings:\n")
         outp.write("    invertorIP=\""+formdata["invertorIP"]+"\"\n")
         outp.write("    numBatteries=\""+formdata["numBatteries"]+"\"\n")
         outp.write("    Print_Raw_Registers="+formdata["Print_Raw_Registers"]+"\n")
@@ -55,6 +54,7 @@ def set_config(formdata):
         outp.write("    MQTT_Password=\""+formdata["MQTT_Password"]+"\"\n")
         outp.write("    MQTT_Topic=\""+formdata["MQTT_Topic"]+"\"\n")
         outp.write("    MQTT_Port="+formdata["MQTT_Port"]+"\n")
+        outp.write("    MQTT_Retain="+formdata["MQTT_Retain"]+"\n")
         outp.write("    Log_Level=\""+formdata["Log_Level"]+"\"\n")
         outp.write("    Influx_Output="+formdata["Influx_Output"]+"\n")
         outp.write("    influxURL=\""+formdata["influxURL"]+"\"\n")
@@ -79,6 +79,12 @@ def set_config(formdata):
             outp.write("    Debug_File_Location=\"/config/GivTCP/log_inv_"+str(inv)+".log\"\n")
         else:
             outp.write("    cache_location=\""+formdata["cache_location"]+"\"\n")
-            outp.write("    Debug_File_Location=\""+formdata["cache_location"]+
-                       "/log_inv_"+str(inv)+".log\"\n")
+            outp.write("    Debug_File_Location=\""+formdata["cache_location"]+"/log_inv_"+str(inv)+".log\"\n")
+
+    import startup_2 as startup
+    # If its already running then stop current processes
+    startup.restart(inv)
+    # else startup
+    startup.startup(inv)
+#reload page (GET)
     return "Settings Updated, reloading GivTCP"

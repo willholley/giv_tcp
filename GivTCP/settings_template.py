@@ -1,16 +1,15 @@
-"""Settings file for GivTCP"""
-class GivSettings:
-    """Settings file for GivTCP"""
+# version 2022.01.31
+class GiV_Settings:
 # Invertor Info
     invertorIP="1.2.3.4"            #Required - IP address of Inverter on local network
     numBatteries=1                  #Required - The number of batteries connected this inverter
     self_run=True
     self_run_timer = 5              #Optional - Used to loop the "Self_run" function for regular reading
-    queue_retries=2                 #Required - The number of calls to the inverter when trying to set a register. A higher number improves the chance of inverter writes succeeding
+    queue_retries=2                 #Required - The number of calls to the inverter when trying to set a register. A higher number improves the chance of inverter writes succeeding    
     default_path = "GivTCP"         #Required - Used to ensure python execution. Should be the base folder you run GivTCP from
     givtcp_instance=1               #Required - WHich instance of GivTCP is this? Usually 1 if you only have one invertor
-    queue_retries=2                 #Required - The number of calls to the inverter when trying to set a register. A higher number improves the chance of inverter writes succeeding
-
+    queue_retries=2                 #Required - The number of calls to the inverter when trying to set a register. A higher number improves the chance of inverter writes succeeding  
+    
 # Debug Settings
     Log_Level="Error"               #Optional - Enables logging level. Default is "Error", but can be "Info", "Critical" or "Debug"
     Print_Raw_Registers=True        #Optional - Bool - True publishes all available registers.
@@ -22,8 +21,9 @@ class GivSettings:
     MQTT_Address="192.168.2.83"     #Optional - (Required is above set to True) IP address of MQTT broker (local or remote)
     MQTT_Username="mqtt"            #Optional - Username for MQTT broker
     MQTT_Password="mqtt2020"        #Optional - Password for MQTT broker
-    MQTT_Topic=""                   #Optional - Root topic for all MQTT messages. Defaults to "GivEnergy/<SerialNumber>
+    MQTT_Topic=""                   #Optional - Root topic for all MQTT messages. Defaults to "GivEnergy/<SerialNumber> 
     MQTT_Port=1883                  #Optional - Int - define port that MQTT broker is listening on (default 1883)
+    MQTT_Retain=False               #Optional - Bool - whether to set retain flag on published MQTT messages (default False)
 
 # Influx Settings
     Influx_Output= False            #Optional - turns on Influx as a data publisher. True or False
@@ -42,3 +42,4 @@ class GivSettings:
     night_rate=0.055                #Required - £ per kWh of your electricity night rate
     night_rate_start="00:00"        #Required - time your night rate starts "HH:MM"
     export_rate=0.055               #Required - £ per kWh of your electricity export rate
+

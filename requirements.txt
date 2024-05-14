@@ -12,4 +12,7 @@ rq
 redis
 npm
 pymodbus
-git+https://github.com/jace/rq-dashboard.git
+async_timeout
+vite
+tzdata
+arrow

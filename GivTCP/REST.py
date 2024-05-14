@@ -1,13 +1,17 @@
-"""Provides endpoints for reading and control of GivTCP via REST"""
 # -*- coding: utf-8 -*-
 # version 2021.12.22
 from os.path import exists
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from flask_cors import CORS
-import read       #grab passthrough functions from main read file
-import write      #grab passthrough functions from main write file
+import asyncio
+import read as rd       #grab passthrough functions from main read file
+import write as wr      #grab passthrough functions from main write file
+import evc as evc
 import config_dash as cfdash
-from giv_lut import GivQueue, GivLUT
+from GivLUT import GivQueue, GivLUT
+import os
+import json
+from settings import GiV_Settings
 
 logger = GivLUT.logger
 
@@ -16,196 +20,299 @@ giv_api = Flask(__name__)
 CORS(giv_api)
 
 #Proxy Read Functions
-@giv_api.route('/config', methods=['GET', 'POST'])
+
+@giv_api.route('/', methods=['GET', 'POST'])
+def root():
+  return send_from_directory('/app/config_frontend/dist', 'index.html')
+
+@giv_api.route('/config')
 def get_config_page():
-    """Simple Config Page via web"""
-    if request.method=="GET":
-        return cfdash.get_config()
-    elif request.method=="POST":
-        return cfdash.set_config(request.form)
-    return "No GET or POST recieved"
+  return send_from_directory('/app/config_frontend/dist', 'index.html')
+#    if request.method=="GET":
+#        return cfdash.get_config()
+#    if request.method=="POST":
+#        return cfdash.set_config(request.form)
 
 #Read from Invertor put in cache and publish
 @giv_api.route('/runAll', methods=['GET'])
-def get_all():
-    """Calls the runALL function from read.py via REST"""
-    return read.runAll(True)
+def getAll():
+    # We need a safe way to do this for REST... just sending cache for now
+    #logger.critical("runAll called via REST")
+    return rd.getCache()
 
 @giv_api.route('/reboot', methods=['GET'])
 def reboot():
-    """Calls the rebootinverter function from writeite.py via REST"""
-    return write.rebootinverter()
+    return wr.rebootinverter()
+
+@giv_api.route('/restart', methods=['GET'])
+def restart():
+    return wr.rebootAddon()
 
 #Publish last cached Invertor Data
 @giv_api.route('/readData', methods=['GET'])
-def read_data():
-    """Calls the pubFromPickle function from read.py via REST"""
-    return read.pub_from_pickle()
+def rdData():
+    #logger.critical("readData called via REST")
+    return rd.pubFromPickle()
 
 #Publish last cached Invertor Data
 @giv_api.route('/getCache', methods=['GET'])
-def gt_cache():
-    """Calls the getCache function from read.py via REST"""
-    return read.get_cache()
+def gtCache():
+    #logger.critical("getCache called via REST")
+    return asyncio.run(rd.runAllRest())
 
-#Read from Invertor put in cache
-@giv_api.route('/getData', methods=['GET'])
-def gt_data():
-    """Calls the getData function from read.py via REST"""
-    return GivQueue.q.enqueue(read.get_data,True)
+# Read from Invertor put in cache
+#@giv_api.route('/getData', methods=['GET'])
+#def gtData():
+#    return GivQueue.q.enqueue(rd.getData,True)
 
 #Proxy Write Functions
 @giv_api.route('/enableChargeTarget', methods=['POST'])
-def en_charge_trgt():
-    """Calls the enableChargeTarget function from writeite.py via REST"""
+def enChargeTrgt():
     payload = request.get_json(silent=True, force=True)
-    return write.enableChargeTarget(payload)
+    return wr.enableChargeTarget(payload)
 
 @giv_api.route('/enableChargeSchedule', methods=['POST'])
-def enable_chrg_schedule():
-    """Calls the enableChargeSchedule function from writeite.py via REST"""
+def enableChrgSchedule():
     payload = request.get_json(silent=True, force=True)
-    return write.enableChargeSchedule(payload)
+    return wr.enableChargeSchedule(payload)
 
 @giv_api.route('/enableDischargeSchedule', methods=['POST'])
-def enable_dischrg_schedule():
-    """Calls the enableDischargeSchedule function from writeite.py via REST"""
+def enableDischrgSchedule():
     payload = request.get_json(silent=True, force=True)
-    return write.enableDischargeSchedule(payload)
+    return wr.enableDischargeSchedule(payload)
 
 @giv_api.route('/enableDischarge', methods=['POST'])
-def enable_bat_disharge():
-    """Calls the enableDischarge function from writeite.py via REST"""
+def enableBatDisharge():
     payload = request.get_json(silent=True, force=True)
-    return write.enableDischarge(payload)
+    return wr.enableDischarge(payload)
+
+### Should this include a slot number and use setChargeTarget2 ###
 
 @giv_api.route('/setChargeTarget', methods=['POST'])
-def set_chrg_target():
-    """Calls the setChargeTarget function from writeite.py via REST"""
+def setChrgTarget():
     payload = request.get_json(silent=True, force=True)
-    return write.setChargeTarget(payload)
+    return wr.setChargeTarget(payload)
+
+@giv_api.route('/setExportTarget', methods=['POST'])
+def setExpTarget():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setExportTarget(payload)
+
+@giv_api.route('/setDischargeTarget', methods=['POST'])
+def setDischrgTarget():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setDischargeTarget(payload)
 
 @giv_api.route('/setBatteryReserve', methods=['POST'])
-def set_batt_reserve():
-    """Calls the setBatteryReserve function from writeite.py via REST"""
+def setBattReserve():
     payload = request.get_json(silent=True, force=True)
-    return write.setBatteryReserve(payload)
+    return wr.setBatteryReserve(payload)
 
 @giv_api.route('/setChargeRate', methods=['POST'])
-def set_chrge_rate():
-    """Calls the setChargeRate function from writeite.py via REST"""
+def setChrgeRate():
     payload = request.get_json(silent=True, force=True)
-    return write.setChargeRate(payload)
+    return wr.setChargeRate(payload)
+
+@giv_api.route('/setCarChargeBoost', methods=['POST'])
+def setCarBoost():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setCarChargeBoost(payload)
+
+@giv_api.route('/setExportLimit', methods=['POST'])
+def setExpLim():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setExportLimit(payload)
 
 @giv_api.route('/setDischargeRate', methods=['POST'])
-def set_dischrge_rate():
-    """Calls the setDischargeRate function from writeite.py via REST"""
+def setDischrgeRate():
     payload = request.get_json(silent=True, force=True)
-    return write.setDischargeRate(payload)
+    return wr.setDischargeRate(payload)
+
+@giv_api.route('/setPauseSlot', methods=['POST'])
+def setPausSlot():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setPauseSlot(payload)
+
+### Should these now include a slot number as the input? ###
 
 @giv_api.route('/setChargeSlot1', methods=['POST'])
-def set_chrg_slot1():
-    """Calls the setChargeSlot function for slot 1 from writeite.py via REST"""
+def setChrgSlot1():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=1
-    return write.setChargeSlot(payload)
+    return wr.setChargeSlot(payload)
 
 @giv_api.route('/setChargeSlot2', methods=['POST'])
-def set_chrg_slot2():
-    """Calls the setChargeSlot function for slot 2 from writeite.py via REST"""
+def setChrgSlot2():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=2
-    return write.setChargeSlot(payload)
+    return wr.setChargeSlot(payload)
+
+@giv_api.route('/setChargeSlot3', methods=['POST'])
+def setChrgSlot3():
+    payload = request.get_json(silent=True, force=True)
+    payload['slot']=3
+    return wr.setChargeSlot(payload)
 
 @giv_api.route('/setDischargeSlot1', methods=['POST'])
-def set_dischrg_slot1():
-    """Calls the setDischargeSlot function for slot 1 from writeite.py via REST"""
+def setDischrgSlot1():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=1
-    return write.setDischargeSlot(payload)
+    return wr.setDischargeSlot(payload)
 
 @giv_api.route('/setDischargeSlot2', methods=['POST'])
-def set_dischrg_slot2():
-    """Calls the setDischargeSlot function for slot 2 from writeite.py via REST"""
+def setDischrgSlot2():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=2
-    return write.setDischargeSlot(payload)
+    return wr.setDischargeSlot(payload)
+
+@giv_api.route('/setDischargeSlot3', methods=['POST'])
+def setDischrgSlot3():
+    payload = request.get_json(silent=True, force=True)
+    payload['slot']=3
+    return wr.setDischargeSlot(payload)
+
+@giv_api.route('/setExportSlot1', methods=['POST'])
+def setExpSlot1():
+    payload = request.get_json(silent=True, force=True)
+    payload['slot']=1
+    return wr.setExportSlot(payload)
+@giv_api.route('/setExportSlot2', methods=['POST'])
+def setExpSlot2():
+    payload = request.get_json(silent=True, force=True)
+    payload['slot']=2
+    return wr.setExportSlot(payload)
+@giv_api.route('/setExportSlot3', methods=['POST'])
+def setExpSlot3():
+    payload = request.get_json(silent=True, force=True)
+    payload['slot']=3
+    return wr.setExportSlot(payload)
 
 @giv_api.route('/tempPauseDischarge', methods=['POST'])
-def tmp_pause_dischrg():
-    """Calls the tempPauseCharge function from writeite.py via REST"""
+def tmpPauseDischrg():
     payload = request.get_json(silent=True, force=True)
-    if payload == "Cancel":
+    if payload == "Cancel" or payload == "0":
         if exists(".tpdRunning"):
-            jobid= str(open(".tpdRunning","r", encoding='ascii').readline())
-            logger.critical("Retrieved jobID to cancel Temp Pause Discharge: %s", str(jobid))
-            return write.cancelJob(jobid)
+            jobid= str(open(".tpdRunning","r").readline())
+            logger.critical("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
+            return wr.cancelJob(jobid)
         else:
             logger.error("Force Charge is not currently running")
     else:
-        return write.tempPauseDischarge(payload)
+        return wr.tempPauseDischarge(payload)
 
 @giv_api.route('/tempPauseCharge', methods=['POST'])
-def tmp_pause_chrg():
-    """Calls the tempPauseCharge function from writeite.py via REST"""
+def tmpPauseChrg():
     payload = request.get_json(silent=True, force=True)
-    if payload == "Cancel":
+    if payload == "Cancel" or payload == "0":
         if exists(".tpcRunning"):
-            jobid= str(open(".tpcRunning","r", encoding='ascii').readline())
-            logger.debug("Retrieved jobID to cancel Temp Pause Charge: %s", str(jobid))
-            return write.cancelJob(jobid)
+            jobid= str(open(".tpcRunning","r").readline())
+            logger.debug("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
+            return wr.cancelJob(jobid)
         else:
             logger.error("Force Charge is not currently running")
     else:
-        return write.tempPauseCharge(payload)
+        return wr.tempPauseCharge(payload)
 
 @giv_api.route('/forceCharge', methods=['POST'])
-def frce_chrg():
-    """Calls the forceCharge function from writeite.py via REST"""
+def frceChrg():
     payload = request.get_json(silent=True, force=True)
     #Check if Cancel then return the right function
-    if payload == "Cancel":
+    if payload == "Cancel" or payload == "0":
         if exists(".FCRunning"):
-            jobid= str(open(".FCRunning","r", encoding='ascii').readline())
-            logger.debug("Retrieved jobID to cancel Force Charge: %s", str(jobid))
-            return write.cancelJob(jobid)
+            jobid= str(open(".FCRunning","r").readline())
+            logger.debug("Retrieved jobID to cancel Force Charge: "+ str(jobid))
+            return wr.cancelJob(jobid)
         else:
             logger.error("Force Charge is not currently running")
-    else:
-        return write.forceCharge(payload)
+    return wr.forceCharge(payload)
 
 @giv_api.route('/forceExport', methods=['POST'])
-def frce_exprt():
-    """Calls the forceExport function from writeite.py via REST"""
+def frceExprt():
     payload = request.get_json(silent=True, force=True)
-    if payload == "Cancel":
+    if payload == "Cancel" or payload == "0":
         if exists(".FERunning"):
-            jobid= str(open(".FERunning","r", encoding='ascii').readline())
-            logger.debug("Retrieved jobID to cancel Force Export: %s", str(jobid))
-            return write.cancelJob(jobid)
+            jobid= str(open(".FERunning","r").readline())
+            logger.debug("Retrieved jobID to cancel Force Export: "+ str(jobid))
+            return wr.cancelJob(jobid)
         else:
             logger.error("Force Charge is not currently running")
-    else:
-        return write.forceExport(payload)
+    return wr.forceExport(payload)
 
 @giv_api.route('/setBatteryMode', methods=['POST'])
-def set_batt_mode():
-    """Calls the setBatteryMode function from writeite.py via REST"""
+def setBattMode():
     payload = request.get_json(silent=True, force=True)
-    return write.setBatteryMode(payload)
+    return wr.setBatteryMode(payload)
+
+@giv_api.route('/setBatteryPauseMode', methods=['POST'])
+def setBattPausMode():
+    payload = request.get_json(silent=True, force=True)
+    return wr.setBatteryPauseMode(payload)
 
 @giv_api.route('/setDateTime', methods=['POST'])
-def set_date():
-    """Calls the setDateTime function from writeite.py via REST"""
+def setDate():
     payload = request.get_json(silent=True, force=True)
-    return write.setDateTime(payload)
+    return wr.setDateTime(payload)
 
 @giv_api.route('/switchRate', methods=['POST'])
-def sw_rates():
-    """Calls the switchRate function from writeite.py via REST"""
+def swRates():
     payload = request.get_json(silent=True, force=True)
-    return write.switchRate(payload)
+    return wr.switchRate(payload)
+
+@giv_api.route('/settings', methods=['GET'])
+def getFileData():
+    file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'r')
+    #file = open(os.path.dirname(__file__) + '/settings.json', 'r')
+    data = json.load(file)
+    file.close()
+    return data
+
+@giv_api.route('/settings', methods=['POST'])
+def editFileData():
+    file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'r')
+    data = json.load(file)
+    file.close()
+    data.update(request.get_json(silent=True, force=True))
+    file = open('/config/GivTCP/settings'+str(GiV_Settings.givtcp_instance)+'.json', 'w')
+    json.dump(data, file,indent=4)
+    file.close()
+    return data
+
+@giv_api.route('/setImportCap', methods=['POST'])
+def impCap():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setImportCap(payload)
+
+@giv_api.route('/setCurrentLimit', methods=['POST'])
+def currLimit():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setCurrentLimit(payload)
+
+@giv_api.route('/setChargeControl', methods=['POST'])
+def chrgeControl():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setChargeControl(payload)
+
+@giv_api.route('/setChargeMode', methods=['POST'])
+def chrgMode():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setChargeMode(payload)
+
+@giv_api.route('/setChargingMode', methods=['POST'])
+def chrgingMode():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setChargingMode(payload)
+
+@giv_api.route('/setMaxSessionEnergy', methods=['POST'])
+def maxSession():
+    payload = request.get_json(silent=True, force=True)
+    return evc.setMaxSessionEnergy(payload)
+
+@giv_api.route('/getEVCCache', methods=['GET'])
+def gtEVCChce():
+    payload = request.get_json(silent=True, force=True)
+    return evc.getEVCCache()
+
+
 
 if __name__ == "__main__":
     giv_api.run()
-    

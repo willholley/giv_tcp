@@ -6,7 +6,7 @@ import rq_dashboard
 import zoneinfo
 import sys
 import requests
-from GivTCP.find_inverter import findInvertor
+from GivTCP.findInvertor import findInvertor
 import givenergy_modbus.model.inverter
 from givenergy_modbus.client import GivEnergyClient
 
@@ -166,6 +166,7 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
             outp.write("    MQTT_Username=\""+str(os.getenv("MQTT_USERNAME","")+"\"\n"))
             outp.write("    MQTT_Password=\""+str(os.getenv("MQTT_PASSWORD","")+"\"\n"))
             outp.write("    MQTT_Port="+str(os.getenv("MQTT_PORT","")+"\n"))
+            outp.write("    MQTT_Retain="+str(os.getenv("MQTT_RETAIN","")+"\n"))
         if isAddon:
             outp.write("    HA_Auto_D=True\n")
         else:
@@ -274,7 +275,6 @@ for inv in range(1,int(os.getenv('NUMINVERTORS'))+1):
         logger.critical ("Creating web dashboard config")
         with open(PATH2+"/app.json", 'w') as outp:
             outp.write("{\n")
-            outp.write("\"givTcpHostname\": \""+os.getenv('HOSTIP')+":6345\",")
             outp.write("\"solarRate\": "+os.getenv('DAYRATE')+",")
             outp.write("\"exportRate\": "+os.getenv('EXPORTRATE')+"")
             outp.write("}")

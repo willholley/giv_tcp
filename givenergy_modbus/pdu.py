@@ -22,7 +22,7 @@ class ModbusPDU(ABC):
 
     builder: BinaryPayloadBuilder
     function_code: int
-    data_adapter_serial_number: str = ''
+    data_adapter_serial_number: str = 'AB12345678'
     #data_adapter_serial_number: int = 0x0000000000
     padding: int = 0x00000008
     slave_address: int = 0x11  # 0x11 is the inverter but the cloud systems interfere, 0x32+ are the batteries
@@ -32,6 +32,9 @@ class ModbusPDU(ABC):
     def __init__(self, **kwargs):
         if "function_id" in kwargs:  # TODO can be removed?
             raise ValueError("function_id= is not valid, use function_code= instead.", self)
+        
+        if "sn" in kwargs:
+            self.data_adapter_serial_number=kwargs["sn"]
 
         if "function_code" in kwargs:
             if not hasattr(self, 'function_code'):
@@ -64,6 +67,7 @@ class ModbusPDU(ABC):
         self._set_attribute_if_present('padding', kwargs)
         self._set_attribute_if_present('slave_address', kwargs)
         self._set_attribute_if_present('check', kwargs)
+        _logger.debug("Serial Number in PDU is: "+self.data_adapter_serial_number)
 
     def __str__(self) -> str:
         filtered_keys = [
@@ -87,7 +91,9 @@ class ModbusPDU(ABC):
         """Encode PDU message from instance attributes."""
         self._ensure_valid_state()
         self.builder = BinaryPayloadBuilder(byteorder=Endian.Big)
-        self.builder.add_string(f"{self.data_adapter_serial_number[-10:]:*>10}")  # ensure exactly 10 bytes
+        self.builder.add_string(self.data_adapter_serial_number)  # ensure exactly 10 bytes
+#        self.builder.add_16bit_uint(0x00)
+#        self.builder.add_64bit_uint(0x00000000)
         self.builder.add_64bit_uint(self.padding)
         self.builder.add_8bit_uint(self.slave_address)
         self.builder.add_8bit_uint(self.function_code)

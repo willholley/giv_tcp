@@ -1,49 +1,32 @@
-"""MQTT Client to handle control messages"""
-import time
-import sys
-import importlib
-from os.path import exists
 import paho.mqtt.client as mqtt
+import time, sys, importlib, time
+from os.path import exists
+from settings import GiV_Settings
 import write as wr
-import settings
-from settings import GivSettings
-from giv_lut import GivLUT
+import evc as evc
+import pickle, settings
+from GivLUT import GivLUT
+from pickletools import read_uint1
 
-sys.path.append(GivSettings.default_path)
+sys.path.append(GiV_Settings.default_path)
 
 logger = GivLUT.logger
 
-if GivSettings.MQTT_Port=='':
-    MQTT_PORT=1883
+if GiV_Settings.MQTT_Port=='':
+    MQTT_Port=1883
 else:
-    MQTT_PORT=int(GivSettings.MQTT_Port)
-MQTT_ADDRESS=GivSettings.MQTT_Address
-if GivSettings.MQTT_Username=='':
-    MQTT_CREDENTIALS=False
+    MQTT_Port=int(GiV_Settings.MQTT_Port)
+MQTT_Address=GiV_Settings.MQTT_Address
+if GiV_Settings.MQTT_Username=='':
+    MQTTCredentials=False
 else:
-    MQTT_CREDENTIALS=True
-    MQTT_USERNAME=GivSettings.MQTT_Username
-    MQTT_PASSWORD=GivSettings.MQTT_Password
-if GivSettings.MQTT_Topic=='':
-    MQTT_TOPIC='GivEnergy'
+    MQTTCredentials=True
+    MQTT_Username=GiV_Settings.MQTT_Username
+    MQTT_Password=GiV_Settings.MQTT_Password
+if GiV_Settings.MQTT_Topic=='':
+    MQTT_Topic='GivEnergy'
 else:
-    MQTT_TOPIC=GivSettings.MQTT_Topic
-
-logger.critical("Connecting to MQTT broker for control- "+str(GivSettings.MQTT_Address))
-#loop till serial number has been found
-COUNT=0          # 09-July-2023  set start point
-
-while not hasattr(GivSettings,'serial_number'):
-    time.sleep(5)
-    #del sys.modules['settings.GivSettings']
-    importlib.reload(settings)
-    from settings import GivSettings
-    COUNT=COUNT + 1      # 09-July-2023  previous +1 only simply reset value to 1 so loop was infinite
-    if COUNT==20:
-        logger.error("No serial_number found in MQTT queue. MQTT Control not available.")
-        break
-    
-logger.debug("Serial Number retrieved: "+GivSettings.serial_number)
+    MQTT_Topic=GiV_Settings.MQTT_Topic
 
 def isfloat(num):
     try:
@@ -57,13 +40,19 @@ def on_message(client, userdata, message):
     logger.debug("MQTT Message Recieved: "+str(message.topic)+"= "+str(message.payload.decode("utf-8")))
     writecommand={}
     try:
-        command=str(message.topic).rsplit('/', maxsplit=1)[-1]
+        command=str(message.topic).split("/")[-1]
         if command=="setDischargeRate":
             writecommand['dischargeRate']=str(message.payload.decode("utf-8"))
             wr.setDischargeRate(writecommand)
         elif command=="setChargeRate":
             writecommand['chargeRate']=str(message.payload.decode("utf-8"))
             wr.setChargeRate(writecommand)
+        elif command=="setDischargeRateAC":
+            writecommand['dischargeRate']=str(message.payload.decode("utf-8"))
+            wr.setDischargeRateAC(writecommand)
+        elif command=="setChargeRateAC":
+            writecommand['chargeRate']=str(message.payload.decode("utf-8"))
+            wr.setChargeRateAC(writecommand)
         elif command=="rebootInverter":
             wr.rebootinverter()
         elif command=="rebootAddon":
@@ -92,12 +81,25 @@ def on_message(client, userdata, message):
         elif command=="setPVInputMode":
             writecommand['state']=str(message.payload.decode("utf-8"))
             wr.setPVInputMode(writecommand)
+        elif command=="setCarChargeBoost":
+            writecommand['state']=str(message.payload.decode("utf-8"))
+            wr.setCarChargeBoost(writecommand)
+        elif command=="setBatteryCalibration":
+            writecommand['state']=str(message.payload.decode("utf-8"))
+            wr.setBatteryCalibration(writecommand)
+        elif command=="setExportLimit":
+            writecommand['state']=str(message.payload.decode("utf-8"))
+            wr.setExportLimit(writecommand)
         elif command=="enableDischarge":
             writecommand['state']=str(message.payload.decode("utf-8"))
             wr.enableDischarge(writecommand)
         elif command=="setChargeTarget":
             writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
             wr.setChargeTarget(writecommand)
+        elif command=="setChargeTarget1":
+            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=1
+            wr.setChargeTarget2(writecommand)
         elif command=="setChargeTarget2":
             writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
             writecommand['slot']=2
@@ -229,6 +231,38 @@ def on_message(client, userdata, message):
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=10
             wr.setChargeSlotEnd(payload)
+
+        elif command=="setEMSChargeStart1":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=1
+            payload['EMS']=True
+            wr.setChargeSlotStart(payload)
+        elif command=="setEMSChargeEnd1":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=1
+            payload['EMS']=True
+            wr.setChargeSlotEnd(payload)
+        elif command=="setEMSChargeStart2":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=2
+            payload['EMS']=True
+            wr.setChargeSlotStart(payload)
+        elif command=="setEMSChargeEnd2":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=2
+            payload['EMS']=True
+            wr.setChargeSlotEnd(payload)
+        elif command=="setEMSChargeStart3":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=3
+            payload['EMS']=True
+            wr.setChargeSlotStart(payload)
+        elif command=="setEMSChargeEnd3":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=3
+            payload['EMS']=True
+            wr.setChargeSlotEnd(payload)
+
         elif command=="setDischargeStart1":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
@@ -309,6 +343,111 @@ def on_message(client, userdata, message):
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=10
             wr.setDischargeSlotEnd(payload)
+        elif command=="setEMSDischargeStart1":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=1
+            payload['EMS']=True
+            wr.setDischargeSlotStart(payload)
+        elif command=="setEMSDischargeEnd1":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=1
+            payload['EMS']=True
+            wr.setDischargeSlotEnd(payload)
+        elif command=="setEMSDischargeStart2":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=2
+            payload['EMS']=True
+            wr.setDischargeSlotStart(payload)
+        elif command=="setEMSDischargeEnd2":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=2
+            payload['EMS']=True
+            wr.setDischargeSlotEnd(payload)
+        elif command=="setEMSDischargeStart3":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=3
+            payload['EMS']=True
+            wr.setDischargeSlotStart(payload)
+        elif command=="setEMSDischargeEnd3":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=3
+            payload['EMS']=True
+            wr.setDischargeSlotEnd(payload)
+        elif command=="setExportStart1":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=1
+            wr.setExportSlotStart(payload)
+        elif command=="setExportEnd1":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=1
+            wr.setExportSlotEnd(payload)
+        elif command=="setExportStart2":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=2
+            wr.setExportSlotStart(payload)
+        elif command=="setExportEnd2":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=2
+            wr.setExportSlotEnd(payload)
+        elif command=="setExportStart3":
+            payload['start']=message.payload.decode("utf-8")[:5]
+            payload['slot']=3
+            wr.setExportSlotStart(payload)
+        elif command=="setExportEnd3":
+            payload['finish']=message.payload.decode("utf-8")[:5]
+            payload['slot']=3
+            wr.setExportSlotEnd(payload)
+        elif command=="setExportTarget1":
+            writecommand['exportToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=1
+            wr.setExportTarget(writecommand)
+        elif command=="setExportTarget2":
+            writecommand['exportToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=2
+            wr.setExportTarget(writecommand)
+        elif command=="setExportTarget3":
+            writecommand['exportToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=3
+        elif command=="setDischargeTarget1":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=1
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget2":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=2
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget3":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=3
+            wr.setExportTarget(writecommand)
+        elif command=="setDischargeTarget4":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=4
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget5":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=5
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget6":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=6
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget7":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=7
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget8":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=8
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget9":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=9
+            wr.setDischargeTarget(writecommand)
+        elif command=="setDischargeTarget10":
+            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            writecommand['slot']=10
+            wr.setDischargeTarget(writecommand)
         elif command=="setPauseStart":
             payload['start']=message.payload.decode("utf-8")[:5]
             wr.setPauseStart(payload)
@@ -316,82 +455,103 @@ def on_message(client, userdata, message):
             payload['finish']=message.payload.decode("utf-8")[:5]
             wr.setPauseEnd(payload)
         elif command=="tempPauseDischarge":
-            if isfloat(message.payload.decode("utf-8")):
-                writecommand=float(message.payload.decode("utf-8"))
-                wr.tempPauseDischarge(writecommand)
-            elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
+            if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".tpdRunning"):
-                    jobid= str(open(".tpdRunning","r", encoding='ascii').readline())
+                    jobid= str(open(".tpdRunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
-                    wr.cancelJob(jobid)
+                    result=wr.cancelJob(jobid)
                 else:
                     logger.error("Temp Pause Charge is not currently running")
-        elif command=="tempPauseCharge":
-            if isfloat(message.payload.decode("utf-8")):
+            elif isfloat(message.payload.decode("utf-8")):
                 writecommand=float(message.payload.decode("utf-8"))
-                wr.tempPauseCharge(writecommand)
-            elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
+                wr.tempPauseDischarge(writecommand)
+        elif command=="tempPauseCharge":
+            if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".tpcRunning"):
-                    jobid= str(open(".tpcRunning","r", encoding='ascii').readline())
+                    jobid= str(open(".tpcRunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
-                    wr.cancelJob(jobid)
+                    result=wr.cancelJob(jobid)
                 else:
                     logger.error("Temp Pause Charge is not currently running")
-        elif command=="forceCharge":
-            if isfloat(message.payload.decode("utf-8")):
+            elif isfloat(message.payload.decode("utf-8")):
                 writecommand=float(message.payload.decode("utf-8"))
-                wr.forceCharge(writecommand)
-            elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
+                wr.tempPauseCharge(writecommand)
+        elif command=="forceCharge":
+            if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".FCRunning"):
-                    jobid= str(open(".FCRunning","r", encoding='ascii').readline())
+                    jobid= str(open(".FCRunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Force Charge: "+ str(jobid))
-                    wr.cancelJob(jobid)
+                    result=wr.cancelJob(jobid)
                 else:
                     logger.error("Force Charge is not currently running")
-        elif command=="forceExport":
-            if isfloat(message.payload.decode("utf-8")):
+            elif isfloat(message.payload.decode("utf-8")):
                 writecommand=float(message.payload.decode("utf-8"))
-                wr.forceExport(writecommand)
-            elif message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal":
+                wr.forceCharge(writecommand)
+        elif command=="forceExport":
+            if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".FERunning"):
-                    jobid= str(open(".FERunning","r", encoding='ascii').readline())
+                    jobid= str(open(".FERunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Force Export: "+ str(jobid))
-                    wr.cancelJob(jobid)
+                    result=wr.cancelJob(jobid)
                 else:
                     logger.error("Force Export is not currently running")
+            elif isfloat(message.payload.decode("utf-8")):
+                writecommand=float(message.payload.decode("utf-8"))
+                wr.forceExport(writecommand)
         elif command=="switchRate":
             writecommand=message.payload.decode("utf-8")
             wr.switchRate(writecommand)
-    except Exception:
-        logger.error("MQTT.OnMessage Exception: "+str(sys.exc_info()))
+        elif command=="chargeMode":
+            writecommand=message.payload.decode("utf-8")
+            evc.setChargeMode(writecommand)
+        elif command=="controlCharge":
+            writecommand=message.payload.decode("utf-8")
+            evc.setChargeControl(writecommand)
+    except:
+        e = sys.exc_info()
+        logger.error("MQTT.OnMessage Exception: "+str(e))
         return
     
     #Do something with the result??
 
-def on_connect(client, userdata, flags, rc):
-    """Overloaded connection method for MQTT"""
-    if rc==0:
+def on_connect(client, userdata, flags, reason_code, properties):
+    if reason_code==0:
         client.connected_flag=True #set flag
-        logger.debug("connected OK Returned code="+str(rc))
+        logger.debug("connected OK Returned code="+str(reason_code))
         #Subscribe to the control topic for this inverter - relies on serial_number being present
-        client.subscribe(MQTT_TOPIC+"/control/"+GivSettings.serial_number+"/#")
-        logger.debug("Subscribing to "+MQTT_TOPIC+"/control/"+GivSettings.serial_number+"/#")
+        client.subscribe(MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
+        logger.debug("Subscribing to "+MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
     else:
-        logger.error("Bad connection Returned code= "+str(rc))
+        logger.error("Bad connection Returned code= "+str(reason_code))
 
+logger.critical("Connecting to MQTT broker for control- "+str(GiV_Settings.MQTT_Address))
+#loop till serial number has been found
+count=0          # 09-July-2023  set start point
 
-client=mqtt.Client("GivEnergy_GivTCP_"+str(GivSettings.givtcp_instance)+"_Control")
-mqtt.Client.connected_flag=False        			#create flag in class
-if MQTT_CREDENTIALS:
-    client.username_pw_set(MQTT_USERNAME,MQTT_PASSWORD)
-client.on_connect=on_connect     			        #bind call back function
-client.on_message=on_message                        #bind call back function
-#client.loop_start()
+while not hasattr(GiV_Settings,'serial_number'):
+    time.sleep(5)
+    #del sys.modules['settings.GiV_Settings']
+    importlib.reload(settings)
+    from settings import GiV_Settings
+    count=count + 1      # 09-July-2023  previous +1 only simply reset value to 1 so loop was infinite
+    if count==50:
+        logger.error("No serial_number found in MQTT queue. MQTT Control not available. Double check logs for connection errors and restart GivTCP or ensure correct AIO/firmware settings")
+        exit
+if hasattr(GiV_Settings,'serial_number'):
+    logger.debug("Serial Number retrieved: "+GiV_Settings.serial_number)
 
-logger.debug ("Connecting to broker(sub): "+ MQTT_ADDRESS)
-client.connect(MQTT_ADDRESS,port=MQTT_PORT)
-client.loop_forever()
+    client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance)+"_Control")
+    mqtt.Client.connected_flag=False        			#create flag in class
+    if MQTTCredentials:
+        client.username_pw_set(MQTT_Username,MQTT_Password)
+    client.on_connect=on_connect     			        #bind call back function
+    client.on_message=on_message                        #bind call back function
+    #client.loop_start()
+
+    logger.debug ("Connecting to broker(sub): "+ MQTT_Address)
+    client.connect(MQTT_Address,port=MQTT_Port)
+    client.loop_forever()

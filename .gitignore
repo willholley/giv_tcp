@@ -21,9 +21,12 @@ GivTCP/testdata.json
 .gitattributes
 GivTCP/settings.py
 MQTT_TEST.py
-REST_TEST.py
 test.py
 settings.py
+*.pkl
+.dayRate*
+.nightRate*
+.FCRunning
 __pycache__
 givenergy_modbus/model/__pycache__/inverter.cpython-310.pyc
 givenergy_modbus/model/__pycache__/plant.cpython-310.pyc
