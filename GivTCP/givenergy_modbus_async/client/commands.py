@@ -15,6 +15,7 @@ from ..model.inverter import Inverter
 from ..pdu import (
     ReadHoldingRegistersRequest,
     ReadInputRegistersRequest,
+    ReadMeterProductRegistersRequest,
     TransparentRequest,
     WriteHoldingRegisterRequest,
 )
@@ -168,6 +169,21 @@ def refresh_additional_holding_registers(
         )
     ]
 
+def refresh_meter_product_registers(
+    base_register: int,
+    slave_addr: int,
+    reg_count: int = 60,
+) -> list[TransparentRequest]:
+    """Requests one specific set of meter registers.
+
+    This is intended to be used in cases where registers may or may not be present,
+    depending on device capabilities."""
+    return [
+        ReadMeterProductRegistersRequest(
+            base_register=base_register, register_count=reg_count, slave_address=slave_addr
+        )
+    ]
+
 def refresh_additional_input_registers(
     base_register: int,
     slave_addr: int,
@@ -187,6 +203,7 @@ def refresh_additional_input_registers(
 def refresh_plant_data(
     complete: bool,
     number_batteries: int = 0,
+    meter_list: list[int] = [],
     slave_addr: int = 0x31,
     isHV: bool = False,
     additional_holding_registers: Optional[list[int]] = None,
@@ -202,6 +219,13 @@ def refresh_plant_data(
             base_register=180, register_count=60, slave_address=slave_addr
         ),
     ]
+
+    for i in meter_list:
+        requests.append(
+            ReadInputRegistersRequest(
+                base_register=60, register_count=60, slave_address=0x00 + i
+            )
+        )
 
     if additional_input_registers:
         for ir in additional_input_registers:

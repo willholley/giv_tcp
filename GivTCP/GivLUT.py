@@ -126,6 +126,7 @@ class GivLUT:
         "status":GEType("sensor","string","","","",False,False,False),
         "Timeout_Error":GEType("sensor","string","","","",False,False,False),
         "GivTCP_Version":GEType("sensor","string","","","",False,False,False),
+        "HV_Battery_Firmware":GEType("sensor","string","","","",False,False,False),
         "Export_Energy_Total_kWh":GEType("sensor","energy","",0,maxTotalEnergy,False,True,True),
         "Battery_Throughput_Total_kWh":GEType("sensor","energy","",0,maxTotalEnergy,False,True,True),
         "AC_Charge_Energy_Total_kWh":GEType("sensor","energy","",0,maxTotalEnergy,False,True,True),

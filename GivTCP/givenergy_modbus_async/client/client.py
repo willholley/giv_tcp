@@ -116,6 +116,7 @@ class Client:
         self,
         full_refresh: bool = True,
         number_batteries: int = 0,
+        meter_list: list[int] = [],
         timeout: float = 3,
         retries: int = 5,
     ) -> Plant:
@@ -125,7 +126,7 @@ class Client:
             full_refresh, number_batteries, isHV=self.plant.isHV, 
             additional_holding_registers=self.plant.additional_holding_registers,
             additional_input_registers=self.plant.additional_input_registers, 
-            slave_addr=self.plant.slave_address,
+            slave_addr=self.plant.slave_address,meter_list=meter_list,
         )
         await self.execute(reqs, timeout=timeout, retries=retries)
         return self.plant
@@ -145,7 +146,7 @@ class Client:
         self.plant.detect_batteries()
         while True:
             if handler:
-                handler()
+                handler(self.plant)
             await asyncio.sleep(refresh_period)
             if not passive:
                 reqs = commands.refresh_plant_data(False, self.plant.number_batteries)
@@ -169,7 +170,7 @@ class Client:
         #Force 0x11 slave address only during detect
         self.plant.slave_address=0x11
         self.plant.isHV = False
-
+        
         await self.refresh_plant(True, number_batteries=0, retries=retries, timeout=timeout)
 
         _logger.info("Plant Detected")
@@ -186,20 +187,26 @@ class Client:
 
         if self.plant.device_type in (Model.ALL_IN_ONE, Model.AC_3PH, Model.HYBRID_3PH):
             self.plant.isHV = True
+            meter_list=[1,2,3,4,5,6,7,8]
         else:
             self.plant.isHV= False
+            meter_list=[]
 
         if self.plant.device_type in (Model.EMS,Model.GATEWAY):
             self.plant.number_batteries=0
         else:
             if self.plant.device_type in (Model.AC, Model.HYBRID):
                 self.plant.slave_address = 0x31
-            await self.refresh_plant(True, number_batteries=6, retries=retries, timeout=timeout)
+            await self.refresh_plant(True, number_batteries=6, meter_list=meter_list, retries=retries, timeout=timeout)
             self.plant.detect_batteries()
+            self.plant.detect_meters()
         
             # Use that to detect the number of batteries
         _logger.info("Batteries detected: %d", self.plant.number_batteries)
         _logger.info("Slave address in use: "+ str(self.plant.slave_address))
+
+        #Get Meter Product Info
+
 
         # Some devices support additional registers
         # When unsupported, devices appear to simple ignore requests

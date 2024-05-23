@@ -44,7 +44,7 @@ class Converter:
     @staticmethod
     def gateway_version(first: int,second: int,third: int,fourth: int,) -> Optional[str]:
         """Return Gateway software ID."""
-        gwversion=bytearray.fromhex(hex(first)[2:]).decode()+bytearray.fromhex(hex(second)[2:]).decode()+str(third).zfill(2)+str(fourth).zfill(2)
+        gwversion=bytearray.fromhex(hex(first)[2:]).decode()+bytearray.fromhex(hex(second)[2:]).decode()+str(third.to_bytes(2)[0])+str(third.to_bytes(2)[1])+str(fourth.to_bytes(2)[0])+str(fourth.to_bytes(2)[1])
         return gwversion
 
     @staticmethod
@@ -975,6 +975,7 @@ class Register:
 
     TYPE_HOLDING = "HR"
     TYPE_INPUT = "IR"
+    TYPE_METER = "MR"
 
     _type: str
     _idx: int
@@ -1008,3 +1009,8 @@ class IR(Register):
     """Input Register."""
 
     _type = Register.TYPE_INPUT
+
+class MR(Register):
+    """Meter Product Register."""
+
+    _type = Register.TYPE_METER

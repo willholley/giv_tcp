@@ -57,6 +57,8 @@ class HAMQTT():
         client.port=GivMQTT.MQTT_Port
         try:
             client.on_connect=HAMQTT.on_connect     			#bind call back function
+            ## set the will message
+            client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/GivTCP_Stats/status","offline", retain=True)
             client.loop_start()
             logger.debug("Connecting to broker: "+ HAMQTT.MQTT_Address)
             #client.connect(HAMQTT.MQTT_Address,port=HAMQTT.MQTT_Port)
@@ -66,11 +68,10 @@ class HAMQTT():
 
             logger.debug("Publishing MQTT: " + HAMQTT.MQTT_Address)
 
-            ## set the will message
-            client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/status","offline", retain=True)
+
 
             ##publish the status message
-            client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/status","online", retain=True)
+            client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/GivTCP_Stats/status","online", retain=True)
             
             array['GivTCP_Stats/Timeout_Error']=0    # Set this always at start in case it doesn't exist
             
@@ -124,12 +125,10 @@ class HAMQTT():
                     for topic in output:
                         #Determine Entitiy type (switch/sensor/number) and publish the right message
                         if GivLUT.entity_type[str(topic).split("/")[-1]].devType=="sensor":
-                            if "Battery_Details" in topic or "Inverters" in topic:
-                                logger.debug('Publishing: '+topic)
-                                #time.sleep(0.01)
-                                publisher.append(["homeassistant/sensor/GivEnergy/"+str(topic).split("/")[-2]+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN)])
-                            elif "GivTCP_Stats" in topic:
-                                publisher.append(["homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN)])
+                            if "Battery_Details" in topic:
+                                publisher.append(["homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-2]+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN)])
+                            elif "Inverters" in topic:
+                                publisher.append(["homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-2]+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN)])
                             else:
                                 publisher.append(["homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN)])
                         elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="switch":
@@ -147,7 +146,9 @@ class HAMQTT():
             i=0
             complete=False
             while not complete:
-                complete=HAMQTT.sendDiscoMsg(publisher,SN)
+                publisher=HAMQTT.sendDiscoMsg(publisher,SN)     #send to broker and return any missing items after a check
+                if len(publisher)<=0:
+                    complete = True
                 i=i+1
                 if i==4:
                     logger.critical("Failed to publish all discovery data in 4 attempts. Check MQTT broker")
@@ -184,23 +185,16 @@ class HAMQTT():
         for pub in array:
             if isinstance(pub[1],(int, str, float, bytearray)):      #Only publish typesafe data
                 client.publish(pub[0],pub[1],retain=True)
-                i=i+1
-                if (i/50).is_integer():
-                    time.sleep(0.1)
         client.loop_stop()                      			#Stop loop
         client.disconnect()
-        logger.critical(f"Had {str(len(array))} messages to publish and managed {str(i)}")
-
-        if i==len(array):
-            complete=True
-        else:
-            complete=False
-        return complete
+        time.sleep(1)
+        unpub=CheckDisco.checkdisco(array)  #Check what is in broker vs what was sent and return missing items
+        return unpub
 
     def create_device_payload(topic,SN):
         tempObj={}
         tempObj['stat_t']=str(topic).replace(" ","_")
-        tempObj['avty_t'] = GiV_Settings.MQTT_Topic+"/"+SN+"/status"
+        tempObj['avty_t'] = GiV_Settings.MQTT_Topic+"/"+SN+"/GivTCP_Stats/status"
         tempObj["pl_avail"]= "online"
         tempObj["pl_not_avail"]= "offline"
         tempObj['device']={}
@@ -369,3 +363,31 @@ class HAMQTT():
         ## Convert this object to json string
         jsonOut=json.dumps(tempObj)
         return jsonOut
+
+class CheckDisco():
+    msgs={}
+    def on_connect(client, userdata, flags, rc, properties):
+        client.subscribe("homeassistant/#")
+
+    def on_message(client, userdata, msg):
+        CheckDisco.msgs[str(msg.topic)]=str(msg.payload)
+
+    def checkdisco(array: str):
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        client.on_connect = CheckDisco.on_connect
+        client.on_message = CheckDisco.on_message
+        client.username_pw_set(GiV_Settings.MQTT_Username,GiV_Settings.MQTT_Password)
+        client.connect(GiV_Settings.MQTT_Address, GiV_Settings.MQTT_Port, 60)
+
+        client.loop_start()
+        time.sleep(3)
+        client.disconnect()
+        client.loop_stop()
+        temp={}
+        logger.critical("Sent "+ str(len(array))+" discovery messages")
+        logger.critical("Found "+ str(len(CheckDisco.msgs))+" discovery messages")
+        unpub=[]
+        for m in array:     #check each item that was sent
+            if not m[0] in CheckDisco.msgs:     #if its not in what was received
+                unpub.append([m[0],m[1]])      #take the one that was sent but not received and add to unpub
+        return unpub

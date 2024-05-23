@@ -2,7 +2,7 @@
 # version 2022.08.01
 from threading import Lock
 from givenergy_modbus_async.model.register import Model, Generation
-from givenergy_modbus_async.model.plant import Plant
+from givenergy_modbus_async.model.plant import Plant, Inverter, EMS, ThreePhaseInverter, Gateway, Battery, BCU
 from givenergy_modbus_async.client.client import commands
 from givenergy_modbus_async.model.register import HR
 import sys
@@ -46,8 +46,9 @@ async def watch_plant(
         """Refresh data about the Plant."""
         try:
             await GivClientAsync.client.connect()
+            logger.critical("Detecting inverter charateristics...")
             await GivClientAsync.client.detect_plant()
-            await GivClientAsync.client.refresh_plant(True, number_batteries=GivClientAsync.client.plant.number_batteries)
+            await GivClientAsync.client.refresh_plant(True, number_batteries=GivClientAsync.client.plant.number_batteries,meter_list=GivClientAsync.client.plant.meter_list)
             #await GivClientAsync.client.close()
             logger.debug ("Running full refresh")
             if handler:
@@ -102,6 +103,7 @@ async def watch_plant(
                         if timeoutErrors>5:
                             logger.error("5 consecutive timeout errors in watch loop. Restarting modbus connection:")
                             await GivClientAsync.client.close()
+                            await asyncio.sleep(2)      #Just pause for a moment before trying to reconnect
                             await GivClientAsync.client.connect()
                         continue
                     if handler:
@@ -121,36 +123,6 @@ def updateErrorsCache(value):
         GiV_Settings.MQTT_Topic = "GivEnergy"
     Topic=str(GiV_Settings.MQTT_Topic+"/"+GiV_Settings.serial_number+"/GivTCP_Stats/Timeout_Errors")
     GivMQTT.single_MQTT_publish(Topic,str(value))
-
-def inverterData(fullrefresh):
-    temp={}
-    # grab serial_number if it exists
-    try:
-        plant = GivClient.getData(fullrefresh)
-    except:
-        return ("ERROR:-"+str(sys.exc_info()))
-    return plant
-
-def getData(fullrefresh):  # Read from Inverter put in cache
-    temp = {}
-    logger.debug("----------------------------Starting----------------------------")
-    logger.debug("Getting All Registers")
-
-    # Connect to inverter and load data
-    try:
-        logger.debug("Connecting to: " + GiV_Settings.invertorIP)
-        plant=inverterData(fullrefresh)
-        if "ERROR" in plant:
-            print (plant)
-            raise Exception ("Garbage or failed inverter Response: "+ str(plant))
-        processData(plant)
-    except:
-        e = sys.exc_info()
-        consecFails(e)
-        temp['result'] = "Error collecting registers: " + str(e)
-        return json.dumps(temp)
-
-    logger.debug("inverter connection successful, registers retrieved")
 
 def getInvModel(plant: Plant):
     inverterModel = InvType
@@ -189,15 +161,42 @@ def getInvModel(plant: Plant):
 
     return inverterModel
 
-def getBatteries(plant):
+def getRaw(plant: Plant):
     if not plant.inverter ==None:
-        GEInv=plant.inverter
+        GEInv: Inverter =plant.inverter
     elif not plant.ems ==None:
         GEInv=plant.ems
     elif not plant.gateway ==None:
         GEInv=plant.gateway
     GEBat=plant.batteries
-    #GEHVBat=plant.hvbatteries
+    GEBCU=plant.bcu
+    Meters=plant.meters
+    isHV=plant.isHV
+    raw = {}
+    bat={}
+    meters={}
+    inv=GEInv.getall()
+    if isHV:
+        for b in GEBCU:
+            bat['bcu']=b.getall()
+    for b in GEBat:
+        bat[b.serial_number]=b.getall()
+    if Meters:
+        for m in Meters:
+            meters['Meter_ID_'+str(m)]=Meters[m].getall()
+    raw['meters']=meters    
+    raw['invertor']=inv
+    raw['batteries']=bat
+    return raw
+
+def getBatteries(plant: Plant):
+    if not plant.inverter ==None:
+        GEInv: Inverter =plant.inverter
+    elif not plant.ems ==None:
+        GEInv=plant.ems
+    elif not plant.gateway ==None:
+        GEInv=plant.gateway
+    GEBat=plant.batteries
     GEBCU=plant.bcu
     isHV=plant.isHV
     batteries2={}
@@ -261,6 +260,8 @@ def getBatteries(plant):
         batteries2['HV_Battery_SOC_Difference']=GEBCU[0].battery_soc_max-GEBCU[0].battery_soc_min
         batteries2['HV_Battery_SOC_High']=GEBCU[0].battery_soc_max
         batteries2['HV_Battery_SOC_Low']=GEBCU[0].battery_soc_min
+        batteries2['HV_Battery_Firmware']=GEBCU[0].pack_software_version
+        batteries2['BMS_Temperature']=GEInv.temp_battery
         for b in GEBat:
             if b.serial_number.upper().isupper():          # Check for empty battery object responses and only process if they are complete (have a serial number)
                 logger.debug("Building battery output: ")
@@ -322,6 +323,7 @@ def getBatteries(plant):
 
 def getTimeslots(plant):
     timeslots={}
+    controlmode={}
     if not plant.inverter ==None:
         GEInv=plant.inverter
     elif not plant.ems ==None:
@@ -372,7 +374,6 @@ def getTimeslots(plant):
             timeslots['Discharge_end_time_slot_9'] = GEInv.discharge_slot_9.end.isoformat()
             timeslots['Discharge_start_time_slot_10'] = GEInv.discharge_slot_10.start.isoformat()
             timeslots['Discharge_end_time_slot_10'] = GEInv.discharge_slot_10.end.isoformat()
-            controlmode={}
             controlmode['Charge_Target_SOC_1'] = GEInv.charge_target_soc_1
             controlmode['Charge_Target_SOC_2'] = GEInv.charge_target_soc_2
             controlmode['Charge_Target_SOC_3'] = GEInv.charge_target_soc_3
@@ -578,6 +579,7 @@ def processInverterInfo(plant: Plant):
     GEInv=plant.inverter
     GEBat=plant.batteries
     GEBCU=plant.bcu
+    Meters=plant.meters
     isHV=plant.isHV
     inverterModel=getInvModel(plant)
 
@@ -885,19 +887,7 @@ def processInverterInfo(plant: Plant):
     multi_output["Control"] = controlmode
     multi_output["Battery_Details"] = batteries2
 #    if GiV_Settings.Print_Raw_Registers:
-    raw = {}
-    bat={}
-    inv=GEInv.getall()
-    if isHV:
-        for b in GEBCU:
-            bat['bcu']=b.getall()
-    else:
-        for b in GEBat:
-            bat[b.serial_number]=b.getall()
-    raw['invertor']=inv
-    raw['batteries']=bat
-    multi_output['raw'] = raw
-    multi_output['raw'] = raw
+    multi_output['raw'] = getRaw(plant)
     return multi_output
 
 def processEMSInfo(plant: Plant):
@@ -1045,10 +1035,7 @@ def processEMSInfo(plant: Plant):
     timeslots['Export_end_time_slot_3'] = GEInv.export_slot_3.end.isoformat()
 
     #if GiV_Settings.Print_Raw_Registers:
-    raw = {}
-    inv=GEInv.getall()
-    raw['invertor']=inv
-    multi_output['raw'] = raw
+    multi_output['raw'] = getRaw(plant)
 
     multi_output['Power']=power_output
     multi_output['Power']['Meters']=meter
@@ -1162,86 +1149,22 @@ def processGatewayInfo(plant: Plant):
     energy_total_output['Parallel_Total_Charge_Energy_Total_kWh']=round(GEInv.e_aio_charge_total/1000,2)
     energy_total_output['Parallel_Total_Discharge_Energy_Total_kWh']=round(GEInv.e_aio_discharge_total/1000,2)
     
-    controlmode={}
-    controlmode=getControls(plant,regCacheStack,inverterModel)
-
     #Only implement these, if Parallel mode is in use
     if GEInv.parallel_aio_online_num>1:
 
-
+        controlmode={}
+        controlmode=getControls(plant,regCacheStack,inverterModel)
         logger.debug("Getting TimeSlot data")
+
+        ######## Grab Timeslots ########
+        res = {}
+        res=getTimeslots(plant)
         timeslots={}
-        timeslots['Discharge_start_time_slot_1'] = GEInv.discharge_slot_1.start.isoformat()
-        timeslots['Discharge_end_time_slot_1'] = GEInv.discharge_slot_1.end.isoformat()
-        timeslots['Discharge_start_time_slot_2'] = GEInv.discharge_slot_2.start.isoformat()
-        timeslots['Discharge_end_time_slot_2'] = GEInv.discharge_slot_2.end.isoformat()
-        timeslots['Charge_start_time_slot_1'] = GEInv.charge_slot_1.start.isoformat()
-        timeslots['Charge_end_time_slot_1'] = GEInv.charge_slot_1.end.isoformat()
-
-        timeslots['Charge_start_time_slot_2'] = GEInv.charge_slot_2.start.isoformat()
-        timeslots['Charge_end_time_slot_2'] = GEInv.charge_slot_2.end.isoformat()
-        timeslots['Charge_start_time_slot_3'] = GEInv.charge_slot_3.start.isoformat()
-        timeslots['Charge_end_time_slot_3'] = GEInv.charge_slot_3.end.isoformat()
-        timeslots['Charge_start_time_slot_4'] = GEInv.charge_slot_4.start.isoformat()
-        timeslots['Charge_end_time_slot_4'] = GEInv.charge_slot_4.end.isoformat()
-        timeslots['Charge_start_time_slot_5'] = GEInv.charge_slot_5.start.isoformat()
-        timeslots['Charge_end_time_slot_5'] = GEInv.charge_slot_5.end.isoformat()
-        timeslots['Charge_start_time_slot_6'] = GEInv.charge_slot_6.start.isoformat()
-        timeslots['Charge_end_time_slot_6'] = GEInv.charge_slot_6.end.isoformat()
-        timeslots['Charge_start_time_slot_7'] = GEInv.charge_slot_7.start.isoformat()
-        timeslots['Charge_end_time_slot_7'] = GEInv.charge_slot_7.end.isoformat()
-        timeslots['Charge_start_time_slot_8'] = GEInv.charge_slot_8.start.isoformat()
-        timeslots['Charge_end_time_slot_8'] = GEInv.charge_slot_8.end.isoformat()
-        timeslots['Charge_start_time_slot_9'] = GEInv.charge_slot_9.start.isoformat()
-        timeslots['Charge_end_time_slot_9'] = GEInv.charge_slot_9.end.isoformat()
-        timeslots['Charge_start_time_slot_10'] = GEInv.charge_slot_10.start.isoformat()
-        timeslots['Charge_end_time_slot_10'] = GEInv.charge_slot_10.end.isoformat()
-        timeslots['Discharge_start_time_slot_3'] = GEInv.discharge_slot_3.start.isoformat()
-        timeslots['Discharge_end_time_slot_3'] = GEInv.discharge_slot_3.end.isoformat()
-        timeslots['Discharge_start_time_slot_4'] = GEInv.discharge_slot_4.start.isoformat()
-        timeslots['Discharge_end_time_slot_4'] = GEInv.discharge_slot_4.end.isoformat()
-        timeslots['Discharge_start_time_slot_5'] = GEInv.discharge_slot_5.start.isoformat()
-        timeslots['Discharge_end_time_slot_5'] = GEInv.discharge_slot_5.end.isoformat()
-        timeslots['Discharge_start_time_slot_6'] = GEInv.discharge_slot_6.start.isoformat()
-        timeslots['Discharge_end_time_slot_6'] = GEInv.discharge_slot_6.end.isoformat()
-        timeslots['Discharge_start_time_slot_7'] = GEInv.discharge_slot_7.start.isoformat()
-        timeslots['Discharge_end_time_slot_7'] = GEInv.discharge_slot_7.end.isoformat()
-        timeslots['Discharge_start_time_slot_8'] = GEInv.discharge_slot_8.start.isoformat()
-        timeslots['Discharge_end_time_slot_8'] = GEInv.discharge_slot_8.end.isoformat()
-        timeslots['Discharge_start_time_slot_9'] = GEInv.discharge_slot_9.start.isoformat()
-        timeslots['Discharge_end_time_slot_9'] = GEInv.discharge_slot_9.end.isoformat()
-        timeslots['Discharge_start_time_slot_10'] = GEInv.discharge_slot_10.start.isoformat()
-        timeslots['Discharge_end_time_slot_10'] = GEInv.discharge_slot_10.end.isoformat()
-        timeslots['Battery_pause_start_time_slot'] = GEInv.battery_pause_slot_1.start.isoformat()
-        timeslots['Battery_pause_end_time_slot'] = GEInv.battery_pause_slot_1.end.isoformat()
-
-        controlmode['Charge_Target_SOC_1'] = GEInv.charge_target_soc_1
-        controlmode['Charge_Target_SOC_2'] = GEInv.charge_target_soc_2
-        controlmode['Charge_Target_SOC_3'] = GEInv.charge_target_soc_3
-        controlmode['Charge_Target_SOC_4'] = GEInv.charge_target_soc_4
-        controlmode['Charge_Target_SOC_5'] = GEInv.charge_target_soc_5
-        controlmode['Charge_Target_SOC_6'] = GEInv.charge_target_soc_6
-        controlmode['Charge_Target_SOC_7'] = GEInv.charge_target_soc_7
-        controlmode['Charge_Target_SOC_8'] = GEInv.charge_target_soc_8
-        controlmode['Charge_Target_SOC_9'] = GEInv.charge_target_soc_9
-        controlmode['Charge_Target_SOC_10'] = GEInv.charge_target_soc_10
-        controlmode['Discharge_Target_SOC_1'] = GEInv.discharge_target_soc_1
-        controlmode['Discharge_Target_SOC_2'] = GEInv.discharge_target_soc_2
-        controlmode['Discharge_Target_SOC_3'] = GEInv.discharge_target_soc_3
-        controlmode['Discharge_Target_SOC_4'] = GEInv.discharge_target_soc_4
-        controlmode['Discharge_Target_SOC_5'] = GEInv.discharge_target_soc_5
-        controlmode['Discharge_Target_SOC_6'] = GEInv.discharge_target_soc_6
-        controlmode['Discharge_Target_SOC_7'] = GEInv.discharge_target_soc_7
-        controlmode['Discharge_Target_SOC_8'] = GEInv.discharge_target_soc_8
-        controlmode['Discharge_Target_SOC_9'] = GEInv.discharge_target_soc_9
-        controlmode['Discharge_Target_SOC_10'] = GEInv.discharge_target_soc_10
+        timeslots.update(res[0])
+        controlmode.update(res[1])
 
     #if GiV_Settings.Print_Raw_Registers:
-    raw = {}
-    bat={}
-    inv=GEInv.getall()
-    raw['invertor']=inv
-    multi_output['raw'] = raw
+    multi_output['raw'] = getRaw(plant)
 
     energy["Today"] = energy_today_output
     energy["Total"] = energy_total_output
@@ -1265,19 +1188,7 @@ def processThreePhaseInfo(plant: Plant):
     multi_output={}
 
 #    if GiV_Settings.Print_Raw_Registers:
-    raw = {}
-    bat={}
-    inv=GEInv.getall()
-    if isHV:
-        i=0
-        for b in GEBCU:
-            i=i+1
-            bat['bcu_'+str(i)]=b.getall()
-    for b in GEBat:
-        bat[b.serial_number]=b.getall()
-    raw['invertor']=inv
-    raw['batteries']=bat
-    multi_output['raw'] = raw
+    multi_output['raw'] = getRaw(plant)
 
     inverterModel=getInvModel(plant)
 
@@ -1442,7 +1353,7 @@ def processData(plant: Plant):
         givtcpdata['Last_Updated_Time'] = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
         givtcpdata['status'] = "online"
         givtcpdata['Time_Since_Last_Update'] = 0
-        givtcpdata['GivTCP_Version']= "2.4.194"
+        givtcpdata['GivTCP_Version']= "2.4.255"
         multi_output['GivTCP_Stats']=givtcpdata
         with GivLUT.cachelock:
             if exists(GivLUT.regcache):      # if there is a cache then grab it
@@ -1552,14 +1463,6 @@ def consecFails(e):
             with open(GivLUT.oldDataCount, 'wb') as outp:
                 pickle.dump(oldDataCount, outp, pickle.HIGHEST_PROTOCOL)
 
-def runAll(full_refresh):  # Read from Inverter put in cache and publish
-    # full_refresh=True
-    from read import getData
-    result=getData(full_refresh)
-    # Step here to validate data against previous pickle?
-    multi_output = pubFromPickle()
-    return multi_output
-
 def runAll2(plant: Plant):  # Read from Inverter put in cache and publish
 ###### Step here to validate data coming in from watch_plant??
     logger.debug("Running processData")
@@ -1575,53 +1478,42 @@ def runAll2(plant: Plant):  # Read from Inverter put in cache and publish
         return ("runAll2 Error processing registers: " + str(e))
     return multi_output
 
-def pubFromJSON():
-    temp = open('GivTCP\\testdata.json')
-    data = json.load(temp)
-    SN = data["Invertor_Details"]['Invertor_Serial_Number']
-    publishOutput(data, SN)
-
 def pubFromPickle():  # Publish last cached Inverter Data
     multi_output = {}
     result = "Success"
     if not exists(GivLUT.regcache):  # if there is no cache, create it
         result = "Please get data from Inverter first, either by calling runAll or waiting until the self-run has completed"
-    if "Success" in result:
-        with GivLUT.cachelock:
-            with open(GivLUT.regcache, 'rb') as inp:
-                regCacheStack = pickle.load(inp)
-                multi_output = regCacheStack[4]
-        SN = multi_output["Invertor_Details"]['Invertor_Serial_Number']
-        publishOutput(multi_output, SN)
-    else:
-        multi_output['result'] = result
-    return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
+    try:
+        if "Success" in result:
+            with GivLUT.cachelock:
+                with open(GivLUT.regcache, 'rb') as inp:
+                    regCacheStack = pickle.load(inp)
+                    multi_output = regCacheStack[4]
+            SN = multi_output["Invertor_Details"]['Invertor_Serial_Number']
+            publishOutput(multi_output, SN)
+        else:
+            multi_output['result'] = result
+        return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
+    except:
+        logger.error("Error publishing data from pickle")
+        multi_output['result']="Error publishing data from pickle"
+        json.dumps(multi_output, indent=4, sort_keys=True, default=str)
 
 def getCache():     # Get latest cache data and return it (for use in REST)
     multi_output={}
-    if exists(GivLUT.regcache):
-        with open(GivLUT.regcache, 'rb') as inp:
-            regCacheStack = pickle.load(inp)
-            multi_output = regCacheStack[4]
-        return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
-    else:
-        multi_output['result']="No register data cache exists, try again later"
-    return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
-def self_run2():
-    counter = 0
-    runAll("True")
-    while True:
-        counter = counter+1
-        if exists(GivLUT.forcefullrefresh):
-            runAll("True")
-            os.remove(GivLUT.forcefullrefresh)
-            counter = 0
-        elif counter == 20:
-            counter = 0
-            runAll("True")
+    try:
+        if exists(GivLUT.regcache):
+            with open(GivLUT.regcache, 'rb') as inp:
+                regCacheStack = pickle.load(inp)
+                multi_output = regCacheStack[4]
+            return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
         else:
-            runAll("False")
-        time.sleep(GiV_Settings.self_run_timer)
+            multi_output['result']="No register data cache exists, try again later"
+        return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
+    except:
+        logger.error("Error getting data from cache")
+        multi_output['result']="Error getting data from cache"
+        json.dumps(multi_output, indent=4, sort_keys=True, default=str)
 
 async def self_run():
     # re-run everytime watch_plant Dies

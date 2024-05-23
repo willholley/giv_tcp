@@ -7,7 +7,7 @@ from .hvbmu import BMU
 from .ems import EMS
 from .gateway import Gateway
 from .threephase import ThreePhaseInverter
-
+from .meter import Meter, MeterProduct
 from .inverter import Inverter
 from .register import Model
 from .register import HR, IR
@@ -35,6 +35,7 @@ class Plant:
     inverter_serial_number: str = ""
     data_adapter_serial_number: str = ""
     number_batteries: int = 0
+    meter_list: list[int] = [1]
     number_bcu: int = 0
     slave_address: int = 0x31
     isHV: bool = True
@@ -108,14 +109,23 @@ class Plant:
                     break
             self.number_batteries = i
 
-        #if self.isHV:
-        #    i = 0
-        #    for i in range(6):
-        #        try:
-        #            assert BCU(self.register_caches[i + 0x70]).is_valid()
-        #        except (KeyError, AssertionError):
-        #            break
-        #    self.number_bcu=i
+    def detect_meters(self) -> None:
+        """Determine the number of meters based on whether the register data is valid.
+
+        Since we attempt to decode register data in the process, it's possible for an
+        exception to be raised.
+        """
+        meter_list=[]
+        i = 1
+        for i in range(8):
+            try:
+                assert Meter(self.register_caches[i + 0x01]).is_valid()
+                meter_list.append(i+1)
+            except (KeyError, AssertionError):
+                continue
+        self.meter_list = meter_list
+
+
 
     @property
     def inverter(self) -> Inverter:     #Would an AIO Class make sense here?
@@ -163,3 +173,20 @@ class Plant:
             return [    
                 BCU(self.register_caches[0x70])
             ]
+    @property
+    def meters(self) -> dict[Meter]:
+        """Return Meter models for the Plant."""
+        temp={}
+        for i in self.meter_list:
+            if i in self.register_caches:
+                temp[i]=Meter(self.register_caches[i + 0x00])
+        return temp
+    
+    @property
+    def meterproduct(self) -> list[Meter]:
+        """Return Meter models for the Plant."""
+        temp=[]
+        for i in self.meter_list:
+            if i in self.register_caches:
+                temp[i]=MeterProduct(self.register_caches[i + 0x01])
+        return temp

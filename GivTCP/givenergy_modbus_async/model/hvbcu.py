@@ -30,7 +30,7 @@ class BCU(RegisterGetter, metaclass=DynamicDoc):
     REGISTER_LUT = {
         # Input Registers, block 60-119
         "pack_software_version": Def(
-            DT.string, None, IR(60), IR(61), IR(62), IR(63)),
+            DT.gateway_version, None, IR(60), IR(61), IR(62), IR(63)),
         "number_of_module": Def(DT.uint16, None, IR(64)),
         "cells_per_module": Def(DT.uint16, None, IR(65)),
         "cluster_cell_voltage": Def(DT.uint16, None, IR(67)),

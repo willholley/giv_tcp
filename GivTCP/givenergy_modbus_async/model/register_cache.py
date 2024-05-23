@@ -6,6 +6,7 @@ from typing import DefaultDict, Optional
 from .register import (
     HR,
     IR,
+    MR,
     Register,
 )
 
