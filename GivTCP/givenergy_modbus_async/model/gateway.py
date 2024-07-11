@@ -31,7 +31,7 @@ class Gateway(RegisterGetter, metaclass=DynamicDoc):
         # Input Registers, block 1600-1640
         #
         "software_version": Def(C.gateway_version, None, IR(1600),IR(1601),IR(1602),IR(1603)),
-        "work_mode": Def(C.uint16, None, IR(1604)),
+        "work_mode": Def(C.uint16, WorkMode, IR(1604)),
         #"system_enable": Def(C.uint16, None, IR(1605)),
         #"do_state": Def(C.string, None, IR(1606)),
         #"di_state": Def(C.string, None, IR(1607)),
@@ -39,7 +39,7 @@ class Gateway(RegisterGetter, metaclass=DynamicDoc):
         "i_grid": Def(C.int16, C.deci, IR(1609)),
         "v_load": Def(C.deci, None, IR(1610)),
         "i_load": Def(C.deci, None, IR(1611)),
-        "i_inverter": Def(C.int16, C.deci, IR(1612)),
+        "i_pv": Def(C.int16, C.deci, IR(1612)),
         "p_ac1": Def(C.int16, None, IR(1616)),
         "p_pv": Def(C.uint16, None, IR(1617)),
         "p_load": Def(C.uint16, None, IR(1618)),
@@ -73,6 +73,7 @@ class Gateway(RegisterGetter, metaclass=DynamicDoc):
         "aio1_soc": Def(C.uint16, None, IR(1801)),
         "p_aio1_inverter": Def(C.int16, None, IR(1816)),
         "aio1_serial_number": Def(C.string, None, IR(1831), IR(1832), IR(1833), IR(1834), IR(1835)),
+        "aio1_serial_number_new": Def(C.string, None, IR(1841), IR(1842), IR(1843), IR(1844), IR(1845)),
     ## AIO - 2
         "e_aio2_charge_today": Def(C.deci, None, IR(1708)),
         "e_aio2_charge_total": Def(C.uint32, C.deci, IR(1709),IR(1710)),
@@ -81,6 +82,7 @@ class Gateway(RegisterGetter, metaclass=DynamicDoc):
         "aio2_soc": Def(C.uint16, None, IR(1802)),
         "p_aio2_inverter": Def(C.int16, None, IR(1817)),
         "aio2_serial_number": Def(C.string, None, IR(1838), IR(1839), IR(1840), IR(1841), IR(1842)),
+        "aio2_serial_number_new": Def(C.string, None, IR(1848), IR(1849), IR(1850), IR(1851), IR(1852)),
     ## AIO - 3
         "e_aio3_charge_today": Def(C.deci, None, IR(1711)),
         "e_aio3_charge_total": Def(C.uint32, C.deci, IR(1712),IR(1713)),
@@ -89,6 +91,7 @@ class Gateway(RegisterGetter, metaclass=DynamicDoc):
         "aio3_soc": Def(C.uint16, None, IR(1803)),
         "p_aio3_inverter": Def(C.int16, None, IR(1818)),
         "aio3_serial_number": Def(C.string, None, IR(1845), IR(1846), IR(1847), IR(1848), IR(1849)),
+        "aio3_serial_number_new": Def(C.string, None, IR(1855), IR(1856), IR(1857), IR(1858), IR(1859)),
 
         "parallel_aio_num": Def(C.uint16, None, IR(1700)),
         "parallel_aio_online_num": Def(C.uint16, None, IR(1701)),

@@ -1,5 +1,6 @@
 import paho.mqtt.client as mqtt
 import time, sys, importlib, time
+import os
 from os.path import exists
 from settings import GiV_Settings
 import write as wr
@@ -512,7 +513,7 @@ def on_message(client, userdata, message):
             writecommand=message.payload.decode("utf-8")
             evc.setChargeControl(writecommand)
     except:
-        e = sys.exc_info()
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         logger.error("MQTT.OnMessage Exception: "+str(e))
         return
     

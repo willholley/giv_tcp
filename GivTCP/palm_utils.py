@@ -228,7 +228,7 @@ class GivEnergyObj:
         i: int = 0
         while i < len(stgs.GE.load_hist_weight):
             if stgs.GE.load_hist_weight[i] > 0:
-                logger.info("Processing load history for day -"+ str(i + 1))
+                logger.debug("Processing load history for day -"+ str(i + 1))
                 load_hist_array = get_load_hist_day(i)
                 j = 0
                 while j < 48:
@@ -238,7 +238,7 @@ class GivEnergyObj:
                 total_weight += stgs.GE.load_hist_weight[i]
                 logger.debug(str(acc_load)+ " total weight: "+ str(total_weight))
             else:
-                logger.info("Skipping load history for day -"+ str(i + 1)+ " (weight <= 0)")
+                logger.debug("Skipping load history for day -"+ str(i + 1)+ " (weight <= 0)")
             i += 1
 
         # Avoid DIV/0 if config file contains incorrect weightings
@@ -251,7 +251,7 @@ class GivEnergyObj:
         while i < 48:
             self.base_load[i] = round(acc_load[i]/total_weight, 1)
             i += 1
-        logger.info("Load Calc Summary: "+ str(self.base_load))
+        logger.debug("Load Calc Summary: "+ str(self.base_load))
 
     def set_mode(self, cmd: str):
         """Configures inverter operating mode"""
@@ -290,7 +290,7 @@ class GivEnergyObj:
                     logger.error(error)
                     return
                 if resp.status_code != 201:
-                    logger.info("Invalid response: "+ str(resp.status_code))
+                    logger.error("Invalid response: "+ str(resp.status_code))
                     return
 
             logger.info("Setting Register "+ str(register)+ " ("+ str(cmd_name) + ") to "+
@@ -319,7 +319,7 @@ class GivEnergyObj:
 
             returned_cmd = json.loads(resp.content.decode('utf-8'))['data']['value']
             if str(returned_cmd) == str(value):
-                logger.info("Successful register read: "+ str(register)+ " = "+ str(returned_cmd))
+                logger.debug("Successful register read: "+ str(register)+ " = "+ str(returned_cmd))
             else:
                 logger.error("Readback failed on GivEnergy API... Expected " +
                     str(value) + ", Read: "+ str(returned_cmd))
@@ -398,8 +398,8 @@ class GivEnergyObj:
             wgt_50 = weight - 10
         wgt_90 = max(0, weight - 50)
 
-        logger.info("")
-        logger.info("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
+        logger.debug("")
+        logger.debug("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
             "Day", "Hour", "Charge", "Cons", "Gen", "SoC"))
 
         # Definitions for export of SoC forecast in chart form
@@ -452,7 +452,7 @@ class GivEnergyObj:
                 elif i > end_charge_period:  # Charging after overnight boost
                     max_charge = max(max_charge, batt_charge[i])
 
-                logger.info("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
+                logger.debug("{:<20} {:>10} {:>10} {:>10} {:>10}  {:>10} {:>10}".format("SoC Calc;",
                     day, t_to_hrs(i * 30), round(batt_charge[i], 2), round(total_load, 2),
                     round(est_gen, 2), int(100 * batt_charge[i] / batt_max_charge)))
 
@@ -517,12 +517,12 @@ class GivEnergyObj:
         self.plot[3] = str(plot_y3)
         self.plot[4] = str(plot_y4)
 
-        logger.info("{:<25} {:>10} {:>10} {:>10} {:>10} {:>10}".format("SoC Calc Summary;",
+        logger.debug("{:<25} {:>10} {:>10} {:>10} {:>10} {:>10}".format("SoC Calc Summary;",
             "Max Charge", "Min Charge", "Max %", "Min %", "Target SoC"))
-        logger.info("{:<25} {:>10} {:>10} {:>10} {:>10} {:>10}".format("SoC Calc Summary;",
+        logger.debug("{:<25} {:>10} {:>10} {:>10} {:>10} {:>10}".format("SoC Calc Summary;",
             round(max_charge, 2), round(min_charge, 2),
             max_charge_pc, min_charge_pc, tgt_soc))
-        logger.info("{:<25} {:>10} {:>10} {:>10} {:>10} {:>10}".format("SoC (Adjusted);",
+        logger.debug("{:<25} {:>10} {:>10} {:>10} {:>10} {:>10}".format("SoC (Adjusted);",
             round(max_charge, 2), round(min_charge, 2),
             max_charge_pc + tgt_soc, min_charge_pc + tgt_soc, "\n"))
 
@@ -582,13 +582,13 @@ class SolcastObj:
             return
 
         if stgs.Solcast.url_sw != "":  # Two arrays are specified
-            logger.info("url_sw = '"+str(stgs.Solcast.url_sw)+"'")
+            logger.debug("url_sw = '"+str(stgs.Solcast.url_sw)+"'")
             result, solcast_data_2 = get_solcast(stgs.Solcast.url_sw)
             if not result:
                 logger.warning("Error; Problem with Solcast data, using previous values (if any)")
                 return
         else:
-            logger.info("No second array")
+            logger.debug("No second array")
 
         logger.info("Successful Solcast download.")
 
@@ -608,7 +608,7 @@ class SolcastObj:
 
         # Check for BST and convert to local time to align with GivEnergy data
         if time.strftime("%z", time.localtime()) == "+0100":
-            logger.info("Applying BST offset to Solcast data")
+            logger.debug("Applying BST offset to Solcast data")
             solcast_offset += 60
 
         i = solcast_offset
@@ -668,11 +668,11 @@ class SolcastObj:
             i += 1
 
         timestamp = time.strftime("%d-%m-%Y %H:%M:%S", time.localtime())
-        logger.info("PV Estimate 10% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
+        logger.debug("PV Estimate 10% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
             str(self.pv_est10_30[0:47])+ str(self.pv_est10_day[0:6]))
-        logger.info("PV Estimate 50% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
+        logger.debug("PV Estimate 50% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
             str(self.pv_est50_30[0:47])+ str(self.pv_est50_day[0:6]))
-        logger.info("PV Estimate 90% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
+        logger.debug("PV Estimate 90% (hrly, 7 days) / kWh; "+ timestamp+ "; "+
             str(self.pv_est90_30[0:47])+ str(self.pv_est90_day[0:6]))
 
 # End of SolcastObj() class definition

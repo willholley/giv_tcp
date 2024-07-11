@@ -61,10 +61,10 @@ def GivTCP_write_soc(cmd: str):
     if cmd == "set_soc":  # Sets target SoC to value
         try:
             result={}
-            logger.debug("Setting Charge Target to: "+ str(inverter.tgt_soc)+ "%")
+            logger.info("Setting Charge Target to: "+ str(inverter.tgt_soc)+ "%")
             payload={}
             payload['chargeToPercent']= inverter.tgt_soc
-            result=GivQueue.q.enqueue(wr.setChargeTarget,payload)
+            result=wr.setChargeTarget(payload)
             logger.debug(result)
         except:
             inverter.set_mode("set_soc")
@@ -119,11 +119,11 @@ if __name__ == '__main__':
     GivTCP_write_soc(inverter.compute_tgt_soc(pv_forecast, PV_WEIGHT, True))
 
     # Send plot data to logfile in CSV format
-    logger.info("SoC Chart Data - Start. Paste these lines into a spreadsheet to create a plot of SoC")
+    logger.debug("SoC Chart Data - Start. Paste these lines into a spreadsheet to create a plot of SoC")
     i = 0
     while i < 5:
-        logger.info(inverter.plot[i])
+        logger.debug(inverter.plot[i])
         i += 1
-    logger.info("SoC Chart Data - End")
+    logger.debug("SoC Chart Data - End")
 
 # End of main

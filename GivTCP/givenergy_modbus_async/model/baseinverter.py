@@ -81,7 +81,7 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "enable_inverter_auto_restart": Def((C.duint8, 0), C.bool, HR(53)),
         "enable_inverter": Def((C.duint8, 1), C.bool, HR(53)),
         "battery_type": Def(C.uint16, BatteryType, HR(54)),
-        "battery_nominal_capacity": Def(C.uint16, None, HR(55)),
+        "battery_nominal_capacity": Def(C.battery_capacity, None, HR(55),HR(0)),
         "discharge_slot_1": Def(C.timeslot, None, HR(56), HR(57)),
         "discharge_slot_1_start": Def(C.uint16, None, HR(56), valid=(0, 2359)),
         "discharge_slot_1_end": Def(C.uint16, None, HR(57), valid=(0, 2359)),
@@ -291,9 +291,11 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "e_battery_discharge_today2": Def(C.deci, None, IR(182)),
         "e_battery_charge_today2": Def(C.deci, None, IR(183)),
         #
-        # Input Registers, block 1000-1119
-        # Three phase Hybrid
+        # Input Registers, block 240-300
+        # Gen3
         #
+        "p_combined_generation":Def(C.uint32,None,IR(247),IR(248))
+
         #
         # Input Registers, block 1600-1631
         # Gateway

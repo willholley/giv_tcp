@@ -1,6 +1,7 @@
 # version 2022.01.21
 import paho.mqtt.client as mqtt
 import time
+import os
 from GivLUT import GivLUT
 from settings import GiV_Settings
 import sys
@@ -51,7 +52,7 @@ class GivMQTT():
                 time.sleep(0.2)
             client.publish(Topic,value)
         except:
-            e = sys.exc_info()
+            e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
         client.loop_stop()                      			    #Stop loop
         client.disconnect()
@@ -85,7 +86,7 @@ class GivMQTT():
                     #else:
                     #    logger.error("MQTT error trying to send a "+ str(type(output[value]))+" to the MQTT broker for: "+str(value) + " - " + str(output[value]))
         except:
-            e = sys.exc_info()
+            e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
         client.loop_stop()                      			    #Stop loop
         client.disconnect()

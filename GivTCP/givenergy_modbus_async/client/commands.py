@@ -203,6 +203,7 @@ def refresh_additional_input_registers(
 def refresh_plant_data(
     complete: bool,
     number_batteries: int = 0,
+    bcu_list: list[tuple] = [],
     meter_list: list[int] = [],
     slave_addr: int = 0x31,
     isHV: bool = False,
@@ -257,19 +258,21 @@ def refresh_plant_data(
                 
 
     if isHV and not number_batteries==0:    #Get Battery data from AIO/HV systems
-        # BCU
-        requests.append(
-            ReadInputRegistersRequest(
-                base_register=60, register_count=60, slave_address=0x70
-            )
-        )
-        # BMU
-        for i in range(number_batteries):
+        # Get each BCU data
+        for bcu in bcu_list:
+        #for bcu_num in range (number_bcus):
             requests.append(
                 ReadInputRegistersRequest(
-                    base_register=60, register_count=60, slave_address=0x50 + i
+                    base_register=60, register_count=60, slave_address=0x70 + bcu[0]
                 )
             )
+        # Get BMU inside each BCU
+            for bmu_num in range(bcu[1]):
+                requests.append(
+                    ReadInputRegistersRequest(
+                        base_register=(60+(120*bcu[0])), register_count=60, slave_address=0x50 + bmu_num
+                    )
+                )
     else:
         #LV Batteries
         for i in range(number_batteries):
@@ -562,12 +565,12 @@ def set_pause_slot(
 
 
 def set_pause_slot_end(
-    idx: int, endtime: datetime
+    endtime: datetime
 ) -> list[TransparentRequest]:
     return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_PAUSE_SLOT_END, int(endtime.strftime("%H%M")))]
 
 def set_pause_slot_start(
-    idx: int, starttime: datetime
+    starttime: datetime
 ) -> list[TransparentRequest]:
     return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_PAUSE_SLOT_START, int(starttime.strftime("%H%M")))]
 

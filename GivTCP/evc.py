@@ -1,5 +1,6 @@
 '''Test Module for GivEVC'''
 from pymodbus.client.sync import ModbusTcpClient
+import logging
 import datetime
 import time
 import pickle
@@ -14,6 +15,7 @@ import sys
 
 logger = GivLUT.logger
 cacheLock = Lock()
+logging.getLogger("pymodbus").setLevel(logging.CRITICAL) 
 
 class EVCType:
     """Defines type for data objects"""
@@ -91,11 +93,13 @@ def getEVC():
         client = ModbusTcpClient(GiV_Settings.evc_ip_address)
         client.connect()
         if not client.is_socket_open():
-            logger.error("Modbus connection failed, check EVC WiFi/LAN connection")
+            logger.debug("Modbus connection failed, check EVC WiFi/LAN connection")
             return output
         result = client.read_holding_registers(0,60)
         result2 = client.read_holding_registers(60,55)
         client.close()
+        if not hasattr(result,'registers') and not hasattr(result2,'registers'):
+            return None
         regs=result.registers+result2.registers
         for reg in EVCLut.evc_lut.items():
             if isinstance(reg[1],tuple):
@@ -191,15 +195,15 @@ def getEVC():
             with open(EVCLut.regcache, 'wb') as outp:
                 pickle.dump(multi_output, outp, pickle.HIGHEST_PROTOCOL)
     except Exception:
-        e = sys.exc_info()
-        #logger.error("Error: "+ str(e))
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        logger.error("Error: "+ str(e))
     return output
 
 def pubFromPickle():  # Publish last cached EVC Data
     multi_output = {}
     result = "Success"
     if not exists(EVCLut.regcache):  # if there is no cache, create it
-        result = "Please get data from Inverter first, either by calling runAll or waiting until the self-run has completed"
+        result = "Please get data from EVC first, either by calling runAll or waiting until the self-run has completed"
     if "Success" in result:
         with cacheLock:
             with open(EVCLut.regcache, 'rb') as inp:
@@ -213,14 +217,30 @@ def pubFromPickle():  # Publish last cached EVC Data
 def runAll():  # Read from EVC put in cache and publish
     # full_refresh=True
     result=getEVC()
-    # Step here to validate data against previous pickle?
-    multi_output = pubFromPickle()
+    if result==None:
+        return None
+    # implement timout on multiple failures
+    if len(result)==0:
+        multi_output={}
+    else:
+        # Step here to validate data against previous pickle?
+        multi_output = pubFromPickle()
     return multi_output
 
 def self_run2():
+    TimeoutError=0
     while True:
-        runAll()
-        time.sleep(GiV_Settings.evc_self_run_timer)
+        result=runAll()
+        if len(result)==0:
+            TimeoutError+=1
+        else:
+            TimeoutError=0
+        if TimeoutError>10:
+            logger.error("10 consecutive errors, pausing and waiting 5 mins for EVC modbus port to come back")
+            time.sleep(300)
+            TimeoutError=0
+        else:
+            time.sleep(GiV_Settings.evc_self_run_timer)
 
 # Additional Publish options can be added here.
 # A separate file in the folder can be added with a new publish "plugin"
@@ -521,7 +541,7 @@ def setDateTime(sysTime):
             e=sys.exc_info()
             logger.error("Error Setting EVC Time: "+str(e))
     except:
-        e = sys.exc_info()
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         temp['result']="Setting inverter DateTime failed: " + str(e) 
         logger.error (temp['result'])
     return json.dumps(temp)

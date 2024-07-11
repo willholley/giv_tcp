@@ -63,6 +63,14 @@ class Converter:
             return vals[idx[0]]
 
     @staticmethod
+    def int32(high_val: int, low_val: int) -> int:
+        """Combine two registers into an signed 32-bit int."""
+        if high_val is not None and low_val is not None:
+            val= (high_val << 16) + low_val
+            if val & (1 << (16 - 1)):
+                val -= 1 << 16
+            return val
+        
     def uint32(high_val: int, low_val: int) -> int:
         """Combine two registers into an unsigned 32-bit int."""
         if high_val is not None and low_val is not None:
@@ -117,6 +125,15 @@ class Converter:
         """Represent ARM & DSP firmware versions in the same format as the dashboard."""
         if dsp_version is not None and arm_version is not None:
             return f"D0.{dsp_version}-A0.{arm_version}"
+
+    @staticmethod
+    def battery_capacity(nom_cap: int, model: int) -> Optional[str]:
+        """Represent ARM & DSP firmware versions in the same format as the dashboard."""
+        model=f"{model:0{4}x}"
+        if model[0] in ['4','6','8']:
+            return round((nom_cap*307)/1000,2)
+        else:
+            return round((nom_cap*51.2)/1000,2)
 
     @staticmethod
     def inverter_max_power(device_type_code: str) -> Optional[int]:
@@ -516,6 +533,18 @@ class Converter:
             _logger.debug("Error processing datetime. Sending Zero Date")
             return datetime(2000,1,1,0,0,0)
 
+class WorkMode(IntEnum):
+    INITALISING = 0
+    OFF_GRID = 1
+    ON_GRID = 2
+    FAULT = 3
+    UPDATE = 4
+
+    @classmethod
+    def _missing_(cls, value):
+        """Default to 0."""
+        return cls(0)
+    
 class State(IntEnum):
     STATIC = 0
     CHARGE = 1
@@ -588,13 +617,13 @@ class Model(StrEnum):
     def add_regs(cls, value):
         """Return possible additional registers."""
         regs={
-            '2': ([],[180,240,300,360]),    #Hybrid
+            '2': ([240],[180,240,300,360]),    #Hybrid
             '3': ([],[180,240,300,360]),    #AC
-            '4': ([1000,1060,1120,1180,1240,1300,1360],[180,240,300,360,1000,1060,1120]),   #"Hybrid - 3ph"
+            '4': ([240,1000,1060,1120,1180,1240,1300,1360],[180,240,300,360,1000,1060,1120]),   #"Hybrid - 3ph"
             '5': ([2040],[2040]),   #EMS
             '6': ([1000,1060,1120,1180,1240,1300,1360],[180,240,300,360,1000,1060,1120]),   #AC - 3ph
             '7': ([1600,1660,1720,1780,1840],[180,240,300,360]),   #Gateway
-            '8': ([],[180,240,300,360]),   #All in One
+            '8': ([240],[180,240,300,360]),   #All in One
         }
         return regs.get(value)
 
@@ -897,12 +926,18 @@ class RegisterGetter:
         for key in self.REGISTER_LUT:
             inverter[key]=self.get(key)
         return inverter
+    
+    def getsn(self) -> Any:
+        return self.cache['serial_number']
 
     # or you can just use inverter.get('name')
     def get(self, key: str) -> Any:
         """Return a named register's value, after pre- and post-conversion."""
         r = self.REGISTER_LUT[key]
 
+        if isinstance(r,int):   #deal with the BCU number in HV battery data
+            return r
+        
         regs = [self.cache.get(r) for r in r.registers]
 
         if None in regs:

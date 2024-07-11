@@ -20,7 +20,8 @@ class Battery(RegisterGetter, metaclass=DynamicDoc):
     # pylint: disable=missing-class-docstring
     # The metaclass turns accesses to __doc__ into calls to
     # _gendoc()  (which we inherit from RegisterGetter)
-
+    
+  
     _DOC = """Battery presents all battery attributes as python types."""
 
     REGISTER_LUT = {
@@ -76,7 +77,6 @@ class Battery(RegisterGetter, metaclass=DynamicDoc):
             DT.string, None, IR(110), IR(111), IR(112), IR(113), IR(114)
         ),
         "usb_device_inserted": Def(DT.uint16, UsbDevice, IR(115)),
-        # IR(116-119) unused
     }
 
     def is_valid(self) -> bool:

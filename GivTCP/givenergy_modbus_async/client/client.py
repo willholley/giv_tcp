@@ -117,8 +117,10 @@ class Client:
         full_refresh: bool = True,
         number_batteries: int = 0,
         meter_list: list[int] = [],
+        bcu_list: list[tuple]=[],
         timeout: float = 3,
         retries: int = 5,
+        return_exceptions: bool = False,
     ) -> Plant:
         """Refresh data about the Plant."""
 
@@ -126,9 +128,9 @@ class Client:
             full_refresh, number_batteries, isHV=self.plant.isHV, 
             additional_holding_registers=self.plant.additional_holding_registers,
             additional_input_registers=self.plant.additional_input_registers, 
-            slave_addr=self.plant.slave_address,meter_list=meter_list,
+            slave_addr=self.plant.slave_address,meter_list=meter_list,bcu_list=bcu_list
         )
-        await self.execute(reqs, timeout=timeout, retries=retries)
+        await self.execute(reqs, timeout=timeout, retries=retries, return_exceptions=return_exceptions)
         return self.plant
 
     async def watch_plant(
@@ -153,6 +155,31 @@ class Client:
                 await self.execute(
                     reqs, timeout=timeout, retries=retries, return_exceptions=True
                 )
+
+    async def get_bcus(self) -> None:
+        """Determine the number of BCUs available in a device by getting BAMS data.
+        """
+        from ..model.register import IR
+        from ..pdu import ReadInputRegistersRequest
+        
+        # Get BAM data at 0xA0
+        req=[]
+        req.append(
+            ReadInputRegistersRequest(
+                base_register=60, register_count=5, slave_address=0xA0
+            ))
+        await self.execute(req,timeout=2, retries=3, return_exceptions=True)
+        self.plant.number_bcus = self.plant.register_caches[0xA0][IR(61)]
+        req=[]
+        for bcu_num in range(self.plant.number_bcus):
+            req.append(
+            ReadInputRegistersRequest(
+                base_register=60, register_count=60, slave_address=0x70+bcu_num
+            ))
+        await self.execute(req,timeout=2, retries=3, return_exceptions=True)
+        for bcu_num in range(self.plant.number_bcus):
+            val=self.plant.register_caches[0x70+bcu_num][IR(64)]
+            self.plant.bcu_list.append([bcu_num,val])
 
     async def detect_plant(
         self,
@@ -192,17 +219,24 @@ class Client:
             self.plant.isHV= False
             meter_list=[]
 
+        #### Set whether a device has batteries and then count them if they are allowed ####
         if self.plant.device_type in (Model.EMS,Model.GATEWAY):
             self.plant.number_batteries=0
         else:
             if self.plant.device_type in (Model.AC, Model.HYBRID):
                 self.plant.slave_address = 0x31
-            await self.refresh_plant(True, number_batteries=6, meter_list=meter_list, retries=retries, timeout=timeout)
+            #### Determine how many BCUs and then define the battery locations to look for, then set plant.number_bcus ####
+            if self.plant.isHV:
+                await self.get_bcus()
+            
+            #### Get max num of batteries for each BCU then test if they are valid ####
+            await self.refresh_plant(True, number_batteries=6, meter_list=meter_list, bcu_list=self.plant.bcu_list, retries=retries, timeout=timeout, return_exceptions=True) #set return exceptions to true to allow meters to not be found
             self.plant.detect_batteries()
             self.plant.detect_meters()
         
             # Use that to detect the number of batteries
-        _logger.info("Batteries detected: %d", self.plant.number_batteries)
+        _logger.info("Batteries detected: %d", self.plant.bcu_list)
+        _logger.info("Meters detected: %d", self.plant.meter_list)
         _logger.info("Slave address in use: "+ str(self.plant.slave_address))
 
         #Get Meter Product Info

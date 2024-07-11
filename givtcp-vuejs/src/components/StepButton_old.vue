@@ -29,7 +29,6 @@
 <script>
 import { useTcpStore, useStep } from '@/stores/counter'
 
-const settingfile = "allsettings.json"
 export default {
   name: 'Setup',
   data() {
@@ -41,21 +40,8 @@ export default {
     }
   },
   async created() {
-    await fetch('hostip.json').then(response => {
-          return response.json();
-      }).then(json => {
-          this.n=json;
-      })
-    if (window.location.protocol == "https:"){
-          var host = "https://" + n +":8098/REST1/settings"
-        }
-        else{
-          var host = "http://" + n +":8099/REST1/settings"
-        }
-    await fetch(host).then(response => {
-          return response.json();
-        }).then(getJSON => {
-          const data = {
+    var host = "http://homeassistant.local:8099/REST1/settings"
+    const data = {
           ...this.storeTCP.web,
           ...this.storeTCP.mqtt,
           ...this.storeTCP.inverters,
@@ -66,34 +52,41 @@ export default {
           ...this.storeTCP.palm,
           ...this.storeTCP.evc
         }
-          Object.keys(data).map((key)=>{
-          if(key in this.storeTCP.web){
-            this.storeTCP.web[key] = getJSON[key]
-          }else if(key in this.storeTCP.mqtt){
-            this.storeTCP.mqtt[key] = getJSON[key]
-          }else if(key in this.storeTCP.inverters){
-            this.storeTCP.inverters[key] = getJSON[key]
-          }else if(key in this.storeTCP.influx){
-            this.storeTCP.influx[key] = getJSON[key]
-          }else if(key in this.storeTCP.selfrun){
-            this.storeTCP.selfrun[key] = getJSON[key]
-          }else if(key in this.storeTCP.tariffs){
-            this.storeTCP.tariffs[key] = getJSON[key]
-          }else if(key in this.storeTCP.miscellaneous){
-            this.storeTCP.miscellaneous[key] = getJSON[key]
-          }else if(key in this.storeTCP.palm){
-            this.storeTCP.palm[key] = getJSON[key]
-          }else if(key in this.storeTCP.evc){
-            this.storeTCP.evc[key] = getJSON[key]
-          }else {
-            return
-          }
-          })
-        }).catch(err => {
-            this.snackbar = true
-            this.message = `Error: ${err}`
-        });
+    const getResponse = await fetch(host)
 
+    const getJSON = {...await getResponse.json()}
+
+    if(!getResponse.ok){
+      this.snackbar = true
+      this.message = `Server Error: ${getResponse.statusText}`
+    }else{
+      this.snackbar = false
+      this.message = `Inital settings fetch Successful:`
+    }
+
+    Object.keys(data).map((key)=>{
+      if(key in this.storeTCP.web){
+        this.storeTCP.web[key] = getJSON[key]
+      }else if(key in this.storeTCP.mqtt){
+        this.storeTCP.mqtt[key] = getJSON[key]
+      }else if(key in this.storeTCP.inverters){
+        this.storeTCP.inverters[key] = getJSON[key]
+      }else if(key in this.storeTCP.influx){
+        this.storeTCP.influx[key] = getJSON[key]
+      }else if(key in this.storeTCP.selfrun){
+        this.storeTCP.selfrun[key] = getJSON[key]
+      }else if(key in this.storeTCP.tariffs){
+        this.storeTCP.tariffs[key] = getJSON[key]
+      }else if(key in this.storeTCP.miscellaneous){
+        this.storeTCP.miscellaneous[key] = getJSON[key]
+      }else if(key in this.storeTCP.palm){
+        this.storeTCP.palm[key] = getJSON[key]
+      }else if(key in this.storeTCP.evc){
+        this.storeTCP.evc[key] = getJSON[key]
+      }else {
+        return
+      }
+      })
     },
     watch: {
     storeStep:{
@@ -101,8 +94,8 @@ export default {
         try{
           this.snackbar = false
           this.message = ""
-
-          const data = {
+          
+        const data = {
           ...this.storeTCP.web,
           ...this.storeTCP.mqtt,
           ...this.storeTCP.inverters,
@@ -113,41 +106,28 @@ export default {
           ...this.storeTCP.palm,
           ...this.storeTCP.evc
         }
-      // Write to json file here
-        const settingdata = JSON.stringify(data);
-
-        await fetch('hostip.json').then(response => {
-          return response.json();
-          }).then(json => {
-              this.n=json;
-          })
-        if (window.location.protocol == "https:"){
-              var host = "https://" + n +":8098/REST1/settings"
-            }
-            else{
-              var host = "http://" + n +":8099/REST1/settings"
-            }
+        var host = "http://homeassistant.local:8099/REST1/settings"
+        //var host = "http://127.0.0.1:8099/REST1/settings"
         const setResponse = await fetch(host,{
         method:"POST",
         headers:{
           "Content-Type":"application/json"
         },
-         body:JSON.stringify(data)
-        })
+        body:JSON.stringify(data)
+      })
+      if(setResponse.ok){
+       this.snackbar = false
+       this.message = `Success`
+       var host = "http://homeassistant.local:8099/REST1/settings"
+       const getResponse = await fetch(host)
 
-        if(!setResponse.ok){
+        const getJSON = {...await getResponse.json()}
+
+        if(!getResponse.ok){
           this.snackbar = true
-          this.message = `Error Saving config change`
-        }
-        else {
-          this.snackbar = true
-          this.message = `Success: Saving config change`
+          this.message = `Server Error: ${getResponse.statusText}`
         }
 
-        await fetch(host).then(response => {
-          return response.json();
-        }).then(getJSON => {
-          
         Object.keys(data).map((key)=>{
           if(key in this.storeTCP.web){
             this.storeTCP.web[key] = getJSON[key]
@@ -170,12 +150,11 @@ export default {
           }else {
             return
           }
-        });
-        }).catch(err => {
-            this.snackbar = true
-            this.message = `Error: ${err}`
-        });
-
+        })
+      }else{
+        this.snackbar = true
+        this.message = `Server Error: ${setResponse.statusText}`
+      }
         }catch(e){
           this.snackbar = true
           this.message = `Error: ${e}`

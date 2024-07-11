@@ -18,7 +18,6 @@ Addr:0x70~0x8F
 Register start address = (Register base NO) + 240  * (BAMS_Addr  -  0x90);
 """
 
-
 class BCU(RegisterGetter, metaclass=DynamicDoc):
     # pylint: disable=missing-class-docstring
     # The metaclass turns accesses to __doc__ into calls to

@@ -1,6 +1,7 @@
 """HA_Discovery: """
 # version 2022.01.21
 import sys
+import os
 import time
 import json
 import paho.mqtt.client as mqtt
@@ -10,6 +11,7 @@ from mqtt import GivMQTT
 from GivLUT import GivLUT
 from os.path import exists
 import pickle
+from read import finditem
 
 logger=GivLUT.logger
 
@@ -33,8 +35,9 @@ class HAMQTT():
             with open(GivLUT.regcache, 'rb') as inp:
                 regCacheStack = pickle.load(inp)
                 multi_output_old = regCacheStack[4]
-            if 'Invertor_Max_Bat_Rate' in multi_output_old['Invertor_Details']:
-                return int(multi_output_old['Invertor_Details']['Invertor_Max_Bat_Rate'])
+
+            if 'Invertor_Max_Bat_Rate' in multi_output_old[finditem(multi_output_old,'Invertor_Serial_Number')]:
+                return int(multi_output_old[finditem(multi_output_old,'Invertor_Serial_Number')]['Invertor_Max_Bat_Rate'])
             else:
                 return 5000
         return 5000
@@ -58,7 +61,7 @@ class HAMQTT():
         try:
             client.on_connect=HAMQTT.on_connect     			#bind call back function
             ## set the will message
-            client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/GivTCP_Stats/status","offline", retain=True)
+            client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/Stats/status","offline", retain=True)
             client.loop_start()
             logger.debug("Connecting to broker: "+ HAMQTT.MQTT_Address)
             #client.connect(HAMQTT.MQTT_Address,port=HAMQTT.MQTT_Port)
@@ -71,9 +74,9 @@ class HAMQTT():
 
 
             ##publish the status message
-            client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/GivTCP_Stats/status","online", retain=True)
+            client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/Stats/status","online", retain=True)
             
-            array['GivTCP_Stats/Timeout_Error']=0    # Set this always at start in case it doesn't exist
+            array['Stats/Timeout_Error']=0    # Set this always at start in case it doesn't exist
             
             ### For each topic create a discovery message
             for p_load in array:
@@ -88,7 +91,7 @@ class HAMQTT():
                                 logger.debug('Publishing: '+topic)
                                 #time.sleep(0.01)
                                 client.publish("homeassistant/sensor/GivEnergy/"+str(topic).split("/")[-2]+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                            elif "GivTCP_Stats" in topic:
+                            elif "Stats" in topic:
                                 client.publish("homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
                             else:
                                 client.publish("homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
@@ -108,13 +111,13 @@ class HAMQTT():
             client.disconnect()
 
         except:
-            e = sys.exc_info()
+            e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
 
     def publish_discovery2(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         try:
             rootTopic=str(GiV_Settings.MQTT_Topic+"/"+SN+"/")
-            array['GivTCP_Stats/Timeout_Error']=0    # Set this always at start in case it doesn't exist
+            array['Stats/Timeout_Error']=0    # Set this always at start in case it doesn't exist
             publisher=[]
             ### For each topic create a discovery message
             for p_load in array:
@@ -145,6 +148,8 @@ class HAMQTT():
             # Loop round HA publishing 4 times in case its not all there
             i=0
             complete=False
+            CheckDisco.removedisco(SN)
+            time.sleep(3)
             while not complete:
                 publisher=HAMQTT.sendDiscoMsg(publisher,SN)     #send to broker and return any missing items after a check
                 if len(publisher)<=0:
@@ -155,7 +160,7 @@ class HAMQTT():
                     break
 
         except:
-            e = sys.exc_info()
+            e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
 
     def sendDiscoMsg(array,SN):
@@ -168,11 +173,11 @@ class HAMQTT():
         client.port=GivMQTT.MQTT_Port
 
         ## set the will message
-        client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/GivTCP_Stats/status","offline", retain=True)
+        client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/Stats/status","offline", retain=True)
 
         client.loop_start()
         logger.debug("Connecting to broker: "+ HAMQTT.MQTT_Address)
-        #client.connect(HAMQTT.MQTT_Address,port=HAMQTT.MQTT_Port)
+
         while not client.connected_flag:        			#wait in loop
             logger.debug("In wait loop")
             time.sleep(0.2)
@@ -180,7 +185,7 @@ class HAMQTT():
         logger.debug("Publishing MQTT: " + HAMQTT.MQTT_Address)
 
         ##publish the status message
-        client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/GivTCP_Stats/status","online", retain=True)
+        client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/Stats/status","online", retain=True)
         i=0
         for pub in array:
             if isinstance(pub[1],(int, str, float, bytearray)):      #Only publish typesafe data
@@ -194,22 +199,28 @@ class HAMQTT():
     def create_device_payload(topic,SN):
         tempObj={}
         tempObj['stat_t']=str(topic).replace(" ","_")
-        tempObj['avty_t'] = GiV_Settings.MQTT_Topic+"/"+SN+"/GivTCP_Stats/status"
+        tempObj['avty_t'] = GiV_Settings.MQTT_Topic+"/"+SN+"/Stats/status"
         tempObj["pl_avail"]= "online"
         tempObj["pl_not_avail"]= "offline"
         tempObj['device']={}
 
         GiVTCP_Device=str(topic).split("/")[2]
         if "Battery_Details" in topic or "Inverters" in topic:
-            tempObj["name"]=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
-            tempObj['uniq_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
-            tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
-            tempObj['device']['identifiers']=str(topic).split("/")[3]+"_"+GiVTCP_Device
-            if str(topic).split("/")[3].replace("_"," ")=="Battery Details":
-                tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+GiVTCP_Device.replace("_"," ")
+            #tempObj["name"]=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
+            if len(str(topic).split("/"))>5:    #Its a battery
+                tempObj["name"]=str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
+                tempObj['uniq_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[4]+"_"+str(topic).split("/")[-1]
+                tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[4]+"_"+str(topic).split("/")[-1]
+                tempObj['device']['identifiers']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[4]
+                tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[4].replace("_"," ")
             else:
-                tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")+" "+GiVTCP_Device.replace("_"," ")
-           # tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+GiVTCP_Device.replace("_"," ")
+                tempObj["name"]=str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
+                tempObj['uniq_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
+                tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+str(topic).split("/")[3]+"_"+str(topic).split("/")[-1]
+                tempObj['device']['identifiers']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3]
+                tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[3].replace("_"," ")
+
+            # tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+GiVTCP_Device.replace("_"," ")
         elif len(SN)>10:    #If EVC and not INV
             tempObj['uniq_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
             tempObj['object_id']=GiV_Settings.ha_device_prefix+"_"+SN+"_"+str(topic).split("/")[-1]
@@ -222,7 +233,8 @@ class HAMQTT():
             tempObj['device']['identifiers']=SN+"_"+GiVTCP_Device
             #tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+SN+" "+str(GiVTCP_Device).replace("_"," ")
             tempObj['device']['name']=GiV_Settings.ha_device_prefix+" "+str(GiVTCP_Device).replace("_"," ")
-            tempObj["name"]=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
+            tempObj["name"]=str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
+            #tempObj["name"]=GiV_Settings.ha_device_prefix+" "+str(topic).split("/")[-1].replace("_"," ") #Just final bit past the last "/"
         tempObj['device']['manufacturer']="GivEnergy"
 
         if not GivLUT.entity_type[str(topic).split("/")[-1]].controlFunc == "":
@@ -384,10 +396,25 @@ class CheckDisco():
         client.disconnect()
         client.loop_stop()
         temp={}
-        logger.critical("Sent "+ str(len(array))+" discovery messages")
-        logger.critical("Found "+ str(len(CheckDisco.msgs))+" discovery messages")
+        logger.debug("Sent "+ str(len(array))+" discovery messages")
+        logger.debug("Found "+ str(len(CheckDisco.msgs))+" discovery messages")
         unpub=[]
         for m in array:     #check each item that was sent
             if not m[0] in CheckDisco.msgs:     #if its not in what was received
                 unpub.append([m[0],m[1]])      #take the one that was sent but not received and add to unpub
         return unpub
+    
+    def removedisco(SN):
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        client.on_connect = CheckDisco.on_connect
+        client.on_message = CheckDisco.on_message
+        client.username_pw_set(GiV_Settings.MQTT_Username,GiV_Settings.MQTT_Password)
+        client.connect(GiV_Settings.MQTT_Address, GiV_Settings.MQTT_Port, 60)
+
+        client.loop_start()
+        time.sleep(3)
+        #Loop through all msgs and remove if they are GivTCP ones
+        for msg in CheckDisco.msgs:
+            if SN in msg:
+                client.publish(msg)
+        client.loop_stop()

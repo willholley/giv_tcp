@@ -31,6 +31,7 @@ class ThreePhaseInverter(RegisterGetter, metaclass=DynamicDoc):
         #
         # Three Phase Holding Registers 1000-1124
         #
+        "generation": Def(C.uint16, Generation, HR(21)),
         "set_command_save": Def(C.bool, None, HR(1001)),
         "active_rate": Def(C.uint16, None, HR(1002)),
         "reactive_rate": Def(C.uint16, None, HR(1003)),
@@ -136,8 +137,8 @@ class ThreePhaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "v_pv2": Def(C.deci, None, IR(1002)),
         "i_pv1": Def(C.deci, None, IR(1009)),
         "i_pv2": Def(C.deci, None, IR(1010)),
-        "p_pv1": Def(C.uint32, None, IR(1017),IR(1018)),
-        "p_pv2": Def(C.uint32, None, IR(1019),IR(1020)),
+        "p_pv1": Def(C.uint32, C.deci, IR(1017),IR(1018)),
+        "p_pv2": Def(C.uint32, C.deci, IR(1019),IR(1020)),
         #
         # Input Registers, block 1060-1120 - Grid
         #
@@ -147,23 +148,27 @@ class ThreePhaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "i_ac1": Def(C.deci, None, IR(1064)),
         "i_ac2": Def(C.deci, None, IR(1065)),
         "i_ac3": Def(C.deci, None, IR(1066)),
-        "f_ac1": Def(C.milli, None, IR(1067)),
+        "f_ac1": Def(C.centi, None, IR(1067)),
         "power_factor": Def(C.int16, None, IR(1068)),
-        "p_inverter_out": Def(C.uint32, None, IR(1069),IR(1070)),
-        "p_inverter_ac_charge": Def(C.uint32, None, IR(1071),IR(1072)),
-        "p_grid_apparent": Def(C.uint32, None, IR(1073),IR(1074)),
+        "p_inverter_out": Def(C.int32, C.deci, IR(1069),IR(1070)),
+        "p_inverter_ac_charge": Def(C.uint32, C.deci, IR(1071),IR(1072)),
+        "p_grid_apparent": Def(C.uint32, C.deci, IR(1073),IR(1074)),
         "system_mode": Def(C.bool, SystemMode, IR(1075)),
         "status": Def(C.uint16, Status, IR(1076)),
         "start_delay_time": Def(C.uint16, None, IR(1077)),
-        "p_meter_import": Def(C.uint32, None, IR(1079),IR(1080)),
-        "p_meter_export": Def(C.uint32, None, IR(1081),IR(1082)),
-        "p_load_ac1": Def(C.int16, None, IR(1083)),
-        "p_load_ac2": Def(C.int16, None, IR(1084)),
-        "p_load_ac3": Def(C.int16, None, IR(1085)),
-        "p_load_all": Def(C.uint32, None, IR(1089),IR(1090)),
-        "p_out_ac1": Def(C.int16, None, IR(1091)),
-        "p_out_ac2": Def(C.int16, None, IR(1092)),
-        "p_out_ac3": Def(C.int16, None, IR(1093)),
+        "p_meter_import": Def(C.uint32, C.deci, IR(1079),IR(1080)),
+        "p_meter_export": Def(C.uint32, C.deci, IR(1081),IR(1082)),
+        "p_load_ac1": Def(C.deci, None, IR(1083)),
+        "p_load_ac2": Def(C.deci, None, IR(1084)),
+        "p_load_ac3": Def(C.deci, None, IR(1085)),
+        "p_load_all": Def(C.uint32, C.deci, IR(1089),IR(1090)),
+        "p_out_ac1": Def(C.deci, None, IR(1091)),
+        "p_out_ac2": Def(C.deci, None, IR(1092)),
+        "p_out_ac3": Def(C.deci, None, IR(1093)),
+        "v_out_ac1": Def(C.deci, None, IR(1094)),
+        "v_out_ac2": Def(C.deci, None, IR(1095)),
+        "v_out_ac3": Def(C.deci, None, IR(1096)),
+        
         
         #
         # Input Registers, block 1120-1140 - Battery
@@ -180,29 +185,29 @@ class ThreePhaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "v_battery_pcs": Def(C.deci, None, IR(1133)),
         "v_dc_bus": Def(C.deci, None, IR(1134)),
         "v_inv_bus": Def(C.deci, None, IR(1135)),
-        "p_battery_discharge": Def(C.uint32, None, IR(1136),IR(1137)),
-        "p_battery_charge": Def(C.uint32, None, IR(1138),IR(1139)),
-        "i_battery": Def(C.int16, None, IR(1140)),
+        "p_battery_discharge": Def(C.uint32, C.deci, IR(1136),IR(1137)),
+        "p_battery_charge": Def(C.uint32, C.deci, IR(1138),IR(1139)),
+        "i_battery": Def(C.int16, C.deci, IR(1140)),
         
         #
         # Input Registers, block 1180-1240 - EPS
         #
-        "f_nominal_eps": Def(C.milli, None, IR(1180)),
+        "f_nominal_eps": Def(C.centi, None, IR(1180)),
         "v_eps_ac1": Def(C.deci, None, IR(1181)),
         "v_eps_ac2": Def(C.deci, None, IR(1182)),
         "v_eps_ac3": Def(C.deci, None, IR(1183)),
         "i_eps_ac1": Def(C.deci, None, IR(1184)),
         "i_eps_ac2": Def(C.deci, None, IR(1185)),
         "i_eps_ac3": Def(C.deci, None, IR(1186)),
-        "p_eps_ac1": Def(C.uint32, None, IR(1187),IR(1188)),
-        "p_eps_ac2": Def(C.uint32, None, IR(1189),IR(1190)),
-        "p_eps_ac3": Def(C.uint32, None, IR(1191),IR(1192)),
+        "p_eps_ac1": Def(C.uint32, C.deci, IR(1187),IR(1188)),
+        "p_eps_ac2": Def(C.uint32, C.deci, IR(1189),IR(1190)),
+        "p_eps_ac3": Def(C.uint32, C.deci, IR(1191),IR(1192)),
         
         #
         # Input Registers, block 1240-1300 - Power
         #
-        "p_export": Def(C.uint32, None, IR(1240),IR(1241)),
-        "p_meter2": Def(C.uint32, None, IR(1244),IR(1245)),
+        "p_export": Def(C.uint32, C.deci, IR(1240),IR(1241)),
+        "p_meter2": Def(C.uint32, C.deci, IR(1244),IR(1245)),
 
         #
         # Input Registers, block 1000-1360 - Fault
@@ -215,6 +220,12 @@ class ThreePhaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "inverter_fault_codes_5": Def((C.inverter_fault_code2,5), None, IR(1305)),
         "inverter_fault_codes_6": Def((C.inverter_fault_code2,6), None, IR(1306)),
         "inverter_fault_codes_7": Def((C.inverter_fault_code2,7), None, IR(1307)),
+        "tph_arm_firmware_version": Def(C.string, None, IR(1327)),
+        "ac_dsp_firmware_version": Def(C.string, None, IR(1325)),
+        "dc_dsp_firmware_version": Def(C.string, None, IR(1326)),
+        "tph_firmware_version": Def(C.string, None, IR(1320), IR(1321), IR(1322), IR(1323), IR(1324)),
+        "firmware_version": Def(C.firmware_version, None, IR(1325), IR(1327)),
+        "tph_software_version": Def(C.string, None, IR(1317), IR(1318), IR(1319)),
         #
         # Input Registers, block 1360-1413 - Energy
         #
