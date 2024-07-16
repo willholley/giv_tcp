@@ -77,17 +77,13 @@ export const useTcpStore = defineStore('givtcp-form', {
       PALM_WEIGHT: 35,
       LOAD_HIST_WEIGHT: 1
     }),
-    miscellaneous: useSessionStorage('miscellaneous', {
+    misc: useSessionStorage('misc', {
       TZ: 'Europe/London',
       Print_Raw_Registers: true,
       Log_Level: "Info",
       queue_retries: 2,
       data_smoother: "medium",
       cache_location: "/config/GivTCP"
-    }),
-    restart: useSessionStorage('restart',{
-      restart:false,
-      hasRestarted:null
     })
   })
 })
@@ -520,7 +516,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'SolCast API Key',
             parent: 'palm',
-            key: 'Solcast_API'
+            key: 'SOLCASTAPI'
           }
         },
         {
@@ -528,7 +524,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'SolCast Site ID 1',
             parent: 'palm',
-            key: 'Solcast_SiteID'
+            key: 'SOLCASTSITEID'
           }
         },
         {
@@ -536,7 +532,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'SolCast Site ID 2',
             parent: 'palm',
-            key: 'Solcast_SiteID2'
+            key: 'SOLCASTSITEID2'
           }
         },
         {
@@ -605,15 +601,15 @@ export const useCard = defineStore('card', {
         }
       ]
     },
-    miscellaneous: {
-      title: 'Miscellaneous',
+    misc: {
+      title: 'Misc',
       subtitle: 'Setup Any Miscellaneous variables',
       fields: [
         {
           type: 'text',
           options: {
             label: 'Timezone',
-            parent: 'miscellaneous',
+            parent: 'misc',
             key: 'TZ'
           }
         },
@@ -621,7 +617,7 @@ export const useCard = defineStore('card', {
           type: 'select',
           options: {
             label: 'Log Level',
-            parent: 'miscellaneous',
+            parent: 'misc',
             items: ["critical", "info", "debug"],
             key: 'Log_Level'
           }
@@ -630,7 +626,7 @@ export const useCard = defineStore('card', {
           type: 'checkbox',
           options: {
             label: 'Print Raw',
-            parent: 'miscellaneous',
+            parent: 'misc',
             key: 'Print_Raw_Registers'
           }
         },
@@ -638,7 +634,7 @@ export const useCard = defineStore('card', {
           type: 'text',
           options: {
             label: 'Queue Retries',
-            parent: 'miscellaneous',
+            parent: 'misc',
             key: 'queue_retries'
           }
         },
@@ -646,7 +642,7 @@ export const useCard = defineStore('card', {
           type: 'select',
           options: {
             label: 'Smoothing',
-            parent: 'miscellaneous',
+            parent: 'misc',
             items: ["high", "medium", "low","none"],
             key: 'data_smoother'
           }
@@ -655,7 +651,7 @@ export const useCard = defineStore('card', {
           type: 'text',
           options: {
             label: 'Cache Location',
-            parent: 'miscellaneous',
+            parent: 'misc',
             key: 'cache_location'
           }
         },
@@ -663,47 +659,8 @@ export const useCard = defineStore('card', {
           type: 'text',
           options: {
             label: 'Timezone',
-            parent: 'miscellaneous',
+            parent: 'misc',
             key: 'TZ'
-          }
-        },
-      ]
-    },
-    restart:{
-      title:"Finished Setup",
-      subtitle:"Restart GivTCP to apply changes",
-      fields:[
-        {
-          type: 'button',
-          options: {
-            label: 'Save and Restart GivTCP',
-            parent: 'restart',
-            key: 'restart',
-            message:useTcpStore().restart.hasRestarted != null ? useTcpStore().restart.hasRestarted ? "GivTCP Restarted Successfully" : "GivTCP Failed to Restart. Try Restarting Manually" : '',
-            onClick:async ()=>{
-              const store = useTcpStore()
-              try{
-                await fetch('hostip.json').then(response => {
-                  return response.json();
-                  }).then(json => {
-                      this.n=json;
-                  })
-                if (window.location.protocol == "https:"){
-                  var host = "https://" + n +":8098/REST1/restart"
-                }
-                else{
-                  var host = "http://" + n +":8099/REST1/restart"
-                }
-              const res = await fetch(host)
-              if(res.ok){
-                store.restart.hasRestarted = true
-              }else{
-                store.restart.hasRestarted = false
-              }
-            } catch(e){
-              store.restart.hasRestarted = false
-            }
-            }
           }
         },
       ]

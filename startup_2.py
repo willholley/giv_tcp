@@ -143,10 +143,12 @@ def createsettingsjson(inv):
             outp.write("    HA_Auto_D=True\n")
             outp.write("    Print_Raw_Registers=True\n")
             outp.write("    MQTT_Output=True\n")
+            outp.write("    isAddon=True\n")
         else:
             outp.write("    HA_Auto_D="+str(setts["HA_Auto_D"]).capitalize()+"\n")
             outp.write("    Print_Raw_Registers="+str(setts["Print_Raw_Registers"]).capitalize()+"\n")
             outp.write("    MQTT_Output="+str(setts["MQTT_Output"]).capitalize()+"\n")
+            outp.write("    isAddon=False\n")
         outp.write("    ha_device_prefix=\""+str(setts["inverterName_"+str(inv)])+"\"\n")
         outp.write("    Log_Level=\""+str(setts["Log_Level"])+"\"\n")
         outp.write("    Influx_Output="+str(setts["Influx_Output"]).capitalize()+"\n")
@@ -338,6 +340,8 @@ if isAddon:
         networks[i]=interface['ipv4']['gateway']
         i=i+1
 else:
+    #os.makedirs("/config/GivTCP", exist_ok=True)
+    
     # Get subnet from docker if not addon
     try:
         import socket
@@ -460,7 +464,7 @@ for inv in inverterStats:
 if len(evcList)>0:
     if setts["evc_ip_address"]=="":
         setts["evc_ip_address"]=evcList[1]
-    setts["evc_enable"]=True
+#    setts["evc_enable"]=True           #Don't force this True
     if setts["NUMINVERTORS"]<len(inverterStats):
         setts["NUMINVERTORS"]=len(inverterStats)   #update NUMINVERTORS if we've found more than are here
 
@@ -470,7 +474,8 @@ with open(SFILE, 'w') as f:
 # Now its written to config folder, symlink to ingress so web frontend can deal with it
 src=SFILE
 dest="/app/ingress/allsettings.json"
-os.symlink(src, dest)
+if not exists(dest):
+    os.symlink(src, dest)
 
 if not os.path.exists(str(setts["cache_location"])):
     os.makedirs(str(setts["cache_location"]))
@@ -496,7 +501,7 @@ for inv in range(1,int(setts['NUMINVERTORS'])+1):
     if exists(PATH+"/settings.py"):
         os.remove(PATH+"/settings.py")
     if exists(firstrun):
-        logger.debug("Removing firstrun")
+        logger.info("Removing firstrun")
         os.remove(firstrun)
 
 #####################################################
@@ -557,6 +562,9 @@ for inv in range(1,int(setts['NUMINVERTORS'])+1):
     if setts['self_run']==True: # Don't autorun if isAddon to prevent autostart creating rubbish before its checked by a user
         logger.info ("Running Invertor ("+str(setts["invertorIP_"+str(inv)])+") read loop every "+str(setts['self_run_timer'])+"/"+str(setts['self_run_timer_full'])+"s")
         selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
+    else:
+        logger.info("=================== Self Run is off, so no data collection is happening ================")
+        logger.info("==================  Head to http://"+str(hostIP)+":8099/config.html  ==============")
 
     if setts['evc_enable']==True and inv==1:  #only run it once
         if not setts['evc_ip_address']=="":
@@ -616,6 +624,9 @@ if setts['Smart_Target']==True:
 
 # Loop round checking all processes are running
 while True:
+    if exists("/app/.reboot"):
+        os.remove("/app/.reboot")
+        exit()
     for inv in range(1,int(setts['NUMINVERTORS'])+1):
         regcache=setts['cache_location']+"/regCache_"+str(inv)+".pkl"
         if exists(regcache):
@@ -630,6 +641,7 @@ while True:
         PATH= "/app/GivTCP_"+str(inv)
         if setts['self_run']==True:
             if not selfRun[inv].poll()==None:
+                selfRun[inv].kill()
                 logger.error("Self Run loop process died. restarting...")
                 os.chdir(PATH)
                 logger.info ("Restarting Invertor read loop every "+str(setts['self_run_timer'])+"s")
@@ -643,10 +655,12 @@ while True:
         if setts['MQTT_Output']==True:
             if not mqttClient[inv].poll()==None:
                 logger.error("MQTT Client process died. Restarting...")
+                mqttClient[inv].kill()
                 os.chdir(PATH)
                 logger.info ("Resubscribing Mosquitto for control on port "+str(setts['MQTT_Port']))
                 mqttClient[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client.py"])
         if not gunicorn[inv].poll()==None:
+            gunicorn[inv].kill()
             logger.error("REST API process died. Restarting...")
             os.chdir(PATH)
             GUPORT=6344+inv
@@ -656,6 +670,7 @@ while True:
     
     if setts['Web_Dash'] == True:
         if not webDash.poll() == None:
+            webDash.kill()
             logger.error("Web Dashboard process died. Restarting...")
             os.chdir("/app/WebDashboard")
             WDPORT = int(setts['Web_Dash_Port'])
@@ -663,9 +678,9 @@ while True:
             command = shlex.split("/usr/bin/node /usr/local/bin/serve -p " + str(WDPORT))
             webDash = subprocess.Popen(command)
 
-
     if setts['MQTT_Address']=="127.0.0.1":
         if not mqttBroker.poll()==None:
+            mqttBroker.kill()
             logger.error("MQTT Broker process died. Restarting...")
             os.chdir(PATH)
             logger.info ("Starting Mosquitto on port "+str(setts['MQTT_Port']))
@@ -673,6 +688,7 @@ while True:
 
     if setts['evc_enable']==True:
         if not evcSelfRun.poll()==None:
+            evcSelfRun.kill()
             logger.error("EVC Self Run loop process died. restarting...")
             os.chdir(PATH)
             logger.info ("Restarting EVC read loop every "+str(setts['evc_self_run_timer'])+"s")
@@ -680,6 +696,7 @@ while True:
 
     if setts['evc_enable']==True:
         if not evcChargeModeLoop.poll()==None:
+            evcChargeModeLoop.kill()
             logger.error("EVC Self Run loop process died. restarting...")
             os.chdir(PATH)
             logger.info ("Restarting EVC chargeMode loop every 60s")

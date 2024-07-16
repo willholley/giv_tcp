@@ -27,12 +27,12 @@
         This config page is where you are able to tweak the configuration of GivTCP to suit your needs. <br>
         GivTCP will add in any inverters it finds into the inverters page, but you are able to tweak them as needed.<br>
         The first time you run this you will need to check the details then turn on "Self Run" to start GivTCP.<br>
-        You need to restart GivTCP (last page) after making any changes to the configuration.<br>
+        You need to restart GivTCP after making any changes to the configuration.<br>
       </h2>
-      <FormCard v-if="storeStep.step >= 0" :card="storeCard[timelineList[storeStep.step]]" />
       <div class="d-flex flex-1-1-100 justify-center ma-5">
         <StepButton />
       </div>
+      <FormCard v-if="storeStep.step >= 0" :card="storeCard[timelineList[storeStep.step]]" />
     </v-container>
   </div>
 </template>

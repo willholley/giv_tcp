@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # version 2021.12.22
 from os.path import exists
-from flask import Flask, request, send_from_directory, render_template
+from flask import Flask, request, send_from_directory, render_template, Response
 from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
@@ -36,7 +36,10 @@ def index():
 
 @giv_api.route('/settings', methods=['POST'])
 def savesetts():
-    SFILE="/config/GivTCP/allsettings.json"
+    if exists("/config/GivTCP/allsettings.json"):
+        SFILE="/config/GivTCP/allsettings.json"
+    else:
+        SFILE="/app/allsettings.json"
     setts = request.get_json()
     with open(SFILE, 'w') as f:
         f.write(json.dumps(setts,indent=4))
@@ -44,7 +47,10 @@ def savesetts():
 
 @giv_api.route('/settings', methods=['GET'])
 def returnsetts():
-    SFILE="/config/GivTCP/allsettings.json"
+    if exists("/config/GivTCP/allsettings.json"):
+        SFILE="/config/GivTCP/allsettings.json"
+    else:
+        SFILE="/app/allsettings.json"
     with open(SFILE, 'r') as f1:
         setts=json.load(f1)
         return setts
@@ -67,13 +73,17 @@ def reboot():
     else:
         return output
 
-@giv_api.route('/restart', methods=['GET'])
+@giv_api.route('/restart', methods=['GET','POST'])
 def restart():
     output=wr.rebootAddon()
-    if output == None:
-        return "{'Result':'Error, no data available'}"
-    else:
-        return "{'Success':'Container restarting...'}"
+    response=json.dumps({
+        "data": {
+            "result": "Container restarting..."
+        }
+    }),
+    status=200,
+    mimetype="application/json"
+    return Response(response)
 
 #Publish last cached Invertor Data
 @giv_api.route('/readData', methods=['GET'])

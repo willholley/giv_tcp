@@ -1670,17 +1670,23 @@ def switchRate(payload):
 def rebootAddon():
     temp={}
     try:
-        logger.critical("Restarting the GivTCP Addon in 5s...")
-        time.sleep(5)
-        access_token = os.getenv("SUPERVISOR_TOKEN")
-        url="http://supervisor/addons/self/restart"
-        result = requests.post(url,
-            headers={'Content-Type':'application/json',
-                    'Authorization': 'Bearer {}'.format(access_token)})
-        logger.info("Supervisor restart was: "+str(result))
+        logger.critical("Restarting the GivTCP Addon in 2s...")
+        time.sleep(2)
+        if GiV_Settings.isAddon:
+            access_token = os.getenv("SUPERVISOR_TOKEN")
+            url="http://supervisor/addons/self/restart"
+            result = requests.post(url,
+                headers={'Content-Type':'application/json',
+                        'Authorization': 'Bearer {}'.format(access_token)})
+            logger.info("Supervisor restart was: "+str(result))
+        else:
+            open("/app/.reboot", 'w').close()
+            result="Container restarting within 60s"
+            logger.info("Container restart was: "+str(result))
+        
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-        temp['result']="Failed to reboot addon: " + str(e) 
+        temp['result']="Failed to reboot GivTCP: " + str(e) 
         logger.error (temp['result'])
     return json.dumps(result)
 
