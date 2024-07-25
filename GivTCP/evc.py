@@ -8,7 +8,7 @@ from os.path import exists
 import os
 from threading import Lock
 import json
-import read as rd
+import GivLUT
 from settings import GiV_Settings
 from GivLUT import GivLUT
 import sys
@@ -85,21 +85,27 @@ class EVCLut:
         111: 'Voltage_L2',
         113: 'Voltage_L3'}
 
-def getEVC():
+def getEVC(client:ModbusTcpClient):
     regs=[]
     output={}
     multi_output={}
     try:
-        client = ModbusTcpClient(GiV_Settings.evc_ip_address)
-        client.connect()
-        if not client.is_socket_open():
-            logger.debug("Modbus connection failed, check EVC WiFi/LAN connection")
-            return output
+        #if client.connect():
+        if client.is_socket_open():
+            logger.debug("Socket is already open")
+        else:
+            logger.debug("Socket isn't yet open")
         result = client.read_holding_registers(0,60)
+        if not client.is_socket_open():
+            logger.debug("Socket is closed")
+        else:
+            logger.debug("Socket is still open")
         result2 = client.read_holding_registers(60,55)
-        client.close()
-        if not hasattr(result,'registers') and not hasattr(result2,'registers'):
-            return None
+        #else:
+        #    return output
+
+        if not hasattr(result,'registers') or not hasattr(result2,'registers'):
+            return output
         regs=result.registers+result2.registers
         for reg in EVCLut.evc_lut.items():
             if isinstance(reg[1],tuple):
@@ -196,7 +202,7 @@ def getEVC():
                 pickle.dump(multi_output, outp, pickle.HIGHEST_PROTOCOL)
     except Exception:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-        logger.error("Error: "+ str(e))
+        logger.debug("Error: "+ str(e))
     return output
 
 def pubFromPickle():  # Publish last cached EVC Data
@@ -214,11 +220,9 @@ def pubFromPickle():  # Publish last cached EVC Data
         multi_output['result'] = result
     return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
 
-def runAll():  # Read from EVC put in cache and publish
+def runAll(client):  # Read from EVC put in cache and publish
     # full_refresh=True
-    result=getEVC()
-    if result==None:
-        return None
+    result=getEVC(client)
     # implement timout on multiple failures
     if len(result)==0:
         multi_output={}
@@ -228,19 +232,22 @@ def runAll():  # Read from EVC put in cache and publish
     return multi_output
 
 def self_run2():
+    client = ModbusTcpClient(GiV_Settings.evc_ip_address, auto_open=True, auto_close=True)
     TimeoutError=0
     while True:
-        result=runAll()
+        result=runAll(client)
         if len(result)==0:
             TimeoutError+=1
         else:
             TimeoutError=0
         if TimeoutError>10:
             logger.error("10 consecutive errors, pausing and waiting 5 mins for EVC modbus port to come back")
+            client.close()
             time.sleep(300)
             TimeoutError=0
         else:
             time.sleep(GiV_Settings.evc_self_run_timer)
+            
 
 # Additional Publish options can be added here.
 # A separate file in the folder can be added with a new publish "plugin"
@@ -394,13 +401,6 @@ def setCurrentLimit(val):
         e=sys.exc_info()
         logger.error("Error controlling EVC: "+str(e))
 
-def test():
-    client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-    result=client.write_registers(95,2)
-    client.close()
-    #getEVC()
-    print (result)
-
 def chargeMode(once=False):
     while True:
         #Run a regular check and manage load based on current mode and session energy
@@ -417,8 +417,9 @@ def chargeMode(once=False):
                 setChargeControl("Stop")
             if not int(evcRegCache['Charger']['Import_Cap'])==0:
                 if exists(GivLUT.regcache):
-                    with open(GivLUT.regcache, 'rb') as inp:
-                        invRegCache= pickle.load(inp)
+                    with GivLUT.cachelock:
+                        with open(GivLUT.regcache, 'rb') as inp:
+                            invRegCache= pickle.load(inp)
                     if float(invRegCache[4]['Power']['Power']['Grid_Current'])>(float(evcRegCache['Charger']['Import_Cap'])*0.95):
                         target=float(evcRegCache['Charger']['Import_Cap'])*0.9
                         reduction=(float(invRegCache[4]['Power']['Power']['Grid_Current']))-target
@@ -437,10 +438,12 @@ def chargeMode(once=False):
 def hybridmode():
     if exists(EVCLut.regcache) and exists(GivLUT.regcache):
         # Set charging current to min 6A plus the level of excess solar
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        with open(GivLUT.regcache, 'rb') as inp:
-            invRegCache= pickle.load(inp)
+        with cacheLock:
+            with open(EVCLut.regcache, 'rb') as inp:
+                evcRegCache= pickle.load(inp)
+        with GivLUT.cachelock:
+            with open(GivLUT.regcache, 'rb') as inp:
+                invRegCache= pickle.load(inp)
         sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
         spareCurrent=int(max((sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']),0)+6)   #Spare current cannot be negative
         if not spareCurrent==evcRegCache['Charger']['Charge_Limit']:
@@ -454,10 +457,12 @@ def gridmode():
 def solarmode():
     # Set charging current to the level of excess solar
     if exists(EVCLut.regcache) and exists(GivLUT.regcache):
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        with open(GivLUT.regcache, 'rb') as inp:
-            invRegCache= pickle.load(inp)
+        with cacheLock:
+            with open(EVCLut.regcache, 'rb') as inp:
+                evcRegCache= pickle.load(inp)
+        with GivLUT.cachelock:
+            with open(GivLUT.regcache, 'rb') as inp:
+                invRegCache= pickle.load(inp)
         sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
         spareCurrent=sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']
         if sparePower>6:    #only if there's excess above min evse level
@@ -473,10 +478,12 @@ def solarmode():
 def importcap():
     # Check grid import and ensure its not exceeding threshold
     if exists(EVCLut.regcache) and exists(GivLUT.regcache):
-        with open(GivLUT.regcache, 'rb') as inp:
-            invRegCache= pickle.load(inp)
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
+        with cacheLock:
+            with open(GivLUT.regcache, 'rb') as inp:
+                invRegCache= pickle.load(inp)
+        with GivLUT.cachelock:
+            with open(EVCLut.regcache, 'rb') as inp:
+                evcRegCache= pickle.load(inp)
         importcurrent=float(invRegCache[4]['Power']['Power']['Grid_Current'])
         evccurrent=float(evcRegCache['Charger']['Current_L1'])
         if importcurrent>GiV_Settings.evc_import_max_current:

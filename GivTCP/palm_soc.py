@@ -4,6 +4,7 @@
 import palm_settings as stgs
 from palm_utils import GivEnergyObj, SolcastObj, t_to_mins
 import time
+import asyncio
 
 # Debug switch (if True) is used to run palm_Soc outside the HA environment for test purpses
 DEBUG_SW = False
@@ -64,7 +65,7 @@ def GivTCP_write_soc(cmd: str):
             logger.info("Setting Charge Target to: "+ str(inverter.tgt_soc)+ "%")
             payload={}
             payload['chargeToPercent']= inverter.tgt_soc
-            result=wr.setChargeTarget(payload)
+            result=asyncio.run(wr.setChargeTarget(payload))
             logger.debug(result)
         except:
             inverter.set_mode("set_soc")
@@ -75,7 +76,7 @@ def GivTCP_write_soc(cmd: str):
             logger.debug("Setting Charge Target to: 100%")
             payload={}
             payload['chargeToPercent']= 100
-            result=GivQueue.q.enqueue(wr.setChargeTarget,payload)
+            result=asyncio.run(wr.setChargeTarget(payload))
             logger.debug(result)
         except:
             inverter.set_mode("set_soc_winter")

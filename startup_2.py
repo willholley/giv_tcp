@@ -405,11 +405,10 @@ logger.info("Running nginx")
 ##########################################################################################################
 
 ########################################################
-#  Set up the settings.json file ready for future use  #
+#  Set up the allsettings.json file ready for future use  #
 ########################################################
 
 PATH= "/app/GivTCP_"
-#SFILE="/app/ingress/allsettings.json"
 SFILE="/config/GivTCP/allsettings.json"
 #SFILE="allsettings.json"
 if not exists(SFILE):
@@ -448,15 +447,20 @@ for inv in inverterStats:
     # Check if serial number is already here and only update if IP address has changed
     if not inverterStats[inv]['Serial_Number'] in [setts["serial_number_1"],setts["serial_number_2"],setts["serial_number_3"],setts["serial_number_4"],setts["serial_number_5"]]:
         # find next empty slot and populate with details
+        logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ "not in settings file")
         for num in range(1,6):
             if setts["invertorIP_"+str(num)]=="":
-                setts["invertorIP_"+str(inv)]=inverterStats[inv]['IP_Address']
-                setts["serial_number_"+str(inv)]=inverterStats[inv]['Serial_Number']
+                logger.info("Adding Inverter "+ str(inverterStats[inv]['Serial_Number'])+ "to slot "+ str(num))
+                setts["invertorIP_"+str(num)]=inverterStats[inv]['IP_Address']
+                setts["serial_number_"+str(num)]=inverterStats[inv]['Serial_Number']
+                break
     else:
+        logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " found in settings file")
         for num in range(1,6):
             if inverterStats[inv]['Serial_Number'] == setts["serial_number_"+str(num)]:
                 if not setts["invertorIP_"+str(num)] == inverterStats[inv]['IP_Address']:
                     #If IP has changed, update it
+                    logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " IP Address is different, updating: "+str(setts["invertorIP_"+str(num)])+" -> "+str(inverterStats[inv]['IP_Address']))
                     setts["invertorIP_"+str(num)]=inverterStats[inv]['IP_Address']
                 break
         
@@ -620,7 +624,7 @@ if setts['Smart_Target']==True:
     logger.info("Setting daily charge target forecast job to run at: "+starttime)
     schedule.every().day.at(starttime).do(palm_job)
     # Run Palm at startup
-    palm_job()
+#    palm_job()
 
 # Loop round checking all processes are running
 while True:

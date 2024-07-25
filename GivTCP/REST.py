@@ -6,6 +6,7 @@ from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
 import evc as evc
+import pickle
 from GivLUT import GivLUT
 import os
 import json
@@ -19,15 +20,14 @@ CORS(giv_api)
 
 #Proxy Read Functions
 
-#@giv_api.route('/', methods=['GET', 'POST'])
-#def root():
-#  return send_from_directory('/app/config_frontend/dist', 'index.html')
-
-#@giv_api.route('/config')
-#def get_config_page():
-#  return send_from_directory('/app/config_frontend/dist', 'index.html')
-
-#Read from Invertor put in cache and publish
+def requestcommand(command,payload):
+    requests=[]
+    if exists(GivLUT.writerequests):
+        with open(GivLUT.writerequests,'rb') as inp:
+            requests=pickle.load(inp)
+    requests.append([command,payload])
+    with open(GivLUT.writerequests,'wb') as outp:
+        pickle.dump(requests, outp, pickle.HIGHEST_PROTOCOL)
 
 @giv_api.route("/showdata")
 def index():
@@ -114,128 +114,151 @@ def gtCache():
 @giv_api.route('/enableChargeTarget', methods=['POST'])
 def enChargeTrgt():
     payload = request.get_json(silent=True, force=True)
-    return wr.enableChargeTarget(payload)
+    requestcommand("enableChargeTarget",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/enableChargeSchedule', methods=['POST'])
 def enableChrgSchedule():
     payload = request.get_json(silent=True, force=True)
-    return wr.enableChargeSchedule(payload)
+    requestcommand("enableChargeSchedule",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/enableDischargeSchedule', methods=['POST'])
 def enableDischrgSchedule():
     payload = request.get_json(silent=True, force=True)
-    return wr.enableDischargeSchedule(payload)
+    requestcommand("enableDischargeSchedule",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/enableDischarge', methods=['POST'])
 def enableBatDisharge():
     payload = request.get_json(silent=True, force=True)
-    return wr.enableDischarge(payload)
+    requestcommand("enableDischarge",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 ### Should this include a slot number and use setChargeTarget2 ###
 
 @giv_api.route('/setChargeTarget', methods=['POST'])
 def setChrgTarget():
     payload = request.get_json(silent=True, force=True)
-    return wr.setChargeTarget(payload)
+    requestcommand("setChargeTarget",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setExportTarget', methods=['POST'])
 def setExpTarget():
     payload = request.get_json(silent=True, force=True)
-    return wr.setExportTarget(payload)
+    requestcommand("setExportTarget",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setDischargeTarget', methods=['POST'])
 def setDischrgTarget():
     payload = request.get_json(silent=True, force=True)
-    return wr.setDischargeTarget(payload)
+    requestcommand("setDischargeTarget",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setBatteryReserve', methods=['POST'])
 def setBattReserve():
     payload = request.get_json(silent=True, force=True)
-    return wr.setBatteryReserve(payload)
+    requestcommand("setBatteryReserve",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setChargeRate', methods=['POST'])
 def setChrgeRate():
     payload = request.get_json(silent=True, force=True)
-    return wr.setChargeRate(payload)
+    requestcommand("setChargeRate",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setCarChargeBoost', methods=['POST'])
 def setCarBoost():
     payload = request.get_json(silent=True, force=True)
-    return wr.setCarChargeBoost(payload)
+    requestcommand("setCarChargeBoost",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setExportLimit', methods=['POST'])
 def setExpLim():
     payload = request.get_json(silent=True, force=True)
-    return wr.setExportLimit(payload)
+    requestcommand("setExportLimit",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setDischargeRate', methods=['POST'])
 def setDischrgeRate():
     payload = request.get_json(silent=True, force=True)
-    return wr.setDischargeRate(payload)
+    requestcommand("setDischargeRate",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setPauseSlot', methods=['POST'])
 def setPausSlot():
     payload = request.get_json(silent=True, force=True)
-    return wr.setPauseSlot(payload)
+    requestcommand("setPauseSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 ### Should these now include a slot number as the input? ###
 
 @giv_api.route('/setChargeSlot', methods=['POST'])
 def setChrgSlot():
     payload = request.get_json(silent=True, force=True)
-    return wr.setChargeSlot(payload)
+    requestcommand("setChargeSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setChargeSlot1', methods=['POST'])
 def setChrgSlot1():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=1
-    return wr.setChargeSlot(payload)
+    requestcommand("setChargeSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setChargeSlot2', methods=['POST'])
 def setChrgSlot2():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=2
-    return wr.setChargeSlot(payload)
+    requestcommand("setChargeSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setChargeSlot3', methods=['POST'])
 def setChrgSlot3():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=3
-    return wr.setChargeSlot(payload)
+    requestcommand("setChargeSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setDischargeSlot1', methods=['POST'])
 def setDischrgSlot1():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=1
-    return wr.setDischargeSlot(payload)
+    requestcommand("setDischargeSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setDischargeSlot2', methods=['POST'])
 def setDischrgSlot2():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=2
-    return wr.setDischargeSlot(payload)
+    requestcommand("setDischargeSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setDischargeSlot3', methods=['POST'])
 def setDischrgSlot3():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=3
-    return wr.setDischargeSlot(payload)
+    requestcommand("setDischargeSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setExportSlot1', methods=['POST'])
 def setExpSlot1():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=1
-    return wr.setExportSlot(payload)
+    requestcommand("setExportSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 @giv_api.route('/setExportSlot2', methods=['POST'])
 def setExpSlot2():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=2
-    return wr.setExportSlot(payload)
+    requestcommand("setExportSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 @giv_api.route('/setExportSlot3', methods=['POST'])
 def setExpSlot3():
     payload = request.get_json(silent=True, force=True)
     payload['slot']=3
-    return wr.setExportSlot(payload)
+    requestcommand("setExportSlot",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/tempPauseDischarge', methods=['POST'])
 def tmpPauseDischrg():
@@ -244,11 +267,12 @@ def tmpPauseDischrg():
         if exists(".tpdRunning"):
             jobid= str(open(".tpdRunning","r").readline())
             logger.critical("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
-            return wr.cancelJob(jobid)
+            requestcommand("cancelJob",jobid)
         else:
             logger.error("Temp Pause Discharge is not currently running")
     else:
-        return wr.tempPauseDischarge(int(payload['duration']))
+        requestcommand("tempPauseDischarge",int(payload['duration']))
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/tempPauseCharge', methods=['POST'])
 def tmpPauseChrg():
@@ -257,11 +281,12 @@ def tmpPauseChrg():
         if exists(".tpcRunning"):
             jobid= str(open(".tpcRunning","r").readline())
             logger.debug("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
-            return wr.cancelJob(jobid)
+            requestcommand("cancelJob",jobid)
         else:
             logger.error("Temp Pause Charge is not currently running")
     else:
-        return wr.tempPauseCharge(int(payload['duration']))
+        requestcommand("tempPauseCharge",int(payload['duration']))
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/forceCharge', methods=['POST'])
 def frceChrg():
@@ -271,11 +296,12 @@ def frceChrg():
         if exists(".FCRunning"):
             jobid= str(open(".FCRunning","r").readline())
             logger.debug("Retrieved jobID to cancel Force Charge: "+ str(jobid))
-            return wr.cancelJob(jobid)
+            requestcommand("cancelJob",jobid)
         else:
             logger.error("Force Charge is not currently running")
     else:
-        return wr.forceCharge(int(payload['duration']))
+        requestcommand("forceCharge",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/forceExport', methods=['POST'])
 def frceExprt():
@@ -284,31 +310,42 @@ def frceExprt():
         if exists(".FERunning"):
             jobid= str(open(".FERunning","r").readline())
             logger.debug("Retrieved jobID to cancel Force Export: "+ str(jobid))
-            return wr.cancelJob(jobid)
+            requestcommand("cancelJob",jobid)
         else:
             logger.error("Force Charge is not currently running")
     else:
-        return wr.forceExport(int(payload['duration']))
+        requestcommand("forceExport",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setBatteryMode', methods=['POST'])
 def setBattMode():
     payload = request.get_json(silent=True, force=True)
-    return wr.setBatteryMode(payload)
+    requestcommand("setBatteryMode",payload)
+    return {"result":"Control command sent: "+str(payload)}
+
+@giv_api.route('/setBatteryPowerMode', methods=['POST'])
+def setBattPwrMode():
+    payload = request.get_json(silent=True, force=True)
+    requestcommand("setBatteryPowerMode",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setBatteryPauseMode', methods=['POST'])
 def setBattPausMode():
     payload = request.get_json(silent=True, force=True)
-    return wr.setBatteryPauseMode(payload)
+    requestcommand("setBatteryPauseMode",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setDateTime', methods=['POST'])
 def setDate():
     payload = request.get_json(silent=True, force=True)
-    return wr.setDateTime(payload)
+    requestcommand("setDateTime",payload)
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/switchRate', methods=['POST'])
 def swRates():
     payload = request.get_json(silent=True, force=True)
-    return wr.switchRate(payload['rate'])
+    requestcommand("switchRate",payload['rate'])
+    return {"result":"Control command sent: "+str(payload)}
 
 @giv_api.route('/setImportCap', methods=['POST'])
 def impCap():

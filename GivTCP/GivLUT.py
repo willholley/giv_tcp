@@ -3,12 +3,21 @@ from givenergy_modbus_async.client.client import Client
 from givenergy_modbus.client import GivEnergyClient
 from settings import GiV_Settings
 from givenergy_modbus.model import plant
+import logging
 
 from threading import Lock
-from enum import IntEnum, StrEnum
+
+logger = logging.getLogger("GivLUT")
+_client = Client(GiV_Settings.invertorIP,8899)
 
 class GivClientAsync:
-    client=Client(GiV_Settings.invertorIP,8899)
+    client = Client(GiV_Settings.invertorIP,8899)
+    async def get_connection():
+        global _client
+        if not _client.connected:
+            logger.info("Opening Modbus Connection to "+str(GiV_Settings.invertorIP))
+            await _client.connect()
+        return _client
 
 class GivClient:
     """Definition of GivEnergy client """
@@ -58,13 +67,13 @@ class InvType:
     # Standard values for devices
 class maxvalues:
     single_phase={
-        'maxInvPower':7000,
-        'maxPower':8000,
+        'maxInvPower':20000,
+        'maxPower':20000,
         'maxBatPower':6200,
-        '-maxInvPower':-7000,
-        '-maxPower':-8000,
+        '-maxInvPower':-20000,
+        '-maxPower':-20000,
         '-maxBatPower':-6200,
-        'maxExport':8000,
+        'maxExport':20000,
         'maxTemp':100,
         '-maxTemp':-100,
         'maxCellVoltage':350,
@@ -76,11 +85,11 @@ class maxvalues:
     three_phase={
         'maxInvPower':11000,
         'maxPower':30000,
-        'maxBatPower':7500,
+        'maxBatPower':13000,
         '-maxInvPower':-11000,
         '-maxPower':-30000,
-        '-maxBatPower':-7500,
-        'maxExport':10000,
+        '-maxBatPower':-13000,
+        'maxExport':20000,
         '-maxTemp':-100,
         'maxTemp':100,
         'maxCellVoltage':350,
@@ -103,13 +112,13 @@ class GivLUT:
     fh.setFormatter(formatter)
     logger = logging.getLogger()
     logger.addHandler(fh)
-    if str(os.getenv("LOG_LEVEL")).lower()=="debug":
+    if str(GiV_Settings.Log_Level).lower()=="debug":
         logger.setLevel(logging.DEBUG)
-    elif str(os.getenv("LOG_LEVEL")).lower()=="info":
+    elif str(GiV_Settings.Log_Level).lower()=="info":
         logger.setLevel(logging.INFO)
-    elif str(os.getenv("LOG_LEVEL")).lower()=="critical":
+    elif str(GiV_Settings.Log_Level).lower()=="critical":
         logger.setLevel(logging.CRITICAL)
-    elif str(os.getenv("LOG_LEVEL")).lower()=="warning":
+    elif str(GiV_Settings.Log_Level).lower()=="warning":
         logger.setLevel(logging.WARNING)
     else:
         logger.setLevel(logging.ERROR)
@@ -118,6 +127,7 @@ class GivLUT:
 
     # File paths for use
     lockfile=".lockfile"
+    writerequests="writerequests.pkl"
     regcache=GiV_Settings.cache_location+"/regCache_"+str(GiV_Settings.givtcp_instance)+".pkl"
     ratedata=GiV_Settings.cache_location+"/rateData_"+str(GiV_Settings.givtcp_instance)+".pkl"
     lastupdate=GiV_Settings.cache_location+"/lastUpdate_"+str(GiV_Settings.givtcp_instance)+".pkl"
@@ -144,6 +154,12 @@ class GivLUT:
         timezone=zoneinfo.ZoneInfo(key="Europe/London")         # Otherwise Assume everyone is in UK!
 
     #Last_Updated_Time=GEType("sensor","timestamp","","","",False,False,False)
+
+    raw_to_pub={
+        "Grid_Power":"p_grid_out",
+        "Import_Power":"p_grid_out",
+        "Export_Power":"p_grid_out"
+    }
 
     entity_type={
         "Last_Updated_Time":GEType("sensor","timestamp","","","",False,False,False),

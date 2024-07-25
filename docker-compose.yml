@@ -5,7 +5,7 @@ services:
     ports:
       - "1883:1883"                   # MQTT
       - "8098:8099"                   # REST and Config web server (https on 8098)
-      - "3000:3000"                   # This should match the WEB_DASH_PORT ENV below
+      - "3000:3000"                   # WEB Dashboard
     volumes:
       - /volume1/docker/GivTCP:/config/GivTCP
     network_mode: "host"

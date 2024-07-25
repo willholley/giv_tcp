@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import time, sys, importlib, time
 import os
+import json
 from os.path import exists
 from settings import GiV_Settings
 import write as wr
@@ -36,425 +37,543 @@ def isfloat(num):
     except ValueError:
         return False
 
+def requestcommand(command,payload):
+    requests=[]
+    if exists(GivLUT.writerequests):
+        with open(GivLUT.writerequests,'rb') as inp:
+            requests=pickle.load(inp)
+    requests.append([command,payload])
+    with open(GivLUT.writerequests,'wb') as outp:
+        pickle.dump(requests, outp, pickle.HIGHEST_PROTOCOL)
+
 def on_message(client, userdata, message):
     payload={}
     logger.debug("MQTT Message Recieved: "+str(message.topic)+"= "+str(message.payload.decode("utf-8")))
-    writecommand={}
+    payload={}
     try:
         command=str(message.topic).split("/")[-1]
         if command=="setDischargeRate":
-            writecommand['dischargeRate']=str(message.payload.decode("utf-8"))
-            wr.setDischargeRate(writecommand)
+            payload['dischargeRate']=str(message.payload.decode("utf-8"))
+            #wr.setDischargeRate(payload)
+            requestcommand(command,payload)
+        elif command=="testCommand":
+            payload['testdata']="test"
+            requestcommand(command,payload)
         elif command=="setChargeRate":
-            writecommand['chargeRate']=str(message.payload.decode("utf-8"))
-            wr.setChargeRate(writecommand)
+            payload['chargeRate']=str(message.payload.decode("utf-8"))
+            #wr.setChargeRate(payload)
+            requestcommand(command,payload)
         elif command=="setDischargeRateAC":
-            writecommand['dischargeRate']=str(message.payload.decode("utf-8"))
-            wr.setDischargeRateAC(writecommand)
+            payload['dischargeRate']=str(message.payload.decode("utf-8"))
+            #wr.setDischargeRateAC(payload)
+            requestcommand(command,payload)
         elif command=="setChargeRateAC":
-            writecommand['chargeRate']=str(message.payload.decode("utf-8"))
-            wr.setChargeRateAC(writecommand)
+            payload['chargeRate']=str(message.payload.decode("utf-8"))
+            #wr.setChargeRateAC(payload)
+            requestcommand(command,payload)
         elif command=="rebootInverter":
-            wr.rebootinverter()
+            #wr.rebootinverter()
+            requestcommand(command,payload)
         elif command=="rebootAddon":
-            wr.rebootAddon()
+            #wr.rebootAddon()
+            requestcommand(command,payload)
         elif command=="setActivePowerRate":
-            writecommand['activePowerRate']=str(message.payload.decode("utf-8"))
-            wr.setActivePowerRate(writecommand)
+            payload['activePowerRate']=str(message.payload.decode("utf-8"))
+            #wr.setActivePowerRate(payload)
+            requestcommand(command,payload)
         elif command=="enableChargeTarget":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.enableChargeTarget(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.enableChargeTarget(payload)
+            requestcommand(command,payload)
         elif command=="enableChargeSchedule":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.enableChargeSchedule(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.enableChargeSchedule(payload)
+            requestcommand(command,payload)
         elif command=="enableDishargeSchedule":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.enableDischargeSchedule(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.enableDischargeSchedule(payload)
+            requestcommand(command,payload)
         elif command=="setBatteryPowerMode":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.setBatteryPowerMode(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.setBatteryPowerMode(payload)
+            requestcommand(command,payload)
         elif command=="setBatteryPauseMode":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.setBatteryPauseMode(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.setBatteryPauseMode(payload)
+            requestcommand(command,payload)
         elif command=="setLocalControlMode":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.setLocalControlMode(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.setLocalControlMode(payload)
+            requestcommand(command,payload)
         elif command=="setPVInputMode":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.setPVInputMode(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.setPVInputMode(payload)
+            requestcommand(command,payload)
         elif command=="setCarChargeBoost":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.setCarChargeBoost(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.setCarChargeBoost(payload)
+            requestcommand(command,payload)
         elif command=="setBatteryCalibration":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.setBatteryCalibration(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.setBatteryCalibration(payload)
+            requestcommand(command,payload)
         elif command=="setExportLimit":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.setExportLimit(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.setExportLimit(payload)
+            requestcommand(command,payload)
         elif command=="enableDischarge":
-            writecommand['state']=str(message.payload.decode("utf-8"))
-            wr.enableDischarge(writecommand)
+            payload['state']=str(message.payload.decode("utf-8"))
+            #wr.enableDischarge(payload)
+            requestcommand(command,payload)
         elif command=="setChargeTarget":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            wr.setChargeTarget(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            ##wr.setChargeTarget(payload)
+            requestcommand(command,payload)
         elif command=="setChargeTarget1":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=1
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=1
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget2":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=2
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=2
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget3":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=3
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=3
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget4":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=4
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=4
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget5":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=5
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=5
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget6":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=6
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=6
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget7":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=7
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=7
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget8":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=8
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=8
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget9":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=9
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=9
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setChargeTarget10":
-            writecommand['chargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=10
-            wr.setChargeTarget2(writecommand)
+            payload['chargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=10
+            #wr.setChargeTarget2(payload)
+            requestcommand("setChargeTarget2",payload)
         elif command=="setBatteryReserve":
-            writecommand['reservePercent']=str(message.payload.decode("utf-8"))
-            wr.setBatteryReserve(writecommand)
+            payload['reservePercent']=str(message.payload.decode("utf-8"))
+            #wr.setBatteryReserve(payload)
+            requestcommand(command,payload)
         elif command=="setBatteryCutoff":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            wr.setBatteryCutoff(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            #wr.setBatteryCutoff(payload)
+            requestcommand(command,payload)
         elif command=="setBatteryMode":
-            writecommand['mode']=str(message.payload.decode("utf-8"))
-            wr.setBatteryMode(writecommand)
+            payload['mode']=str(message.payload.decode("utf-8"))
+            #wr.setBatteryMode(payload)
+            requestcommand(command,payload)
         elif command=="setDateTime":
-            writecommand['dateTime']=str(message.payload.decode("utf-8"))
-            wr.setDateTime(writecommand)
+            payload['dateTime']=str(message.payload.decode("utf-8"))
+            #wr.setDateTime(payload)
+            requestcommand(command,payload)
         elif command=="setShallowCharge":
-            writecommand['val']=str(message.payload.decode("utf-8"))
-            wr.setShallowCharge(writecommand)
+            payload['val']=str(message.payload.decode("utf-8"))
+            #wr.setShallowCharge(payload)
+            requestcommand(command,payload)
         elif command=="setChargeStart1":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd1":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart2":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd2":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart3":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd3":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart4":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=4
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd4":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=4
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart5":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=5
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd5":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=5
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart6":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=6
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd6":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=6
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart7":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=7
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd7":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=7
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart8":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=8
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd8":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=8
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart9":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=9
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd9":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=9
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setChargeStart10":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=10
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setChargeEnd10":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=10
-            wr.setChargeSlotEnd(payload)
-
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setEMSChargeStart1":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
             payload['EMS']=True
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setEMSChargeEnd1":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
             payload['EMS']=True
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setEMSChargeStart2":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
             payload['EMS']=True
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setEMSChargeEnd2":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
             payload['EMS']=True
-            wr.setChargeSlotEnd(payload)
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setEMSChargeStart3":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
             payload['EMS']=True
-            wr.setChargeSlotStart(payload)
+            #wr.setChargeSlotStart(payload)
+            requestcommand("setChargeSlotStart",payload)
         elif command=="setEMSChargeEnd3":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
             payload['EMS']=True
-            wr.setChargeSlotEnd(payload)
-
+            #wr.setChargeSlotEnd(payload)
+            requestcommand("setChargeSlotEnd",payload)
         elif command=="setDischargeStart1":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd1":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart2":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd2":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart3":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd3":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart4":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=4
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd4":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=4
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart5":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=5
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd5":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=5
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart6":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=6
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd6":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=6
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart7":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=7
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd7":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=7
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart8":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=8
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd8":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=8
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart9":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=9
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd9":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=9
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setDischargeStart10":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=10
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setDischargeEnd10":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=10
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setEMSDischargeStart1":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
             payload['EMS']=True
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setEMSDischargeEnd1":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
             payload['EMS']=True
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setEMSDischargeStart2":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
             payload['EMS']=True
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setEMSDischargeEnd2":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
             payload['EMS']=True
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setEMSDischargeStart3":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
             payload['EMS']=True
-            wr.setDischargeSlotStart(payload)
+            #wr.setDischargeSlotStart(payload)
+            requestcommand("setDischargeSlotStart",payload)
         elif command=="setEMSDischargeEnd3":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
             payload['EMS']=True
-            wr.setDischargeSlotEnd(payload)
+            #wr.setDischargeSlotEnd(payload)
+            requestcommand("setDischargeSlotEnd",payload)
         elif command=="setExportStart1":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
-            wr.setExportSlotStart(payload)
+           #wr.setExportSlotStart(payload)
+            requestcommand("setExportSlotStart",payload)
         elif command=="setExportEnd1":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=1
-            wr.setExportSlotEnd(payload)
+           #wr.setExportSlotEnd(payload)
+            requestcommand("setExportSlotEnd",payload)
         elif command=="setExportStart2":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
-            wr.setExportSlotStart(payload)
+           #wr.setExportSlotStart(payload)
+            requestcommand("setExportSlotStart",payload)
         elif command=="setExportEnd2":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=2
-            wr.setExportSlotEnd(payload)
+           #wr.setExportSlotEnd(payload)
+            requestcommand("setExportSlotEnd",payload)
         elif command=="setExportStart3":
             payload['start']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
-            wr.setExportSlotStart(payload)
+           #wr.setExportSlotStart(payload)
+            requestcommand("setExportSlotStart",payload)
         elif command=="setExportEnd3":
             payload['finish']=message.payload.decode("utf-8")[:5]
             payload['slot']=3
-            wr.setExportSlotEnd(payload)
+           #wr.setExportSlotEnd(payload)
+            requestcommand("setExportSlotEnd",payload)
         elif command=="setExportTarget1":
-            writecommand['exportToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=1
-            wr.setExportTarget(writecommand)
+            payload['exportToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=1
+           #wr.setExportTarget(payload)
+            requestcommand("setExportTarget",payload)
         elif command=="setExportTarget2":
-            writecommand['exportToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=2
-            wr.setExportTarget(writecommand)
+            payload['exportToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=2
+           #wr.setExportTarget(payload)
+            requestcommand("setExportTarget",payload)
         elif command=="setExportTarget3":
-            writecommand['exportToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=3
+            payload['exportToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=3
+           #wr.setExportTarget(payload)
+            requestcommand("setExportTarget",payload)
         elif command=="setDischargeTarget1":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=1
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=1
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget2":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=2
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=2
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget3":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=3
-            wr.setExportTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=3
+           #wr.setExportTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget4":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=4
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=4
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget5":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=5
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=5
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget6":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=6
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=6
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget7":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=7
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=7
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget8":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=8
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=8
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget9":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=9
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=9
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setDischargeTarget10":
-            writecommand['dischargeToPercent']=str(message.payload.decode("utf-8"))
-            writecommand['slot']=10
-            wr.setDischargeTarget(writecommand)
+            payload['dischargeToPercent']=str(message.payload.decode("utf-8"))
+            payload['slot']=10
+           #wr.setDischargeTarget(payload)
+            requestcommand("setDischargeTarget",payload)
         elif command=="setPauseStart":
             payload['start']=message.payload.decode("utf-8")[:5]
-            wr.setPauseStart(payload)
+           #wr.setPauseStart(payload)
+            requestcommand(command,payload)
         elif command=="setPauseEnd":
             payload['finish']=message.payload.decode("utf-8")[:5]
-            wr.setPauseEnd(payload)
+           #wr.setPauseEnd(payload)
+            requestcommand(command,payload)
         elif command=="tempPauseDischarge":
             if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
@@ -465,8 +584,9 @@ def on_message(client, userdata, message):
                 else:
                     logger.error("Temp Pause Charge is not currently running")
             elif isfloat(message.payload.decode("utf-8")):
-                writecommand=float(message.payload.decode("utf-8"))
-                wr.tempPauseDischarge(writecommand)
+                payload=float(message.payload.decode("utf-8"))
+               #wr.tempPauseDischarge(payload)
+                requestcommand(command,payload)
         elif command=="tempPauseCharge":
             if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
@@ -477,41 +597,47 @@ def on_message(client, userdata, message):
                 else:
                     logger.error("Temp Pause Charge is not currently running")
             elif isfloat(message.payload.decode("utf-8")):
-                writecommand=float(message.payload.decode("utf-8"))
-                wr.tempPauseCharge(writecommand)
+                payload=float(message.payload.decode("utf-8"))
+               #wr.tempPauseCharge(payload)
+                requestcommand(command,payload)
         elif command=="forceCharge":
             if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".FCRunning"):
                     jobid= str(open(".FCRunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Force Charge: "+ str(jobid))
-                    result=wr.cancelJob(jobid)
+                    requestcommand("cancelJob",jobid)
                 else:
                     logger.error("Force Charge is not currently running")
             elif isfloat(message.payload.decode("utf-8")):
-                writecommand=float(message.payload.decode("utf-8"))
-                wr.forceCharge(writecommand)
+                payload['duration']=float(message.payload.decode("utf-8"))
+               #wr.forceCharge(payload)
+                requestcommand(command,payload)
         elif command=="forceExport":
             if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".FERunning"):
                     jobid= str(open(".FERunning","r").readline().strip('\n'))
                     logger.info("Retrieved jobID to cancel Force Export: "+ str(jobid))
-                    result=wr.cancelJob(jobid)
+                    requestcommand("cancelJob",jobid)
                 else:
                     logger.error("Force Export is not currently running")
             elif isfloat(message.payload.decode("utf-8")):
-                writecommand=float(message.payload.decode("utf-8"))
-                wr.forceExport(writecommand)
+                payload['duration']=float(message.payload.decode("utf-8"))
+               #wr.forceExport(payload)
+                requestcommand(command,payload)
         elif command=="switchRate":
-            writecommand=message.payload.decode("utf-8")
-            wr.switchRate(writecommand)
+            payload=message.payload.decode("utf-8")
+           #wr.switchRate(payload)
+            requestcommand(command,payload)
         elif command=="chargeMode":
-            writecommand=message.payload.decode("utf-8")
-            evc.setChargeMode(writecommand)
+            payload=message.payload.decode("utf-8")
+            evc.setChargeMode(payload)
+            requestcommand("setChargeMode",payload)
         elif command=="controlCharge":
-            writecommand=message.payload.decode("utf-8")
-            evc.setChargeControl(writecommand)
+            payload=message.payload.decode("utf-8")
+            evc.setChargeControl(payload)
+            requestcommand("setChargeControl",payload)
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         logger.error("MQTT.OnMessage Exception: "+str(e))

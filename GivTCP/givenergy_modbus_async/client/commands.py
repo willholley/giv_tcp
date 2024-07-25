@@ -476,6 +476,12 @@ def set_battery_power_reserve(val: int) -> list[TransparentRequest]:
         )
     ]
 
+def set_eco_mode(enabled: bool) -> list[TransparentRequest]:
+    """enable eco mode."""
+    if enabled:
+        return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_POWER_MODE, 1)]
+    else:
+        return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_POWER_MODE, 0)]
 
 def set_battery_pause_mode(val: BatteryPauseMode) -> list[TransparentRequest]:
     """Set the battery pause mode."""

@@ -459,6 +459,7 @@ class Client:
                     else:
                         return response
             except asyncio.TimeoutError:
+                await asyncio.sleep(0.5)
                 pass
 
             if tries <= retries:
@@ -469,7 +470,7 @@ class Client:
                     retries,
                 )
 
-        _logger.critical(
+        _logger.debug(
             "Timeout awaiting %s after %d tries at %ds, giving up",
             expected_response,
             tries,

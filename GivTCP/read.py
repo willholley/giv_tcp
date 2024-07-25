@@ -11,6 +11,8 @@ import logging
 import datetime
 import pickle
 import time
+import write
+import inspect
 from GivLUT import GivLUT, maxvalues, InvType
 from settings import GiV_Settings
 from os.path import exists
@@ -45,31 +47,57 @@ async def watch_plant(
         totalTimeoutErrors=0
         """Refresh data about the Plant."""
         try:
-            await GivClientAsync.client.connect()
+#            client= await GivClientAsync.client
+            client = await GivClientAsync.get_connection()
+#            await client.connect()
             logger.critical("Detecting inverter characteristics...")
-            await GivClientAsync.client.detect_plant()
-            await GivClientAsync.client.refresh_plant(True, number_batteries=GivClientAsync.client.plant.number_batteries,meter_list=GivClientAsync.client.plant.meter_list)
-            #await GivClientAsync.client.close()
+            await client.detect_plant()
+            await client.refresh_plant(True, number_batteries=client.plant.number_batteries,meter_list=client.plant.meter_list)
+            #await client.close()
             logger.debug ("Running full refresh")
             if handler:
                 try:
-                    handler(GivClientAsync.client.plant)
+                    handler(client.plant)
                 except Exception:
                     e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
                     logger.error ("Error in calling handler: "+str(e))
         except Exception:
             e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error ("Error in inital detect/refresh: "+str(e))
-            await GivClientAsync.client.close()
+            await client.close()
             return
         # set last full_refresh time
         lastfulltime=datetime.datetime.now()
+        lastruntime=datetime.datetime.now()
         timeoutErrors=0
         while True:
             try:
-                await asyncio.sleep(refresh_period)
-                # add a check in here to see if it got stuck ( not updated for ages?) and then restart
+                if not client.connected:
+                    #in case the client has died, reopen it
+                    logger.info("Opening Modbus Connecion to: "+str(GiV_Settings.invertorIP))
+                    client.connect()
+                # Write command and initiation to use the same client connection
+                if exists(GivLUT.writerequests):
+                    logger.debug("Write Request recieved")
+                    with open(GivLUT.writerequests, 'rb') as inp:
+                        writecommands= pickle.load(inp)
+                    for command in writecommands:
+                        # call wr command and pass parameters
+                        logger.debug("Command: "+str(command[0])+" was sent: "+str(command[1]))
+                        if hasattr(write, command[0]):
+                            func = getattr(write, command[0])
+                            if inspect.iscoroutinefunction(func):
+                                result = await func(command[1],True)
+                            else:
+                                result = func(command[1],True)
+                    os.remove(GivLUT.writerequests)
 
+                timesincelast=datetime.datetime.now()-lastruntime
+                if timesincelast.total_seconds() < refresh_period:
+                    await asyncio.sleep(1)
+                    #if refresh period hasn't expired then just keep looping
+                    continue
+                
                 if not passive:
                     #Check time since last full_refresh
                     timesincefull=datetime.datetime.now()-lastfulltime
@@ -83,12 +111,12 @@ async def watch_plant(
                         fullRefresh=False
                         logger.debug ("Running partial refresh")
                     try:
-                        #await GivClientAsync.client.connect()
-                        reqs = commands.refresh_plant_data(fullRefresh, GivClientAsync.client.plant.number_batteries, slave_addr=GivClientAsync.client.plant.slave_address,isHV=GivClientAsync.client.plant.isHV,additional_holding_registers=GivClientAsync.client.plant.additional_holding_registers,additional_input_registers=GivClientAsync.client.plant.additional_input_registers)
-                        result= await GivClientAsync.client.execute(
+                        #await client.connect()
+                        reqs = commands.refresh_plant_data(fullRefresh, client.plant.number_batteries, slave_addr=client.plant.slave_address,isHV=client.plant.isHV,additional_holding_registers=client.plant.additional_holding_registers,additional_input_registers=client.plant.additional_input_registers)
+                        result= await client.execute(
                             reqs, timeout=timeout, retries=retries, return_exceptions=True
                         )
-                        #await GivClientAsync.client.close()
+                        #await client.close()
                         hasTimeout=False
                         for res in result:
                             if isinstance(res,TimeoutError):
@@ -96,6 +124,7 @@ async def watch_plant(
                                 raise Exception(res)
                         timeoutErrors=0     # Reset timeouts if all is good this run
                         logger.debug("Data get was successful, now running handler if needed: ")
+                        lastruntime=datetime.datetime.now()
                     except Exception:
                         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
                         totalTimeoutErrors=totalTimeoutErrors+1
@@ -106,20 +135,21 @@ async def watch_plant(
                         logger.debug("Not running handler")
                         if timeoutErrors>5:
                             logger.error("5 consecutive timeout errors in watch loop. Restarting modbus connection:")
-                            await GivClientAsync.client.close()
+                            await client.close()
                             await asyncio.sleep(2)      #Just pause for a moment before trying to reconnect
-                            await GivClientAsync.client.connect()
+                            await client.connect()
                         continue
                     if handler:
                         try:
-                            handler(GivClientAsync.client.plant)
+                            handler(client.plant)
                         except Exception:
                             e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
                             logger.error ("Error in calling handler: "+str(e))
             except Exception:
+                f=sys.exc_info()
                 e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
                 logger.error ("Error in Watch Loop: "+str(e))
-                await GivClientAsync.client.close()
+                await client.close()
 
 def updateErrorsCache(value):
     # immediately update broker on Timeout Error
@@ -1386,7 +1416,7 @@ def processData(plant: Plant):
         givtcpdata['Last_Updated_Time'] = datetime.datetime.now(datetime.UTC).isoformat()
         givtcpdata['status'] = "online"
         givtcpdata['Time_Since_Last_Update'] = 0
-        givtcpdata['GivTCP_Version']= "2.4.393"
+        givtcpdata['GivTCP_Version']= "2.4.513beta"
         multi_output['Stats']=givtcpdata
         with GivLUT.cachelock:
             if exists(GivLUT.regcache):      # if there is a cache then grab it
@@ -1440,28 +1470,28 @@ def processData(plant: Plant):
         regCacheStack.append(multi_output)
 
         # Get lastupdate from pickle if it exists
+        if exists(GivLUT.lastupdate):
+            with open(GivLUT.lastupdate, 'rb') as inp:
+                previousUpdate = pickle.load(inp)
+            timediff = datetime.datetime.fromisoformat(multi_output['Stats']['Last_Updated_Time'])-datetime.datetime.fromisoformat(previousUpdate)
+            multi_output['Stats']['Time_Since_Last_Update'] = (((timediff.seconds*1000000)+timediff.microseconds)/1000000)
+
+        # Save new time to pickle
+        with open(GivLUT.lastupdate, 'wb') as outp:
+            pickle.dump(multi_output['Stats']['Last_Updated_Time'], outp, pickle.HIGHEST_PROTOCOL)
+
+        # Save new data to Pickle
         with GivLUT.cachelock:
-            if exists(GivLUT.lastupdate):
-                with open(GivLUT.lastupdate, 'rb') as inp:
-                    previousUpdate = pickle.load(inp)
-                timediff = datetime.datetime.fromisoformat(multi_output['Stats']['Last_Updated_Time'])-datetime.datetime.fromisoformat(previousUpdate)
-                multi_output['Stats']['Time_Since_Last_Update'] = (((timediff.seconds*1000000)+timediff.microseconds)/1000000)
-
-            # Save new time to pickle
-            with open(GivLUT.lastupdate, 'wb') as outp:
-                pickle.dump(multi_output['Stats']['Last_Updated_Time'], outp, pickle.HIGHEST_PROTOCOL)
-
-            # Save new data to Pickle
             with open(GivLUT.regcache, 'wb') as outp:
                 pickle.dump(regCacheStack, outp, pickle.HIGHEST_PROTOCOL)
-                
-            logger.debug("Successfully processed data from: " + GiV_Settings.invertorIP)
+            
+        logger.debug("Successfully processed data from: " + GiV_Settings.invertorIP)
 
-            result['result'] = "Success processing data"
+        result['result'] = "Success processing data"
 
-            # Success, so delete oldDataCount
-            if exists(GivLUT.oldDataCount):
-                os.remove(GivLUT.oldDataCount)
+        # Success, so delete oldDataCount
+        if exists(GivLUT.oldDataCount):
+            os.remove(GivLUT.oldDataCount)
 
     except Exception:
         e = sys.exc_info()
@@ -1540,14 +1570,15 @@ def pubFromPickle():  # Publish last cached Inverter Data
 def getCache():     # Get latest cache data and return it (for use in REST)
     multi_output={}
     try:
-        if exists(GivLUT.regcache):
-            with open(GivLUT.regcache, 'rb') as inp:
-                regCacheStack = pickle.load(inp)
-                multi_output = regCacheStack[4]
+        with GivLUT.cachelock:
+            if exists(GivLUT.regcache):
+                with open(GivLUT.regcache, 'rb') as inp:
+                    regCacheStack = pickle.load(inp)
+                    multi_output = regCacheStack[4]
+                return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
+            else:
+                multi_output['result']="No register data cache exists, try again later"
             return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
-        else:
-            multi_output['result']="No register data cache exists, try again later"
-        return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         logger.error("Error getting data from cache: "+str(e))
@@ -1866,18 +1897,19 @@ def dataSmoother2(dataNew, dataOld, lastUpdate):
 
     if GiV_Settings.data_smoother.lower() == "high":
         smoothRate = 0.25
-        abssmooth=3000
+        abssmooth=1000
     elif GiV_Settings.data_smoother.lower() == "medium":
         smoothRate = 0.35
-        abssmooth=1000
+        abssmooth=5000
     elif GiV_Settings.data_smoother.lower() == "none":
         return(newData)
     else:
         smoothRate = 0.50
-        abssmooth=5000
+        abssmooth=7000
     if isinstance(newData, int) or isinstance(newData, float):
-        with open(GivLUT.regcache, 'rb') as inp:
-            regCacheStack = pickle.load(inp)
+        with GivLUT.cachelock:
+            with open(GivLUT.regcache, 'rb') as inp:
+                regCacheStack = pickle.load(inp)
         if not '3PH' in finditem(regCacheStack[4],"Invertor_Type"):
             if isinstance(lookup.min,str):
                 min=maxvalues.single_phase[lookup.min]
@@ -1918,12 +1950,14 @@ def dataSmoother2(dataNew, dataOld, lastUpdate):
                     timeDelta = (now-then).total_seconds()
                     dataDelta = abs(newData-oldData)/oldData    #Should it be a ratio or an abs value as low values easily meet the threshold
                     if "Power" in name:
-                        if abs(newData-oldData)>0:
-                            if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds
-                                logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
-                                return(oldData)
-                            else:
+                        if newData==12179:
+                            return oldData
+                        if abs(newData-oldData)>abssmooth:
+                            if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds then use new value
                                 return(newData)
+                            else:
+                                logger.info(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
+                                return(oldData)
                     else:
                         if dataDelta > smoothRate and timeDelta < 60:
                             logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
@@ -1936,15 +1970,12 @@ def checkRawcache(newData,name,abssmooth):
     if exists(GivLUT.rawpkl):
         with open(GivLUT.rawpkl, 'rb') as inp:
             rawCacheStack = pickle.load(inp)
-        result=True
-        for cache in rawCacheStack:
-            try:
-                oldData=cache['inverter'][name]
-            except:
-                continue
-            if abs(newData-oldData)>abssmooth:
-                result=False
-    return result
+        bigjump=False
+        oldData=rawCacheStack[1]['invertor'][GivLUT.raw_to_pub[name]]
+        if abs(newData-oldData)>abssmooth:
+            bigjump=True
+        logger.info("NewData is: "+str(newData)+" and cached raw value was: "+str(oldData))
+    return bigjump
 
 def calcBatteryValue(multi_output):
     # get current data from read pickle
