@@ -37,14 +37,21 @@ def palm_job():
 
 def validateEVC(HOST):
     logger.debug("Validating "+str(HOST))
+    SN=""
     try:
         client = ModbusTcpClient(HOST)
         regs = client.read_holding_registers(97,6).registers
         systime=datetime(regs[0],regs[1],regs[2],regs[3],regs[4],regs[5]).replace(tzinfo=timezone.utc).isoformat()
-        return True
+        #get serial number here now and put in the settings file
+        sn_regs = client.read_holding_registers(38,31).registers
+        for num in sn_regs:
+            if not num==0:
+                SN=SN+chr(num)
+        #logger.info("EVC Serial Number is: "+ str(SN))
+        return SN
     except:
         e=sys.exc_info()
-        #logger.info(e)
+        logger.info(e)
         return False
 
 def getInvDeets(HOST):
@@ -91,7 +98,7 @@ async def getInvDeets2(HOST):
         logger.info(f'Inverter {str(SN)} which is a {str(gen.name.capitalize())} - {str(model.name.capitalize())} with {str(numbats)} batteries has been found at: {str(HOST)}')
         return Stats
     except:
-        logger.error("Gathering inverter details for " + str(HOST) + " failed.")
+        logger.debug("Gathering inverter details for " + str(HOST) + " failed.")
         return None
     
 def isitoldfw(invstats):
@@ -193,6 +200,7 @@ def createsettingsjson(inv):
 
         outp.write("    evc_enable="+str(setts["evc_enable"]).capitalize()+"\n")
         outp.write("    evc_ip_address=\""+str(setts["evc_ip_address"])+"\"\n")
+        outp.write("    serial_number_evc=\""+str(setts["serial_number_evc"])+"\"\n")
         outp.write("    evc_self_run_timer="+str(setts["evc_self_run_timer"])+"\n")
         outp.write("    evc_import_max_current="+str(setts["evc_import_max_current"])+"\n")
         if SuperTimezone: outp.write("    timezone=\""+str(SuperTimezone)+"\"\n")
@@ -223,14 +231,19 @@ def findinv(networks):
                     if evclist:
                         poplist=[]
                         for evc in evclist:
-                            if validateEVC(evclist[evc]):
-                                logger.info("GivEVC found at: "+str(evclist[evc]))
+                            sn=validateEVC(evclist[evc])
+                            if sn:
+                                logger.info("GivEVC "+str(sn)+" found at: "+str(evclist[evc]))
+                                evclist[evc]=[evclist[evc],sn]
                             else:
                                 logger.debug(evclist[evc]+" is not an EVC")
                                 poplist.append(evc)
                         for pop in poplist:
                             evclist.pop(pop)    #remove the unknown modbus device(s)
                     # Get Inverter Details
+
+
+
                     count=0
                     while len(list)<=0:
                         if count<2:
@@ -292,8 +305,9 @@ except:
     hasMQTT=False
     SuperTimezone=False
 
+hostIP=""
 if isAddon:
-    #Get MQTT Details    
+    #Get MQTT Details
     url="http://supervisor/services/mqtt"
     result = requests.get(url,
         headers={'Content-Type':'application/json',
@@ -317,7 +331,7 @@ if isAddon:
                 'Authorization': 'Bearer {}'.format(access_token)})
     info=result.json()
     SuperTimezone=info['data']['timezone']
-    logger.info("Supervisor Timezone: "+str(SuperTimezone))
+    logger.debug("Supervisor Timezone: "+str(SuperTimezone))
     
     #Get addonslug/ingress url    
     url="http://supervisor/addons/self/info"
@@ -325,7 +339,7 @@ if isAddon:
         headers={'Content-Type':'application/json',
                 'Authorization': 'Bearer {}'.format(access_token)})
     baseurl=result.json()['data']['ingress_url']
-    logger.info("Ingress URL is: "+str(baseurl))
+    logger.debug("Ingress URL is: "+str(baseurl))
 
     #Get Host Details    
     url="http://supervisor/network/info"
@@ -335,13 +349,12 @@ if isAddon:
     hostDetails=result.json()
     i=0
     for interface in hostDetails['data']['interfaces']:
-        hostIP=str(interface['ipv4']['address']).split('/')[0][2:]
-        logger.info("IP Address is: "+str(hostIP))
+        ip=str(interface['ipv4']['address']).split('/')[0][2:]
+        if not ip == "":
+            hostIP=ip
         networks[i]=interface['ipv4']['gateway']
         i=i+1
 else:
-    #os.makedirs("/config/GivTCP", exist_ok=True)
-    
     # Get subnet from docker if not addon
     try:
         import socket
@@ -353,11 +366,11 @@ else:
         s.close()
         networks[0]=IP
         hostIP=IP
-        logger.info("IP Address is: "+str(hostIP))
         baseurl="/"
     except:
         e=sys.exc_info()
         logger.error("Could not get network info: "+ str(e))
+logger.info("IP Address is: "+str(hostIP))
 
 sleep(2)        # Sleep to allow port scanning socket to close
 
@@ -447,10 +460,10 @@ for inv in inverterStats:
     # Check if serial number is already here and only update if IP address has changed
     if not inverterStats[inv]['Serial_Number'] in [setts["serial_number_1"],setts["serial_number_2"],setts["serial_number_3"],setts["serial_number_4"],setts["serial_number_5"]]:
         # find next empty slot and populate with details
-        logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ "not in settings file")
+        logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " not in settings file")
         for num in range(1,6):
             if setts["invertorIP_"+str(num)]=="":
-                logger.info("Adding Inverter "+ str(inverterStats[inv]['Serial_Number'])+ "to slot "+ str(num))
+                logger.info("Adding Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " to slot "+ str(num))
                 setts["invertorIP_"+str(num)]=inverterStats[inv]['IP_Address']
                 setts["serial_number_"+str(num)]=inverterStats[inv]['Serial_Number']
                 break
@@ -466,11 +479,14 @@ for inv in inverterStats:
         
 
 if len(evcList)>0:
+    logger.info("evcList: "+str(evcList))
     if setts["evc_ip_address"]=="":
-        setts["evc_ip_address"]=evcList[1]
+        setts["evc_ip_address"]=evcList[1][0]
+    if setts["serial_number_evc"]=="":
+        setts["serial_number_evc"]=evcList[1][1]
 #    setts["evc_enable"]=True           #Don't force this True
-    if setts["NUMINVERTORS"]<len(inverterStats):
-        setts["NUMINVERTORS"]=len(inverterStats)   #update NUMINVERTORS if we've found more than are here
+if setts["NUMINVERTORS"]<len(inverterStats):
+    setts["NUMINVERTORS"]=len(inverterStats)   #update NUMINVERTORS if we've found more than are here
 
 with open(SFILE, 'w') as f:
     f.write(json.dumps(setts,indent=4))
@@ -516,26 +532,30 @@ for inv in range(1,int(setts['NUMINVERTORS'])+1):
         
     ######
     #  Always delete lockfiles and FCRunning etc... but only delete pkl if too old?
+    for file in os.listdir(setts["cache_location"]):
+        filename = os.fsdecode(file)
+        if not filename.endswith(".log") and not filename.startswith("rateData") and not filename.startswith("allsettings"): 
+            # print(os.path.join(directory, filename))
+            os.remove(setts['cache_location']+"/"+file)
 
-
-    if exists(setts["cache_location"]+"/rawData_"+str(inv)+".pkl"):
-        logger.debug("Removing old invertor raw data cache")
-        os.remove(str(setts["cache_location"])+"/rawData_"+str(inv)+".pkl")
-    if exists(setts["cache_location"]+"/regCache_"+str(inv)+".pkl"):
-        logger.debug("Removing old invertor data cache")
-        os.remove(str(setts["cache_location"])+"/regCache_"+str(inv)+".pkl")
-    if exists(PATH+"/.lockfile"):
-        logger.debug("Removing old .lockfile")
-        os.remove(PATH+"/.lockfile")
-    if exists(PATH+"/.FCRunning"):
-        logger.debug("Removing old .FCRunning")
-        os.remove(PATH+"/.FCRunning")
-    if exists(PATH+"/.FERunning"):
-        logger.debug("Removing old .FERunning")
-        os.remove(PATH+"/.FERunning")
-    if exists(setts["cache_location"]+"/battery_"+str(inv)+".pkl"):
-        logger.debug("Removing old battery data cache")
-        os.remove(str(setts["cache_location"])+"/battery_"+str(inv)+".pkl")
+#    if exists(setts["cache_location"]+"/rawData_"+str(inv)+".pkl"):
+#        logger.debug("Removing old invertor raw data cache")
+#        os.remove(str(setts["cache_location"])+"/rawData_"+str(inv)+".pkl")
+#    if exists(setts["cache_location"]+"/regCache_"+str(inv)+".pkl"):
+#        logger.debug("Removing old invertor data cache")
+#        os.remove(str(setts["cache_location"])+"/regCache_"+str(inv)+".pkl")
+#    if exists(PATH+"/.lockfile"):
+#        logger.debug("Removing old .lockfile")
+#        os.remove(PATH+"/.lockfile")
+#    if exists(PATH+"/.FCRunning"):
+#        logger.debug("Removing old .FCRunning")
+#        os.remove(PATH+"/.FCRunning")
+#    if exists(PATH+"/.FERunning"):
+#        logger.debug("Removing old .FERunning")
+#        os.remove(PATH+"/.FERunning")
+#    if exists(setts["cache_location"]+"/battery_"+str(inv)+".pkl"):
+#        logger.debug("Removing old battery data cache")
+#        os.remove(str(setts["cache_location"])+"/battery_"+str(inv)+".pkl")
     if exists(setts["cache_location"]+"/rateData_"+str(inv)+".pkl"):
         if "TZ" in os.environ:
             timezone=zoneinfo.ZoneInfo(key=setts["TZ"])
@@ -553,6 +573,10 @@ for inv in range(1,int(setts['NUMINVERTORS'])+1):
 # Check if settings.py exists then start processes  #
 # Still need to run the below process per inverter  #
 #####################################################
+    logger.info("==============================================================")
+    logger.info("====             Web Gui Config is at                     ====")
+    logger.info("====     http://"+str(hostIP)+":8099/config.html          ====")
+    logger.info("==============================================================")
 
     os.chdir(PATH)
 
@@ -568,22 +592,17 @@ for inv in range(1,int(setts['NUMINVERTORS'])+1):
         selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
     else:
         logger.info("=================== Self Run is off, so no data collection is happening ================")
-        logger.info("==================  Head to http://"+str(hostIP)+":8099/config.html  ==============")
 
     if setts['evc_enable']==True and inv==1:  #only run it once
         if not setts['evc_ip_address']=="":
             logger.info ("Running EVC read loop every "+str(setts['evc_self_run_timer'])+"s")
             evcSelfRun=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
-            logger.info ("Subscribing MQTT Broker for EVC control")
-            mqttClientEVC=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client_evc.py"])
+#            logger.info ("Subscribing MQTT Broker for EVC control")
+#            mqttClientEVC=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client_evc.py"])
             evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
             logger.info ("Setting chargeMode loop to manage different charge modes every 60s")
         else:
             logger.info("EVC IP is missing from config. Please update and restart GivTCP")
-
-    if setts['MQTT_Output']==True or isAddon:
-        logger.info ("Subscribing MQTT Broker for control")
-        mqttClient[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client.py"])
     
     GUPORT=6344+inv
     logger.info ("Starting Gunicorn on port "+str(GUPORT))
@@ -628,84 +647,79 @@ if setts['Smart_Target']==True:
 
 # Loop round checking all processes are running
 while True:
-    if exists("/app/.reboot"):
-        os.remove("/app/.reboot")
-        exit()
-    for inv in range(1,int(setts['NUMINVERTORS'])+1):
-        regcache=setts['cache_location']+"/regCache_"+str(inv)+".pkl"
-        if exists(regcache):
-            with open(regcache, 'rb') as inp:
-                regCacheStack = pickle.load(inp)
-                timediff = datetime.now(UTC) - datetime.fromisoformat(regCacheStack[4]['Stats']['Last_Updated_Time'])
-                timesince=(((timediff.seconds*1000000)+timediff.microseconds)/1000000)
-                logger.debug("timesince last read= "+str(timesince))
-        else:
-            sleep(10)       #wait for first regcache then go back round loop
-            continue
-        PATH= "/app/GivTCP_"+str(inv)
-        if setts['self_run']==True:
-            if not selfRun[inv].poll()==None:
-                selfRun[inv].kill()
-                logger.error("Self Run loop process died. restarting...")
+    try:
+        if exists("/app/.reboot"):
+            os.remove("/app/.reboot")
+            exit()
+        for inv in range(1,int(setts['NUMINVERTORS'])+1):
+            regcache=setts['cache_location']+"/regCache_"+str(inv)+".pkl"
+            if exists(regcache):
+                with open(regcache, 'rb') as inp:
+                    regCacheStack = pickle.load(inp)
+                    timediff = datetime.now(UTC) - datetime.fromisoformat(regCacheStack[4]['Stats']['Last_Updated_Time'])
+                    timesince=(((timediff.seconds*1000000)+timediff.microseconds)/1000000)
+                    logger.debug("timesince last read= "+str(timesince))
+            else:
+                sleep(10)       #wait for first regcache then go back round loop
+                continue
+            PATH= "/app/GivTCP_"+str(inv)
+            if setts['self_run']==True:
+                if not selfRun[inv].poll()==None:
+                    selfRun[inv].kill()
+                    logger.error("Self Run loop process died. restarting...")
+                    os.chdir(PATH)
+                    logger.info ("Restarting Invertor read loop every "+str(setts['self_run_timer'])+"s")
+                    selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
+                elif timesince>(float(setts['self_run_timer'])*5):
+                    logger.error("Self Run loop process stuck. Killing and restarting...")
+                    os.chdir(PATH)
+                    selfRun[inv].kill()
+                    logger.info ("Restarting Invertor read loop every "+str(setts['self_run_timer'])+"s")
+                    selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
+            if not gunicorn[inv].poll()==None:
+                gunicorn[inv].kill()
+                logger.error("REST API process died. Restarting...")
                 os.chdir(PATH)
-                logger.info ("Restarting Invertor read loop every "+str(setts['self_run_timer'])+"s")
-                selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
-            elif timesince>(float(setts['self_run_timer'])*5):
-                logger.error("Self Run loop process stuck. Killing and restarting...")
+                GUPORT=6344+inv
+                logger.info ("Starting Gunicorn on port "+str(GUPORT))
+                command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
+                gunicorn[inv]=subprocess.Popen(command)
+        
+        if setts['Web_Dash'] == True:
+            if not webDash.poll() == None:
+                webDash.kill()
+                logger.error("Web Dashboard process died. Restarting...")
+                os.chdir("/app/WebDashboard")
+                WDPORT = int(setts['Web_Dash_Port'])
+                logger.info("Serving Web Dashboard from port " + str(WDPORT))
+                command = shlex.split("/usr/bin/node /usr/local/bin/serve -p " + str(WDPORT))
+                webDash = subprocess.Popen(command)
+
+        if setts['MQTT_Address']=="127.0.0.1":
+            if not mqttBroker.poll()==None:
+                mqttBroker.kill()
+                logger.error("MQTT Broker process died. Restarting...")
                 os.chdir(PATH)
-                selfRun[inv].kill()
-                logger.info ("Restarting Invertor read loop every "+str(setts['self_run_timer'])+"s")
-                selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
-        if setts['MQTT_Output']==True:
-            if not mqttClient[inv].poll()==None:
-                logger.error("MQTT Client process died. Restarting...")
-                mqttClient[inv].kill()
+                logger.info ("Starting Mosquitto on port "+str(setts['MQTT_Port']))
+                mqttBroker=subprocess.Popen(["/usr/sbin/mosquitto", "-c",PATH+"/mqtt.conf"])
+
+        if setts['evc_enable']==True:
+            if not evcSelfRun.poll()==None:
+                evcSelfRun.kill()
+                logger.error("EVC Self Run loop process died. restarting...")
                 os.chdir(PATH)
-                logger.info ("Resubscribing Mosquitto for control on port "+str(setts['MQTT_Port']))
-                mqttClient[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client.py"])
-        if not gunicorn[inv].poll()==None:
-            gunicorn[inv].kill()
-            logger.error("REST API process died. Restarting...")
-            os.chdir(PATH)
-            GUPORT=6344+inv
-            logger.info ("Starting Gunicorn on port "+str(GUPORT))
-            command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
-            gunicorn[inv]=subprocess.Popen(command)
-    
-    if setts['Web_Dash'] == True:
-        if not webDash.poll() == None:
-            webDash.kill()
-            logger.error("Web Dashboard process died. Restarting...")
-            os.chdir("/app/WebDashboard")
-            WDPORT = int(setts['Web_Dash_Port'])
-            logger.info("Serving Web Dashboard from port " + str(WDPORT))
-            command = shlex.split("/usr/bin/node /usr/local/bin/serve -p " + str(WDPORT))
-            webDash = subprocess.Popen(command)
-
-    if setts['MQTT_Address']=="127.0.0.1":
-        if not mqttBroker.poll()==None:
-            mqttBroker.kill()
-            logger.error("MQTT Broker process died. Restarting...")
-            os.chdir(PATH)
-            logger.info ("Starting Mosquitto on port "+str(setts['MQTT_Port']))
-            mqttBroker=subprocess.Popen(["/usr/sbin/mosquitto", "-c",PATH+"/mqtt.conf"])
-
-    if setts['evc_enable']==True:
-        if not evcSelfRun.poll()==None:
-            evcSelfRun.kill()
-            logger.error("EVC Self Run loop process died. restarting...")
-            os.chdir(PATH)
-            logger.info ("Restarting EVC read loop every "+str(setts['evc_self_run_timer'])+"s")
-            selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
-
-    if setts['evc_enable']==True:
-        if not evcChargeModeLoop.poll()==None:
-            evcChargeModeLoop.kill()
-            logger.error("EVC Self Run loop process died. restarting...")
-            os.chdir(PATH)
-            logger.info ("Restarting EVC chargeMode loop every 60s")
-            evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
+                logger.info ("Restarting EVC read loop every "+str(setts['evc_self_run_timer'])+"s")
+                selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
+            if not evcChargeModeLoop.poll()==None:
+                evcChargeModeLoop.kill()
+                logger.error("EVC Self Run loop process died. restarting...")
+                os.chdir(PATH)
+                logger.info ("Restarting EVC chargeMode loop every 60s")
+                evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
+    except:
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        logger.error("Error in watchdog loop: "+str(e))
 
     #Run jobs for smart target
     schedule.run_pending()
-    sleep (60)
+    sleep (10)

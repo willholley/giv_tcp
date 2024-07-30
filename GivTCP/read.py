@@ -13,7 +13,7 @@ import pickle
 import time
 import write
 import inspect
-from GivLUT import GivLUT, maxvalues, InvType
+from GivLUT import GivLUT, maxvalues, InvType, GivClientAsync
 from settings import GiV_Settings
 from os.path import exists
 import os
@@ -21,6 +21,7 @@ from datetime import timedelta
 import asyncio
 from typing import Callable, Optional
 from mqtt import GivMQTT
+#import mqtt
 
 logging.getLogger("givenergy_modbus_async").setLevel(logging.CRITICAL) 
 logging.getLogger("rq.worker").setLevel(logging.CRITICAL)
@@ -31,8 +32,6 @@ givLUT = GivLUT.entity_type
 logger = GivLUT.logger
 
 #cacheLock = Lock()
-
-from GivLUT import GivClientAsync
 
 async def watch_plant(
         host: str,
@@ -74,8 +73,8 @@ async def watch_plant(
             try:
                 if not client.connected:
                     #in case the client has died, reopen it
-                    logger.info("Opening Modbus Connecion to: "+str(GiV_Settings.invertorIP))
-                    client.connect()
+                    logger.debug("Opening Modbus Connecion to: "+str(GiV_Settings.invertorIP))
+                    await client.connect()
                 # Write command and initiation to use the same client connection
                 if exists(GivLUT.writerequests):
                     logger.debug("Write Request recieved")
@@ -90,11 +89,29 @@ async def watch_plant(
                                 result = await func(command[1],True)
                             else:
                                 result = func(command[1],True)
+                            #send result to touchfile for REST response
+                            response={}
+                            responses=[]
+                            response['id']=command[0]
+                            response['result']=result
+                            if exists(GivLUT.restresponse):
+                                with GivLUT.restlock:
+                                    with open(GivLUT.restresponse,'r') as inp:
+                                        responses=json.load(inp)
+                                logger.debug("responses is: "+str(responses))
+                                responses.append(response)
+                            else:
+                                responses.append(response)
+                                logger.debug("responses is: "+str(responses))
+                            with GivLUT.restlock:
+                                with open(GivLUT.restresponse,'w') as outp:
+                                    outp.write(json.dumps(responses))
+
                     os.remove(GivLUT.writerequests)
 
                 timesincelast=datetime.datetime.now()-lastruntime
                 if timesincelast.total_seconds() < refresh_period:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(0.3)
                     #if refresh period hasn't expired then just keep looping
                     continue
                 
@@ -1410,7 +1427,7 @@ def processData(plant: Plant):
         elif modeltype in ('4', '6'):
             multi_output=processThreePhaseInfo(plant)
         else:
-            multi_output=processInverterInfo(plant)
+                multi_output=processInverterInfo(plant)
 
         givtcpdata={}
         givtcpdata['Last_Updated_Time'] = datetime.datetime.now(datetime.UTC).isoformat()
@@ -1619,8 +1636,6 @@ def publishOutput(array, SN):
             open(GivLUT.firstrun, 'w').close()
         else:
             logger.debug("firstrun exists, so this should already have been run")
-# Do this in a thread?
-        from mqtt import GivMQTT
         logger.debug("Publish all to MQTT")
         if GiV_Settings.MQTT_Topic == "":
             GiV_Settings.MQTT_Topic = "GivEnergy"
@@ -1945,13 +1960,14 @@ def dataSmoother2(dataNew, dataOld, lastUpdate):
                 if (oldData-newData) > 0.11:
                     logger.debug(str(name)+" has decreased so using old value")
                     return oldData
+            if "Power" in name:
+                if newData==12179:
+                    return oldData
             if lookup.smooth:     # apply smoothing if required
                 if newData != oldData:  # Only if its not the same
                     timeDelta = (now-then).total_seconds()
                     dataDelta = abs(newData-oldData)/oldData    #Should it be a ratio or an abs value as low values easily meet the threshold
                     if "Power" in name:
-                        if newData==12179:
-                            return oldData
                         if abs(newData-oldData)>abssmooth:
                             if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds then use new value
                                 return(newData)

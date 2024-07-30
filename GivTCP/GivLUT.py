@@ -15,7 +15,7 @@ class GivClientAsync:
     async def get_connection():
         global _client
         if not _client.connected:
-            logger.info("Opening Modbus Connection to "+str(GiV_Settings.invertorIP))
+            logger.debug("Opening Modbus Connection to "+str(GiV_Settings.invertorIP))
             await _client.connect()
         return _client
 
@@ -124,10 +124,12 @@ class GivLUT:
         logger.setLevel(logging.ERROR)
 
     cachelock=Lock()
+    restlock=Lock()
 
     # File paths for use
     lockfile=".lockfile"
     writerequests="writerequests.pkl"
+    restresponse="restresponse.json"
     regcache=GiV_Settings.cache_location+"/regCache_"+str(GiV_Settings.givtcp_instance)+".pkl"
     ratedata=GiV_Settings.cache_location+"/rateData_"+str(GiV_Settings.givtcp_instance)+".pkl"
     lastupdate=GiV_Settings.cache_location+"/lastUpdate_"+str(GiV_Settings.givtcp_instance)+".pkl"

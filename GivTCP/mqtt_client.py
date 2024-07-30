@@ -579,27 +579,27 @@ def on_message(client, userdata, message):
                 # Get the Job ID from the touchfile
                 if exists(".tpdRunning"):
                     jobid= str(open(".tpdRunning","r").readline().strip('\n'))
-                    logger.info("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
+                    logger.debug("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
                     result=wr.cancelJob(jobid)
                 else:
                     logger.error("Temp Pause Charge is not currently running")
             elif isfloat(message.payload.decode("utf-8")):
-                payload=float(message.payload.decode("utf-8"))
+                duration=float(message.payload.decode("utf-8"))
                #wr.tempPauseDischarge(payload)
-                requestcommand(command,payload)
+                requestcommand(command,duration)
         elif command=="tempPauseCharge":
             if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
                 if exists(".tpcRunning"):
                     jobid= str(open(".tpcRunning","r").readline().strip('\n'))
-                    logger.info("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
+                    logger.debug("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
                     result=wr.cancelJob(jobid)
                 else:
                     logger.error("Temp Pause Charge is not currently running")
             elif isfloat(message.payload.decode("utf-8")):
-                payload=float(message.payload.decode("utf-8"))
+                duration=float(message.payload.decode("utf-8"))
                #wr.tempPauseCharge(payload)
-                requestcommand(command,payload)
+                requestcommand(command,duration)
         elif command=="forceCharge":
             if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
@@ -610,9 +610,9 @@ def on_message(client, userdata, message):
                 else:
                     logger.error("Force Charge is not currently running")
             elif isfloat(message.payload.decode("utf-8")):
-                payload['duration']=float(message.payload.decode("utf-8"))
+                duration=float(message.payload.decode("utf-8"))
                #wr.forceCharge(payload)
-                requestcommand(command,payload)
+                requestcommand(command,duration)
         elif command=="forceExport":
             if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                 # Get the Job ID from the touchfile
@@ -623,9 +623,9 @@ def on_message(client, userdata, message):
                 else:
                     logger.error("Force Export is not currently running")
             elif isfloat(message.payload.decode("utf-8")):
-                payload['duration']=float(message.payload.decode("utf-8"))
+                duration=float(message.payload.decode("utf-8"))
                #wr.forceExport(payload)
-                requestcommand(command,payload)
+                requestcommand(command,duration)
         elif command=="switchRate":
             payload=message.payload.decode("utf-8")
            #wr.switchRate(payload)

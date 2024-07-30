@@ -60,6 +60,7 @@
     "PALM_WEIGHT": 35,
     "LOAD_HIST_WEIGHT": "1",
     "evc_ip_address":"",
+    "serial_number_evc":"",
     "evc_enable": false,
     "evc_self_run_timer": 10,
     "evc_import_max_current": 60

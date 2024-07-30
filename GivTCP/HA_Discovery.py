@@ -4,7 +4,7 @@ import sys
 import os
 import time
 import json
-import paho.mqtt.client as mqtt
+import paho.mqtt.client as paho_mqtt
 from settings import GiV_Settings
 from givenergy_modbus_async.model.register import Model
 from mqtt import GivMQTT
@@ -30,6 +30,8 @@ class HAMQTT():
     if GiV_Settings.MQTT_Topic=="":
         GiV_Settings.MQTT_Topic="GivEnergy"
 
+    
+
     def getinvbatmax():
         if exists(GivLUT.regcache):      # if there is a cache then grab it
             with GivLUT.cachelock:
@@ -50,70 +52,6 @@ class HAMQTT():
             #client.subscribe(topic)
         else:
             logger.error("Bad connection Returned code= "+str(reason_code))
-
-    def publish_discovery(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
-        mqtt.Client.connected_flag=False        			#create flag in class
-        client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
-        rootTopic=str(GiV_Settings.MQTT_Topic+"/"+SN+"/")
-        if HAMQTT.MQTTCredentials:
-            client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
-        client.host=GivMQTT.MQTT_Address
-        client.port=GivMQTT.MQTT_Port
-        try:
-            client.on_connect=HAMQTT.on_connect     			#bind call back function
-            ## set the will message
-            client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/Stats/status","offline", retain=True)
-            client.loop_start()
-            logger.debug("Connecting to broker: "+ HAMQTT.MQTT_Address)
-            #client.connect(HAMQTT.MQTT_Address,port=HAMQTT.MQTT_Port)
-            while not client.connected_flag:        			#wait in loop
-                logger.debug("In wait loop")
-                time.sleep(0.2)
-
-            logger.debug("Publishing MQTT: " + HAMQTT.MQTT_Address)
-
-
-
-            ##publish the status message
-            client.publish(GiV_Settings.MQTT_Topic+"/"+SN+"/Stats/status","online", retain=True)
-            
-            array['Stats/Timeout_Error']=0    # Set this always at start in case it doesn't exist
-            
-            ### For each topic create a discovery message
-            for p_load in array:
-                if p_load != "raw":
-                    payload=array[p_load]
-                    logger.debug('Publishing: '+rootTopic+p_load)
-                    output=GivMQTT.iterate_dict(payload,rootTopic+p_load)   #create LUT for MQTT publishing
-                    for topic in output:
-                        #Determine Entitiy type (switch/sensor/number) and publish the right message
-                        if GivLUT.entity_type[str(topic).split("/")[-1]].devType=="sensor":
-                            if "Battery_Details" in topic or "Inverters" in topic:
-                                logger.debug('Publishing: '+topic)
-                                #time.sleep(0.01)
-                                client.publish("homeassistant/sensor/GivEnergy/"+str(topic).split("/")[-2]+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                            elif "Stats" in topic:
-                                client.publish("homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                            else:
-                                client.publish("homeassistant/sensor/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-
-                        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="switch":
-                            client.publish("homeassistant/switch/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="number":
-                            client.publish("homeassistant/number/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                    #    elif GivLUT.entity_type[str(topic).split("/")[-1]][0]=="binary_sensor":
-                    #        client.publish("homeassistant2/binary_sensor/GivEnergy/"+str(topic).split("/")[-1]+"/config",HAMQTT.create_binary_sensor_payload(topic,SN),retain=True)
-                        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="select":
-                            client.publish("homeassistant/select/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)
-                        elif GivLUT.entity_type[str(topic).split("/")[-1]].devType=="button":
-                            client.publish("homeassistant/button/GivEnergy/"+SN+"_"+str(topic).split("/")[-1]+"/config",HAMQTT.create_device_payload(topic,SN),retain=True)   
-                
-            client.loop_stop()                      			#Stop loop
-            client.disconnect()
-
-        except:
-            e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-            logger.error("Error connecting to MQTT Broker: " + str(e))
 
     def publish_discovery2(array,SN):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
         try:
@@ -159,28 +97,26 @@ class HAMQTT():
                 if i==4:
                     logger.critical("Failed to publish all discovery data in 4 attempts. Check MQTT broker")
                     break
-
         except:
             e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
 
     def sendDiscoMsg(array,SN):
-        mqtt.Client.connected_flag=False        			#create flag in class
-        client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+        paho_mqtt.Client.connected_flag=False        			#create flag in class
+        client=paho_mqtt.Client(paho_mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_senddisco_"+str(GiV_Settings.givtcp_instance))
         client.on_connect=HAMQTT.on_connect     			#bind call back function
         if HAMQTT.MQTTCredentials:
             client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
         client.host=GivMQTT.MQTT_Address
         client.port=GivMQTT.MQTT_Port
-
         ## set the will message
         client.will_set(GiV_Settings.MQTT_Topic+"/"+SN+"/Stats/status","offline", retain=True)
 
         client.loop_start()
         logger.debug("Connecting to broker: "+ HAMQTT.MQTT_Address)
-
+#        client=GivMQTT.get_connection()
         while not client.connected_flag:        			#wait in loop
-            logger.debug("In wait loop")
+            logger.debug("In wait loop (sendDiscoMsg)")
             time.sleep(0.2)
 
         logger.debug("Publishing MQTT: " + HAMQTT.MQTT_Address)
@@ -386,16 +322,16 @@ class CheckDisco():
         CheckDisco.msgs[str(msg.topic)]=str(msg.payload)
 
     def checkdisco(array: str):
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        client = paho_mqtt.Client(paho_mqtt.CallbackAPIVersion.VERSION2,"GivEnergy_GivTCP_checkdisco_"+str(GiV_Settings.givtcp_instance))
         client.on_connect = CheckDisco.on_connect
         client.on_message = CheckDisco.on_message
-        client.username_pw_set(GiV_Settings.MQTT_Username,GiV_Settings.MQTT_Password)
+        if HAMQTT.MQTTCredentials:
+            client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
         client.connect(GiV_Settings.MQTT_Address, GiV_Settings.MQTT_Port, 60)
 
         client.loop_start()
         time.sleep(3)
         client.disconnect()
-        client.loop_stop()
         temp={}
         logger.debug("Sent "+ str(len(array))+" discovery messages")
         logger.debug("Found "+ str(len(CheckDisco.msgs))+" discovery messages")
@@ -406,10 +342,11 @@ class CheckDisco():
         return unpub
     
     def removedisco(SN):
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        client = paho_mqtt.Client(paho_mqtt.CallbackAPIVersion.VERSION2,"GivEnergy_GivTCP_removedisco_"+str(GiV_Settings.givtcp_instance))
         client.on_connect = CheckDisco.on_connect
         client.on_message = CheckDisco.on_message
-        client.username_pw_set(GiV_Settings.MQTT_Username,GiV_Settings.MQTT_Password)
+        if HAMQTT.MQTTCredentials:
+            client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
         client.connect(GiV_Settings.MQTT_Address, GiV_Settings.MQTT_Port, 60)
 
         client.loop_start()
@@ -418,4 +355,6 @@ class CheckDisco():
         for msg in CheckDisco.msgs:
             if SN in msg:
                 client.publish(msg)
+        time.sleep(2)
         client.loop_stop()
+        client.disconnect()

@@ -1,10 +1,13 @@
 '''Test Module for GivEVC'''
 from pymodbus.client.sync import ModbusTcpClient
+import paho.mqtt.client as mqtt
 import logging
+import importlib
+import settings
 import datetime
 import time
 import pickle
-from os.path import exists
+from os.path import exists, basename
 import os
 from threading import Lock
 import json
@@ -16,6 +19,28 @@ import sys
 logger = GivLUT.logger
 cacheLock = Lock()
 logging.getLogger("pymodbus").setLevel(logging.CRITICAL) 
+
+if GiV_Settings.MQTT_Port=='':
+    MQTT_Port=1883
+else:
+    MQTT_Port=int(GiV_Settings.MQTT_Port)
+MQTT_Address=GiV_Settings.MQTT_Address
+if GiV_Settings.MQTT_Username=='':
+    MQTTCredentials=False
+else:
+    MQTTCredentials=True
+    MQTT_Username=GiV_Settings.MQTT_Username
+    MQTT_Password=GiV_Settings.MQTT_Password
+if GiV_Settings.MQTT_Retain:
+    MQTT_Retain=True
+else:
+    MQTT_Retain=False
+if GiV_Settings.MQTT_Topic=='':
+    MQTT_Topic='GivEnergy'
+else:
+    MQTT_Topic=GiV_Settings.MQTT_Topic
+
+_client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivEVC")
 
 class EVCType:
     """Defines type for data objects"""
@@ -184,12 +209,6 @@ def getEVC(client:ModbusTcpClient):
         now=datetime.datetime.utcnow()
         delta=now-evcTime
 
-        #if abs(delta.total_seconds())>90:
-        #    # Send system time update to EVC
-        #    logger.info("EVC Time is "+ str(delta.total_seconds()) +"s out from local time. Syncing time...")
-        #    setDateTime(now)
-        #    evcTime=now
-
         output['System_Time']= evcTime.replace(tzinfo=datetime.timezone.utc).isoformat()
 
         td=datetime.timedelta(seconds=int(regs[79]))
@@ -261,13 +280,12 @@ def publishOutput(array, SN):
             if GiV_Settings.HA_Auto_D:        # Home Assistant MQTT Discovery
                 logger.critical("Publishing Home Assistant Discovery messages")
                 from HA_Discovery import HAMQTT
-                HAMQTT.publish_discovery(tempoutput, SN)
+                HAMQTT.publish_discovery2(tempoutput, SN)
             GiV_Settings.first_run_evc = False  
-        from mqtt import GivMQTT
         logger.debug("Publish all to MQTT")
         if GiV_Settings.MQTT_Topic == "":
             GiV_Settings.MQTT_Topic = "GivEnergy"
-        GivMQTT.multi_MQTT_publish(str(GiV_Settings.MQTT_Topic+"/"+SN+"/"), tempoutput)
+        multi_MQTT_publish(str(GiV_Settings.MQTT_Topic+"/"+SN+"/"), tempoutput)
     if GiV_Settings.Influx_Output:
         from influx import GivInflux
         logger.debug("Pushing output to Influx")
@@ -315,6 +333,62 @@ def updateFirstRun(SN):
             logger.debug("removing lockfile")
             break
 
+def on_connect(_client, userdata, flags, reason_code, properties):
+    if reason_code==0:
+        _client.connected_flag=True #set flag
+        logger.debug("connected OK Returned code="+str(reason_code))
+    else:
+        logger.error("Bad connection Returned code= "+str(reason_code))
+    _client.subscribe(MQTT_Topic+"/control/#")
+    logger.debug("Subscribing to "+MQTT_Topic+"/control/#")
+
+def get_connection():
+    global _client
+    if not _client.connected_flag:
+        logger.debug("MQTT Connection appears closed, re-opening")
+        if MQTTCredentials:
+            _client.username_pw_set(MQTT_Username,MQTT_Password)
+        _client.on_connect=on_connect     			#bind call back function
+        _client.on_message=on_message     			#bind call back function
+        logger.debug("Opening MQTT Connection to "+str(MQTT_Address))
+        _client.connect(MQTT_Address,port=MQTT_Port)
+        _client.loop_start()
+    return _client
+
+def multi_MQTT_publish(rootTopic,array):                    #Recieve multiple payloads with Topics and publish in a single MQTT connection
+    client=get_connection()
+    try:
+        while not client.connected_flag:        			#wait in loop
+            logger.debug ("In wait loop (multi_MQTT_publish)")
+            time.sleep(0.2)
+        for p_load in array:
+            payload=array[p_load]
+            logger.debug('Publishing: '+rootTopic+p_load)
+            output=iterate_dict_mqtt(payload,rootTopic+p_load)   #create LUT for MQTT publishing
+            for value in output:
+                if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
+                    client.publish(value,output[value], retain=GiV_Settings.MQTT_Retain)
+    except:
+        e=sys.exc_info()[0].__name__, basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        logger.error("Error connecting to MQTT Broker: " + str(e))
+        client.loop_stop()                      			    #Stop loop
+        client.disconnect()
+
+def iterate_dict_mqtt(array,topic):      #Create LUT of topics and datapoints
+    MQTT_LUT={}
+    if isinstance(array, dict):
+        # Create a publish safe version of the output
+        for p_load in array:
+            output=array[p_load]
+            if isinstance(output, dict):
+                MQTT_LUT.update(iterate_dict_mqtt(output,topic+"/"+p_load))
+                logger.debug('Prepping '+p_load+" for publishing")
+            else:
+                MQTT_LUT[topic+"/"+p_load]=output
+    else:
+        MQTT_LUT[topic]=array
+    return(MQTT_LUT)
+
 def iterate_dict(array):        # Create a publish safe version of the output (convert non-string or int datapoints)
     safeoutput = {}
     for p_load in array:
@@ -344,6 +418,61 @@ def iterate_dict(array):        # Create a publish safe version of the output (c
         else:
             safeoutput[p_load] = output
     return(safeoutput)
+
+def isfloat(num):
+    try:
+        float(num)
+        return True
+    except ValueError:
+        return False
+
+def on_message(client, userdata, message):
+    from settings import GiV_Settings
+    proceed=False
+    if not hasattr(GiV_Settings,'serial_number_evc'):
+        importlib.reload(settings)
+        from settings import GiV_Settings
+        if hasattr(GiV_Settings,'serial_number_evc'):
+            logger.debug("EVC serial num now found and is: "+str(GiV_Settings.serial_number_evc))
+            proceed=True
+    else:
+        proceed=True
+
+    if proceed:
+        if not GiV_Settings.serial_number_evc in message.topic:
+            return
+        payload={}
+        logger.debug("MQTT Message Recieved: "+str(message.topic)+"= "+str(message.payload.decode("utf-8")))
+        writecommand={}
+        try:
+            command=str(message.topic).split("/")[-1]
+            if command=="chargeMode":
+                writecommand=message.payload.decode("utf-8")
+                setChargeMode(writecommand)
+            elif command=="controlCharge":
+                writecommand=message.payload.decode("utf-8")
+                setChargeControl(writecommand)
+            elif command=="setCurrentLimit":
+                writecommand=message.payload.decode("utf-8")
+                setCurrentLimit(int(writecommand))
+            elif command=="setImportCap":
+                writecommand=message.payload.decode("utf-8")
+                setImportCap(writecommand)
+            elif command=="setChargingMode":
+                writecommand=message.payload.decode("utf-8")
+                setChargingMode(writecommand)
+            elif command=="setMaxSessionEnergy":
+                writecommand=message.payload.decode("utf-8")
+                setMaxSessionEnergy(int(writecommand))
+            elif command=="setSystemTime":
+                writecommand=message.payload.decode("utf-8")
+                setDateTime(writecommand)
+        except:
+            e = sys.exc_info()
+            logger.error("MQTT.OnMessage Exception: "+str(e))
+            return
+    else:
+        logger.info("No serial_number_evc found in MQTT queue. MQTT Control not yet available.")
 
 def getEVCCache():
     if exists(EVCLut.regcache):
