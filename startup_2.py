@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone, UTC
-from genericpath import exists
+from os.path import exists
 import os, pickle, subprocess, logging,shutil, shlex, schedule
 from time import sleep
 import json
@@ -72,7 +72,7 @@ def getInvDeets(HOST):
         Stats['IP Address']=HOST
         return Stats
     except:
-        #logger.error("Gathering inverter details for " + str(HOST) + " failed.")
+        logger.debug("Device at " + str(HOST) + " is not an inverter, ignoring...")
         return None
 
 async def getInvDeets2(HOST):
@@ -233,7 +233,7 @@ def findinv(networks):
                         for evc in evclist:
                             sn=validateEVC(evclist[evc])
                             if sn:
-                                logger.info("GivEVC "+str(sn)+" found at: "+str(evclist[evc]))
+                                logger.debug("GivEVC "+str(sn)+" found at: "+str(evclist[evc]))
                                 evclist[evc]=[evclist[evc],sn]
                             else:
                                 logger.debug(evclist[evc]+" is not an EVC")
@@ -241,9 +241,6 @@ def findinv(networks):
                         for pop in poplist:
                             evclist.pop(pop)    #remove the unknown modbus device(s)
                     # Get Inverter Details
-
-
-
                     count=0
                     while len(list)<=0:
                         if count<2:
@@ -263,19 +260,9 @@ def findinv(networks):
                             while not deets:
                                 if count<2:
                                     deets=asyncio.run(getInvDeets2(invList[inv]))
-                                    #deets=getInvDeets2(invList[inv])
                                     if deets:
                                         inverterStats[inv]=deets
-                                        if isitoldfw(inverterStats[inv]):
-                                            logger.debug("This inverter IS on 'old firmware', ensure that the old firmware setting IS checked in the configuration")
-                                        else:
-                                            logger.debug("This inverter is on 'new firmware', ensure that the old firmware setting is NOT checked in the configuration")
-                                        if deets['Model']=="All in One":
-                                            logger.debug("This inverter IS an AIO, ensure that the AIO setting IS checked in the configuration and NUMBATTERIES is set to 0")
-                                        else:
-                                            logger.debug("This inverter is NOT an AIO, ensure that the AIO setting is NOT checked")
-                                    #else:
-                                    #    logger.error("Unable to interrogate inverter to get base details")
+                                        break   #If we found the deets then don't try again
                                     count=count+1
                                 else:
                                     break
@@ -300,7 +287,7 @@ try:
     isAddon=True
     access_token = os.getenv("SUPERVISOR_TOKEN")
 except:
-    logger.info("SUPERVISOR TOKEN does not exist")
+    logger.debug("SUPERVISOR TOKEN does not exist")
     isAddon=False
     hasMQTT=False
     SuperTimezone=False
@@ -314,7 +301,7 @@ if isAddon:
                 'Authorization': 'Bearer {}'.format(access_token)})
     mqttDetails=result.json()
     if mqttDetails['result']=="ok":
-        logger.info ("HA MQTT Service has been found at "+str(mqttDetails['data']['host']))
+        logger.debug ("HA MQTT Service has been found at "+str(mqttDetails['data']['host']))
         mqtt_host=mqttDetails['data']['host']
         mqtt_username=mqttDetails['data']['username']
         mqtt_password=mqttDetails['data']['password']
@@ -322,7 +309,7 @@ if isAddon:
         hasMQTT=True
     else:
         hasMQTT=False
-        logger.info("No HA MQTT service has been found")
+        logger.info("No HA MQTT service has been found. Install and run the Mosquitto addon, or manually configure your own MQTT broker.")
 
     #Get Timezone    
     url="http://supervisor/info"
@@ -370,7 +357,7 @@ else:
     except:
         e=sys.exc_info()
         logger.error("Could not get network info: "+ str(e))
-logger.info("IP Address is: "+str(hostIP))
+logger.debug("Host IP Address is: "+str(hostIP))
 
 sleep(2)        # Sleep to allow port scanning socket to close
 
@@ -395,7 +382,7 @@ evcList=finv[2]
 logger.debug("GivTCP isAddon: "+str(isAddon))
 
 redis=subprocess.Popen(["/usr/bin/redis-server","/app/redis.conf"])
-logger.info("Running Redis")
+logger.debug("Running Redis")
 
 #rqdash=subprocess.Popen(["/usr/local/bin/rq-dashboard","-u redis://127.0.0.1:6379"])
 #logger.info("Running RQ Dashboard on port 9181")
@@ -407,7 +394,7 @@ if not exists("/ssl/fullchain.pem"):
 #logger.info("Running Config Frontend")
 
 subprocess.Popen(["nginx","-g","daemon off;"])
-logger.info("Running nginx")
+logger.debug("Running nginx")
 
 ##########################################################################################################
 #                                                                                                        #
@@ -468,9 +455,9 @@ for inv in inverterStats:
                 setts["serial_number_"+str(num)]=inverterStats[inv]['Serial_Number']
                 break
     else:
-        logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " found in settings file")
         for num in range(1,6):
             if inverterStats[inv]['Serial_Number'] == setts["serial_number_"+str(num)]:
+                logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " already found in settings file (slot "+str(num)+"), checking IP address is unchanged...")
                 if not setts["invertorIP_"+str(num)] == inverterStats[inv]['IP_Address']:
                     #If IP has changed, update it
                     logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " IP Address is different, updating: "+str(setts["invertorIP_"+str(num)])+" -> "+str(inverterStats[inv]['IP_Address']))
@@ -479,14 +466,14 @@ for inv in inverterStats:
         
 
 if len(evcList)>0:
-    logger.info("evcList: "+str(evcList))
+    logger.debug("evcList: "+str(evcList))
     if setts["evc_ip_address"]=="":
         setts["evc_ip_address"]=evcList[1][0]
     if setts["serial_number_evc"]=="":
         setts["serial_number_evc"]=evcList[1][1]
 #    setts["evc_enable"]=True           #Don't force this True
-if setts["NUMINVERTORS"]<len(inverterStats):
-    setts["NUMINVERTORS"]=len(inverterStats)   #update NUMINVERTORS if we've found more than are here
+#if int(setts["NUMINVERTORS"])<len(inverterStats):
+#    setts["NUMINVERTORS"]=len(inverterStats)   #update NUMINVERTORS if we've found more than are here
 
 with open(SFILE, 'w') as f:
     f.write(json.dumps(setts,indent=4))
@@ -497,7 +484,7 @@ dest="/app/ingress/allsettings.json"
 if not exists(dest):
     os.symlink(src, dest)
 
-if not os.path.exists(str(setts["cache_location"])):
+if not exists(str(setts["cache_location"])):
     os.makedirs(str(setts["cache_location"]))
     logger.debug("No config directory exists, so creating it...")
 else:
@@ -505,109 +492,95 @@ else:
 
 #for inv in range(1,int(len(finv[0])+1)):
 
+runninginv=[]
+#for inv in range(1,int(setts['NUMINVERTORS'])+1):
 
-for inv in range(1,int(setts['NUMINVERTORS'])+1):
-    logger.info ("Setting up invertor: "+str(inv)+" of "+str(setts['NUMINVERTORS']))
-    PATH= "/app/GivTCP_"+str(inv)
-    SFILE="/config/GivTCP/settings"+str(inv)+".json"
-    firstrun="/config/GivTCP/.firstrun_"+str(inv)
+# Change this to only use those inverters set to enabled in settings (INDENT)
+for inv in range(1,6):
+    if setts['inverter_enable_'+str(inv)]:
+        runninginv.append(inv)
+        logger.info ("Setting up invertor: "+str(inv))  #+" of "+str(setts['NUMINVERTORS']))
+        PATH= "/app/GivTCP_"+str(inv)
+    #    SFILE="/config/GivTCP/settings"+str(inv)+".json"
+        firstrun="/config/GivTCP/.firstrun_"+str(inv)
 
-    # Create folder per instance
-    if not exists(PATH):
-        shutil.copytree("/app/GivTCP", PATH)
-    logger.debug("Copying in a template settings.json")
-    shutil.copyfile("/app/settings.json",PATH+"/settings.json")
-    # Remove old settings file
-    if exists(PATH+"/settings.py"):
-        os.remove(PATH+"/settings.py")
-    if exists(firstrun):
-        logger.info("Removing firstrun")
-        os.remove(firstrun)
+        # Create folder per instance
+        if not exists(PATH):
+            shutil.copytree("/app/GivTCP", PATH)
+        logger.debug("Copying in a template settings.json")
+        shutil.copyfile("/app/settings.json",PATH+"/settings.json")
+        # Remove old settings file
+        if exists(PATH+"/settings.py"):
+            os.remove(PATH+"/settings.py")
+        if exists(firstrun):
+            logger.info("Removing firstrun")
+            os.remove(firstrun)
 
-#####################################################
-#  Set up the settings.py file ready for use now    #
-#####################################################
+    #####################################################
+    #  Set up the settings.py file ready for use now    #
+    #####################################################
 
-    createsettingsjson(inv)
+        createsettingsjson(inv)
+            
+        ######
+        #  Always delete lockfiles and FCRunning etc... but only delete pkl if too old?
+        for file in os.listdir(setts["cache_location"]):
+            filename = os.fsdecode(file)
+            if not filename.endswith(".log") and not filename.startswith("rateData") and not filename.startswith("allsettings"): 
+                # print(os.path.join(directory, filename))
+                os.remove(setts['cache_location']+"/"+file)
+        if exists(setts["cache_location"]+"/rateData_"+str(inv)+".pkl"):
+            if "TZ" in os.environ:
+                timezone=zoneinfo.ZoneInfo(key=setts["TZ"])
+            else:
+                timezone=zoneinfo.ZoneInfo(key="Europe/London")
+            modDay= datetime.fromtimestamp(os.path.getmtime(setts["cache_location"]+"/rateData_"+str(inv)+".pkl")).date()
+            if modDay<datetime.now(timezone).date():
+                logger.debug("Old rate data cache not updated today, so deleting")
+                os.remove(str(setts["cache_location"])+"/rateData_"+str(inv)+".pkl")
+            else:
+                logger.debug("Rate Data exists but is from today so keeping it")
+
+    #####################################################
+    #         Run the various processes needed          #
+    # Check if settings.py exists then start processes  #
+    # Still need to run the below process per inverter  #
+    #####################################################
+        logger.info("==============================================================")
+        logger.info("====             Web Gui Config is at                     ====")
+        logger.info("====     http://"+str(hostIP)+":8099/config.html             ====")
+        logger.info("==============================================================")
+
+        os.chdir(PATH)
+
+        rqWorker[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/worker.py"])
+        logger.debug("Running RQ worker to queue and process resume calls")
+
+        if not hasMQTT and setts['MQTT_Address']=="127.0.0.1" and setts['MQTT_Output']==True:
+            logger.info ("Starting Mosquitto on port "+str(setts['MQTT_Port']))
+            mqttBroker=subprocess.Popen(["/usr/sbin/mosquitto", "-c",PATH+"/mqtt.conf"])
+
+        if setts['self_run']==True: # Don't autorun if isAddon to prevent autostart creating rubbish before its checked by a user
+            logger.info ("Running Invertor ("+str(setts["invertorIP_"+str(inv)])+") read loop every "+str(setts['self_run_timer'])+"/"+str(setts['self_run_timer_full'])+"s")
+            selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
+        else:
+            logger.info("======= Self Run is off, so no data collection is happening =======")
         
-    ######
-    #  Always delete lockfiles and FCRunning etc... but only delete pkl if too old?
-    for file in os.listdir(setts["cache_location"]):
-        filename = os.fsdecode(file)
-        if not filename.endswith(".log") and not filename.startswith("rateData") and not filename.startswith("allsettings"): 
-            # print(os.path.join(directory, filename))
-            os.remove(setts['cache_location']+"/"+file)
+        GUPORT=6344+inv
+        logger.info ("Starting Gunicorn on port "+str(GUPORT))
+        command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
+        gunicorn[inv]=subprocess.Popen(command)
 
-#    if exists(setts["cache_location"]+"/rawData_"+str(inv)+".pkl"):
-#        logger.debug("Removing old invertor raw data cache")
-#        os.remove(str(setts["cache_location"])+"/rawData_"+str(inv)+".pkl")
-#    if exists(setts["cache_location"]+"/regCache_"+str(inv)+".pkl"):
-#        logger.debug("Removing old invertor data cache")
-#        os.remove(str(setts["cache_location"])+"/regCache_"+str(inv)+".pkl")
-#    if exists(PATH+"/.lockfile"):
-#        logger.debug("Removing old .lockfile")
-#        os.remove(PATH+"/.lockfile")
-#    if exists(PATH+"/.FCRunning"):
-#        logger.debug("Removing old .FCRunning")
-#        os.remove(PATH+"/.FCRunning")
-#    if exists(PATH+"/.FERunning"):
-#        logger.debug("Removing old .FERunning")
-#        os.remove(PATH+"/.FERunning")
-#    if exists(setts["cache_location"]+"/battery_"+str(inv)+".pkl"):
-#        logger.debug("Removing old battery data cache")
-#        os.remove(str(setts["cache_location"])+"/battery_"+str(inv)+".pkl")
-    if exists(setts["cache_location"]+"/rateData_"+str(inv)+".pkl"):
-        if "TZ" in os.environ:
-            timezone=zoneinfo.ZoneInfo(key=setts["TZ"])
-        else:
-            timezone=zoneinfo.ZoneInfo(key="Europe/London")
-        modDay= datetime.fromtimestamp(os.path.getmtime(setts["cache_location"]+"/rateData_"+str(inv)+".pkl")).date()
-        if modDay<datetime.now(timezone).date():
-            logger.debug("Old rate data cache not updated today, so deleting")
-            os.remove(str(setts["cache_location"])+"/rateData_"+str(inv)+".pkl")
-        else:
-            logger.debug("Rate Data exists but is from today so keeping it")
-
-#####################################################
-#         Run the various processes needed          #
-# Check if settings.py exists then start processes  #
-# Still need to run the below process per inverter  #
-#####################################################
-    logger.info("==============================================================")
-    logger.info("====             Web Gui Config is at                     ====")
-    logger.info("====     http://"+str(hostIP)+":8099/config.html          ====")
-    logger.info("==============================================================")
-
-    os.chdir(PATH)
-
-    rqWorker[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/worker.py"])
-    logger.info("Running RQ worker to queue and process givernergy-modbus calls")
-
-    if not hasMQTT and setts['MQTT_Address']=="127.0.0.1" and setts['MQTT_Output']==True:
-        logger.info ("Starting Mosquitto on port "+str(setts['MQTT_Port']))
-        mqttBroker=subprocess.Popen(["/usr/sbin/mosquitto", "-c",PATH+"/mqtt.conf"])
-
-    if setts['self_run']==True: # Don't autorun if isAddon to prevent autostart creating rubbish before its checked by a user
-        logger.info ("Running Invertor ("+str(setts["invertorIP_"+str(inv)])+") read loop every "+str(setts['self_run_timer'])+"/"+str(setts['self_run_timer_full'])+"s")
-        selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
-    else:
-        logger.info("=================== Self Run is off, so no data collection is happening ================")
-
-    if setts['evc_enable']==True and inv==1:  #only run it once
-        if not setts['evc_ip_address']=="":
-            logger.info ("Running EVC read loop every "+str(setts['evc_self_run_timer'])+"s")
-            evcSelfRun=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
+if setts['evc_enable']==True:
+    if not setts['evc_ip_address']=="":
+        logger.info ("Running EVC read loop every "+str(setts['evc_self_run_timer'])+"s")
+        evcSelfRun=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "self_run2"])
 #            logger.info ("Subscribing MQTT Broker for EVC control")
 #            mqttClientEVC=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client_evc.py"])
-            evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
-            logger.info ("Setting chargeMode loop to manage different charge modes every 60s")
-        else:
-            logger.info("EVC IP is missing from config. Please update and restart GivTCP")
-    
-    GUPORT=6344+inv
-    logger.info ("Starting Gunicorn on port "+str(GUPORT))
-    command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
-    gunicorn[inv]=subprocess.Popen(command)
+        evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
+        logger.info ("Setting chargeMode loop to manage different charge modes every 60s")
+    else:
+        logger.info("EVC IP is missing from config. Please update and restart GivTCP")
 
 
 if setts['Web_Dash']==True:
@@ -642,8 +615,6 @@ if setts['Smart_Target']==True:
     starttime= datetime.strftime(datetime.strptime(setts['night_rate_start'],'%H:%M') - timedelta(hours=0, minutes=10),'%H:%M')
     logger.info("Setting daily charge target forecast job to run at: "+starttime)
     schedule.every().day.at(starttime).do(palm_job)
-    # Run Palm at startup
-#    palm_job()
 
 # Loop round checking all processes are running
 while True:
@@ -651,7 +622,9 @@ while True:
         if exists("/app/.reboot"):
             os.remove("/app/.reboot")
             exit()
-        for inv in range(1,int(setts['NUMINVERTORS'])+1):
+        #for inv in range(1,int(setts['NUMINVERTORS'])+1):
+
+        for inv in runninginv:
             regcache=setts['cache_location']+"/regCache_"+str(inv)+".pkl"
             if exists(regcache):
                 with open(regcache, 'rb') as inp:

@@ -677,7 +677,7 @@ def set_mode_storage(
         ret = set_discharge_mode_to_match_demand()  # r27=1
     #ret.extend(set_battery_soc_reserve(100))  # r110=100
     ret.extend(set_enable_discharge(True))  # r59=1
-    ret.extend(set_discharge_slot_1(discharge_slot_1))  # r56=1600, r57=700
+    #ret.extend(set_discharge_slot_1(discharge_slot_1))  # r56=1600, r57=700
     if discharge_slot_1:
         ret.extend(set_discharge_slot_1(discharge_slot_1))  # r56=1600, r57=700
     if discharge_slot_2:

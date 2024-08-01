@@ -92,7 +92,7 @@ def getAll():
     #logger.critical("runAll called via REST")
     output=rd.getCache()
     if output == None:
-        return "{'Result':'Error, no data available'}"
+        return "{\"Result\":\"Error, no data available\"}"
     else:
         return output
 
@@ -117,9 +117,9 @@ def restart():
 @giv_api.route('/readData', methods=['GET'])
 def rdData():
     #logger.critical("readData called via REST")
-    output=rd.pubFromPickle()
+    output=rd.getCache()
     if output == None:
-        return "{'Result':'Error, no data available'}"
+        return "{\"Result\":\"Error, no data available\"}"
     else:
         return output
 
@@ -129,7 +129,7 @@ def gtCache():
     #logger.critical("getCache called via REST")
     output=rd.getCache()
     if output == None:
-        return "{'Result':'Error, no data available'}"
+        return "{\"Result\":\"Error, no data available\"}"
     else:
         return output
 

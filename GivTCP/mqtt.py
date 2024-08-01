@@ -11,8 +11,9 @@ import sys
 
 logger = GivLUT.logger
 
-mqtt.Client.connected_flag=False     
-_client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+#connected_flag=False     
+_mqttclient=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
+_mqttclient.connected_flag=False
 
 class GivMQTT():
     client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivTCP_"+str(GiV_Settings.givtcp_instance))
@@ -38,28 +39,18 @@ class GivMQTT():
         MQTT_Topic=GiV_Settings.MQTT_Topic
 
     def get_connection():
-        global _client
-        if not _client.connected_flag:
+        global _mqttclient
+        if not _mqttclient.connected_flag:
             logger.debug("MQTT Connection appears closed, re-opening")
             if GivMQTT.MQTTCredentials:
-                _client.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)
-            _client.on_connect=GivMQTT.on_connect     			#bind call back function
-            _client.on_message=GivMQTT.on_message               #bind call back function
+                _mqttclient.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)
+            _mqttclient.on_connect=GivMQTT.on_connect     			#bind call back function
+            _mqttclient.on_disconnect=GivMQTT.on_disconnect     	   #bind call back function
+            _mqttclient.on_message=GivMQTT.on_message               #bind call back function
             logger.debug("Opening MQTT Connection to "+str(GivMQTT.MQTT_Address))
-            _client.connect(GivMQTT.MQTT_Address,port=GivMQTT.MQTT_Port)
-            _client.loop_start()
-        return _client
-    
-    def connect():
-        if not GivMQTT.client.connected_flag:
-            logger.debug("MQTT Connection appears closed, re-opening")
-            if GivMQTT.MQTTCredentials:
-                GivMQTT.client.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)
-            GivMQTT.client.on_connect=GivMQTT.on_connect     			#bind call back function
-            GivMQTT.client.on_message=GivMQTT.on_message               #bind call back function
-            logger.debug("Opening MQTT Connection to "+str(GivMQTT.MQTT_Address))
-            GivMQTT.client.connect(GivMQTT.MQTT_Address,port=GivMQTT.MQTT_Port)
-            GivMQTT.client.loop_start()
+            _mqttclient.connect(GivMQTT.MQTT_Address,port=GivMQTT.MQTT_Port)
+            _mqttclient.loop_start()
+        return _mqttclient
     
     def isfloat(num):
         try:
@@ -77,34 +68,38 @@ class GivMQTT():
         with open(GivLUT.writerequests,'wb') as outp:
             pickle.dump(requests, outp, pickle.HIGHEST_PROTOCOL)
 
+    def on_disconnect(_client, userdata, flags, reason_code, properties):
+        _client.connected_flag=False #set flag
+        _client.loop_stop()
+        logger.info("MQTT connection disconnected")
+
     def on_connect(_client, userdata, flags, reason_code, properties):
         if reason_code==0:
             _client.connected_flag=True #set flag
             logger.debug("connected OK Returned code="+str(reason_code))
+            _client.subscribe(GivMQTT.MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
+            logger.debug("Subscribing to "+GivMQTT.MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
         else:
             logger.error("Bad connection Returned code= "+str(reason_code))
-        _client.subscribe(GivMQTT.MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
-        logger.debug("Subscribing to "+GivMQTT.MQTT_Topic+"/control/"+GiV_Settings.serial_number+"/#")
 
     def single_MQTT_publish(Topic,value):   #Recieve multiple payloads with Topics and publish in a single MQTT connection
-        #client=GivMQTT.get_connection()
+        client=GivMQTT.get_connection()
         try:
-            while not GivMQTT.client.connected_flag:        			#wait in loop
-                GivMQTT.connect()
+            while not _mqttclient.connected_flag:        			#wait in loop
+                #GivMQTT.connect()
                 logger.debug ("In wait loop (single_MQTT_publish)")
                 time.sleep(0.2)
             GivMQTT.client.publish(Topic,value)
         except:
             e=sys.exc_info()[0].__name__, basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
-            GivMQTT.client.loop_stop()                      			    #Stop loop
             GivMQTT.client.disconnect()
+#            GivMQTT.client.loop_stop()                      			    #Stop loop
 
     def multi_MQTT_publish(rootTopic,array):                    #Recieve multiple payloads with Topics and publish in a single MQTT connection
-        #client=GivMQTT.get_connection()
+        client=GivMQTT.get_connection()
         try:
-            while not GivMQTT.client.connected_flag:        			#wait in loop
-                GivMQTT.connect()
+            while not _mqttclient.connected_flag:        			#wait in loop
                 logger.debug ("In wait loop (multi_MQTT_publish)")
                 time.sleep(0.2)
             for p_load in array:
@@ -113,12 +108,12 @@ class GivMQTT():
                 output=GivMQTT.iterate_dict(payload,rootTopic+p_load)   #create LUT for MQTT publishing
                 for value in output:
                     if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
-                        GivMQTT.client.publish(value,output[value], retain=GivMQTT.MQTT_Retain)
+                        client.publish(value,output[value], retain=GivMQTT.MQTT_Retain)
         except:
             e=sys.exc_info()[0].__name__, basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
-            GivMQTT.client.loop_stop()                      			    #Stop loop
-            GivMQTT.client.disconnect()
+            client.disconnect()
+            client.loop_stop()                      			    #Stop loop
 
     def iterate_dict(array,topic):      #Create LUT of topics and datapoints
         MQTT_LUT={}

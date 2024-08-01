@@ -337,10 +337,11 @@ def on_connect(_client, userdata, flags, reason_code, properties):
     if reason_code==0:
         _client.connected_flag=True #set flag
         logger.debug("connected OK Returned code="+str(reason_code))
+        _client.subscribe(MQTT_Topic+"/control/#")
+        logger.debug("Subscribing to "+MQTT_Topic+"/control/#")
     else:
         logger.error("Bad connection Returned code= "+str(reason_code))
-    _client.subscribe(MQTT_Topic+"/control/#")
-    logger.debug("Subscribing to "+MQTT_Topic+"/control/#")
+    
 
 def get_connection():
     global _client
@@ -483,16 +484,16 @@ def getEVCCache():
         return json.dumps("No EVC data found",indent=4)
 
 def setChargeMode(mode):
-    if mode=="enable":
-        val=0
-    elif mode=="disable":
-        val=1
-    else:
-        logger.error("Invalid control mode called: "+str(mode))
-        return
-    logger.info("Setting Charge mode to: "+ mode)
-    logger.debug("numeric value "+str(val)+ " sent to EVC")
     try:
+        if mode=="enable":
+            val=0
+        elif mode=="disable":
+            val=1
+        else:
+            logger.error("Invalid control mode called: "+str(mode))
+            return
+        logger.info("Setting Charge mode to: "+ mode)
+        logger.debug("numeric value "+str(val)+ " sent to EVC")
         client=ModbusTcpClient(GiV_Settings.evc_ip_address)
         client.write_registers(93,val)
     except:
@@ -500,32 +501,37 @@ def setChargeMode(mode):
         logger.error("Error controlling EVC: "+str(e))
 
 def setChargeControl(mode):
-    if mode in GivLUT.charge_control:
-        logger.info("Setting Charge control to: "+ mode)
-        val=GivLUT.charge_control.index(mode)
-        logger.debug("numeric value "+str(val)+ " sent to EVC")
-        try:
-            client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-            client.write_registers(95,val)
-        except:
-            e=sys.exc_info()
-            logger.error("Error controlling EVC: "+str(e))
-    else:
-        logger.error("Invalid selection for Charge Control ("+str(mode)+")")
+    try:
+        if mode in GivLUT.charge_control:
+            logger.info("Setting Charge control to: "+ mode)
+            val=GivLUT.charge_control.index(mode)
+            logger.debug("numeric value "+str(val)+ " sent to EVC")
+            try:
+                client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+                client.write_registers(95,val)
+            except:
+                e=sys.exc_info()
+                logger.error("Error controlling EVC: "+str(e))
+        else:
+            logger.error("Invalid selection for Charge Control ("+str(mode)+")")
+    except:
+        e=sys.exc_info()
+        logger.error("Error setting Charge Conrol: "+str(e))
 
 def setCurrentLimit(val):
-    #Check limit is between 6 and MAX SAFE LIMIT
-    with cacheLock:
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-    safeMax=int(evcRegCache['Charger']['Evse_Max_Current'])
-    safeMin=int(evcRegCache['Charger']['Evse_Min_Current'])
-    val=max(val,safeMin)  #Force to 6 if less than
-    val=min(val,safeMax) # Get safe MAX value from pkl
-    logger.info("Setting Charge current limit to: "+ str(val))
     try:
-        client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-        client.write_registers(91,(val*10))
+        #Check limit is between 6 and MAX SAFE LIMIT
+        if exists(EVCLut.regcache):
+            with cacheLock:
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+            safeMax=int(evcRegCache['Charger']['Evse_Max_Current'])
+            safeMin=int(evcRegCache['Charger']['Evse_Min_Current'])
+            val=max(val,safeMin)  #Force to 6 if less than
+            val=min(val,safeMax) # Get safe MAX value from pkl
+            logger.info("Setting Charge current limit to: "+ str(val))
+            client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+            client.write_registers(91,(val*10))
     except:
         e=sys.exc_info()
         logger.error("Error controlling EVC: "+str(e))
@@ -533,51 +539,62 @@ def setCurrentLimit(val):
 def chargeMode(once=False):
     while True:
         #Run a regular check and manage load based on current mode and session energy
-        if exists(EVCLut.regcache):
-            with open(EVCLut.regcache, 'rb') as inp:
-                evcRegCache= pickle.load(inp)                
-            if evcRegCache['Charger']['Charging_State']=="Charging" or evcRegCache['Charger']['Charging_State']=="Connected":
-                if evcRegCache['Charger']['Charging_Mode']=="Hybrid":
-                    hybridmode()
-                elif evcRegCache['Charger']['Charging_Mode']=="Solar":
-                    solarmode()
-            if not evcRegCache['Charger']['Max_Session_Energy']==0 and evcRegCache['Charger']['Charge_Session_Energy']>=evcRegCache['Charger']['Max_Session_Energy'] and evcRegCache['Charger']['Charge_Control']=="Start":
-                logger.info("Session energy limit reached: "+str(evcRegCache['Charger']['Charge_Session_Energy'])+"kWh stopping charge")
-                setChargeControl("Stop")
-            if not int(evcRegCache['Charger']['Import_Cap'])==0:
-                if exists(GivLUT.regcache):
-                    with GivLUT.cachelock:
-                        with open(GivLUT.regcache, 'rb') as inp:
-                            invRegCache= pickle.load(inp)
-                    if float(invRegCache[4]['Power']['Power']['Grid_Current'])>(float(evcRegCache['Charger']['Import_Cap'])*0.95):
-                        target=float(evcRegCache['Charger']['Import_Cap'])*0.9
-                        reduction=(float(invRegCache[4]['Power']['Power']['Grid_Current']))-target
-                        newlimit=int(float(evcRegCache['Charger']['Charge_Limit'])-reduction)
-                        if not int(evcRegCache['Charger']['Charge_Limit'])==4:
-                            logger.info("Grid import threshold within 5%, reducing EVC charge current to: "+str(newlimit))
-                            setCurrentLimit(newlimit)
-                        else:
-                            logger.info("Grid import threshold within 5%, cannot reduce Charge limit below 6A. Stopping Charge")
-                            setChargeControl("Stop")
+        try:
+            if exists(EVCLut.regcache):
+                with cacheLock:
+                    with open(EVCLut.regcache, 'rb') as inp:
+                        evcRegCache= pickle.load(inp)                
+                if evcRegCache['Charger']['Charging_State']=="Charging" or evcRegCache['Charger']['Charging_State']=="Connected":
+                    if evcRegCache['Charger']['Charging_Mode']=="Hybrid":
+                        hybridmode()
+                    elif evcRegCache['Charger']['Charging_Mode']=="Solar":
+                        solarmode()
+                if not evcRegCache['Charger']['Max_Session_Energy']==0 and evcRegCache['Charger']['Charge_Session_Energy']>=evcRegCache['Charger']['Max_Session_Energy'] and evcRegCache['Charger']['Charge_Control']=="Start":
+                    logger.info("Session energy limit reached: "+str(evcRegCache['Charger']['Charge_Session_Energy'])+"kWh stopping charge")
+                    setChargeControl("Stop")
+                if not int(evcRegCache['Charger']['Import_Cap'])==0 and evcRegCache['Charger']['Charging_State']=="Charging":
+                    if exists(GivLUT.regcache):
+                        with GivLUT.cachelock:
+                            with open(GivLUT.regcache, 'rb') as inp:
+                                invRegCache= pickle.load(inp)
+                        if float(invRegCache[4]['Power']['Power']['Grid_Current'])>(float(evcRegCache['Charger']['Import_Cap'])*0.95):
+                            target=float(evcRegCache['Charger']['Import_Cap'])*0.9
+                            reduction=(float(invRegCache[4]['Power']['Power']['Grid_Current']))-target
+                            newlimit=int(float(evcRegCache['Charger']['Charge_Limit'])-reduction)
+                            logger.info("Car charge current too high reducing... ("+str(evcRegCache['Charger']['Charge_Limit'])+"A - "+str(reduction)+"A = "+str(newlimit)+")")
+                            #if not int(evcRegCache['Charger']['Charge_Limit'])==4:
+                            if int(newlimit)>=6:
+                                logger.info("Grid import threshold within 5%, reducing EVC charge current to: "+str(newlimit))
+                                setCurrentLimit(newlimit)
+                            else:
+                                logger.info("Grid import threshold within 5%, cannot reduce Charge limit below 6A. Stopping Charge")
+                                setChargeControl("Stop")
+        except:
+            e=sys.exc_info()
+            logger.error("Error in EVC charge mode loop: "+str(e))
         if once:
             break
-        time.sleep(60)
+        time.sleep(30)
     
 
 def hybridmode():
-    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
-        # Set charging current to min 6A plus the level of excess solar
-        with cacheLock:
-            with open(EVCLut.regcache, 'rb') as inp:
-                evcRegCache= pickle.load(inp)
-        with GivLUT.cachelock:
-            with open(GivLUT.regcache, 'rb') as inp:
-                invRegCache= pickle.load(inp)
-        sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
-        spareCurrent=int(max((sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']),0)+6)   #Spare current cannot be negative
-        if not spareCurrent==evcRegCache['Charger']['Charge_Limit']:
-            logger.info("Topping up min charge with Solar curent ("+str(spareCurrent-6)+"A), setting EVC charge to: "+str(spareCurrent)+"A")
-            setCurrentLimit(spareCurrent)
+    try:
+        if exists(EVCLut.regcache) and exists(GivLUT.regcache):
+            # Set charging current to min 6A plus the level of excess solar
+            with cacheLock:
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+            with GivLUT.cachelock:
+                with open(GivLUT.regcache, 'rb') as inp:
+                    invRegCache= pickle.load(inp)
+            sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
+            spareCurrent=int(max((sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']),0)+6)   #Spare current cannot be negative
+            if not spareCurrent==evcRegCache['Charger']['Charge_Limit']:
+                logger.info("Topping up min charge with Solar curent ("+str(spareCurrent-6)+"A), setting EVC charge to: "+str(spareCurrent)+"A")
+                setCurrentLimit(spareCurrent)
+    except:
+        e=sys.exc_info()
+        logger.error("Error in EVC hybrid mode: "+str(e))
 
 def gridmode():
     # Just don't do anything in Grid Mode and leave charging current as it was
@@ -585,77 +602,77 @@ def gridmode():
 
 def solarmode():
     # Set charging current to the level of excess solar
-    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
-        with cacheLock:
-            with open(EVCLut.regcache, 'rb') as inp:
-                evcRegCache= pickle.load(inp)
-        with GivLUT.cachelock:
-            with open(GivLUT.regcache, 'rb') as inp:
-                invRegCache= pickle.load(inp)
-        sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
-        spareCurrent=sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']
-        if sparePower>6:    #only if there's excess above min evse level
-            if not spareCurrent==evcRegCache['Charger']['Current_L1']:
-                logger.info("Spare Solar curent ("+str(spareCurrent)+"), setting EVC charge to: "+str(spareCurrent)+"A")
-                setChargeControl("Start")
-                setCurrentLimit(spareCurrent)
-        else:
-            if not evcRegCache['Charger']['Charge_Control']=="Stop":
-                logger.info("Solar excess dropped to below 6A, stopping charge")
-                setChargeControl("Stop")
-
-def importcap():
-    # Check grid import and ensure its not exceeding threshold
-    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
-        with cacheLock:
-            with open(GivLUT.regcache, 'rb') as inp:
-                invRegCache= pickle.load(inp)
-        with GivLUT.cachelock:
-            with open(EVCLut.regcache, 'rb') as inp:
-                evcRegCache= pickle.load(inp)
-        importcurrent=float(invRegCache[4]['Power']['Power']['Grid_Current'])
-        evccurrent=float(evcRegCache['Charger']['Current_L1'])
-        if importcurrent>GiV_Settings.evc_import_max_current:
-            excess=importcurrent-GiV_Settings.evc_import_max_current
-            newcurrent=int(max(6,evccurrent-excess))    #newcurrent must be at least 6A
-            logger.info("Import current exceeded ("+str(excess)+"), reducing EVC charge to: "+str(newcurrent)+"A")
-            setCurrentLimit(newcurrent)
-
+    try:
+        if exists(EVCLut.regcache) and exists(GivLUT.regcache):
+            with cacheLock:
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+            with GivLUT.cachelock:
+                with open(GivLUT.regcache, 'rb') as inp:
+                    invRegCache= pickle.load(inp)
+            sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
+            spareCurrent=sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']
+            if sparePower>6:    #only if there's excess above min evse level
+                if not spareCurrent==evcRegCache['Charger']['Current_L1']:
+                    logger.info("Spare Solar curent ("+str(spareCurrent)+"), setting EVC charge to: "+str(spareCurrent)+"A")
+                    setChargeControl("Start")
+                    setCurrentLimit(spareCurrent)
+            else:
+                if not evcRegCache['Charger']['Charge_Control']=="Stop":
+                    logger.info("Solar excess dropped to below 6A, stopping charge")
+                    setChargeControl("Stop")
+    except:
+        e=sys.exc_info()
+        logger.error("Error setting EVC solar mode: "+str(e))
 
 def setMaxSessionEnergy(val):
-    if exists(EVCLut.regcache):
-        logger.info("Setting Max Session energy to: "+str(val))
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        evcRegCache['Charger']['Max_Session_Energy']=val
-        with cacheLock:
-            with open(EVCLut.regcache, 'wb') as outp:
-                pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
-
-
-def setImportCap(val):
-    if exists(EVCLut.regcache):
-        logger.info("Setting Import Cap to: "+str(val))
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        evcRegCache['Charger']['Import_Cap']=val
-        with cacheLock:
-            with open(EVCLut.regcache, 'wb') as outp:
-                pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
-
-def setChargingMode(mode):
-    if mode in GivLUT.charging_mode:
+    try:
         if exists(EVCLut.regcache):
-            logger.info("Setting Charging Mode to: "+str(mode))
+            logger.info("Setting Max Session energy to: "+str(val))
             with open(EVCLut.regcache, 'rb') as inp:
                 evcRegCache= pickle.load(inp)
-            evcRegCache['Charger']['Charging_Mode']=mode
+            evcRegCache['Charger']['Max_Session_Energy']=val
             with cacheLock:
                 with open(EVCLut.regcache, 'wb') as outp:
                     pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
-            chargeMode(True)    # Run an initial call when changing modes
-    else:
-        logger.error("Invalid selection for Charge Mode ("+str(mode)+")")
+    except:
+        e=sys.exc_info()
+        logger.error("Error in setting Max Session energy: "+str(e))
+
+
+def setImportCap(val):
+    try:
+        if exists(EVCLut.regcache):
+            logger.info("Setting Import Cap to: "+str(val))
+            with cacheLock:
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+            evcRegCache['Charger']['Import_Cap']=val
+            with cacheLock:
+                with open(EVCLut.regcache, 'wb') as outp:
+                    pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
+    except:
+        e=sys.exc_info()
+        logger.error("Error setting EVC Import Cap: "+str(e))
+
+def setChargingMode(mode):
+    try:
+        if mode in GivLUT.charging_mode:
+            if exists(EVCLut.regcache):
+                logger.info("Setting Charging Mode to: "+str(mode))
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+                evcRegCache['Charger']['Charging_Mode']=mode
+                with cacheLock:
+                    with open(EVCLut.regcache, 'wb') as outp:
+                        pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
+                chargeMode(True)    # Run an initial call when changing modes
+        else:
+            logger.error("Invalid selection for Charge Mode ("+str(mode)+")")
+    except:
+        e=sys.exc_info()
+        logger.error("Error setting EVC Charge Mode: "+str(e))
+
 
 def setDateTime(sysTime):
     temp={}

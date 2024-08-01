@@ -1219,17 +1219,14 @@ def processGatewayInfo(plant: Plant):
     energy_total_output['Parallel_Total_Charge_Energy_Total_kWh']=round(GEInv.e_aio_charge_total/1000,2)
     energy_total_output['Parallel_Total_Discharge_Energy_Total_kWh']=round(GEInv.e_aio_discharge_total/1000,2)
     
+    controlmode={}    
+    timeslots={}
     #Only implement these, if Parallel mode is in use
     if GEInv.parallel_aio_online_num>1:
-
-        controlmode={}
         controlmode=getControls(plant,regCacheStack,inverterModel)
         logger.debug("Getting TimeSlot data")
-
-        ######## Grab Timeslots ########
         res = {}
         res=getTimeslots(plant)
-        timeslots={}
         timeslots.update(res[0])
         controlmode.update(res[1])
 
@@ -1248,8 +1245,10 @@ def processGatewayInfo(plant: Plant):
     multi_output['Inverters']=inverters
     multi_output["Power"]  = power
     multi_output["Energy"] = energy
-    multi_output["Timeslots"] = timeslots
-    multi_output["Control"] = controlmode
+    if timeslots:
+        multi_output["Timeslots"] = timeslots
+    if controlmode:
+        multi_output["Control"] = controlmode
     multi_output[GEInv.serial_number]=gateway
     multi_output["Meter_Details"] = meters
 
@@ -1427,13 +1426,13 @@ def processData(plant: Plant):
         elif modeltype in ('4', '6'):
             multi_output=processThreePhaseInfo(plant)
         else:
-                multi_output=processInverterInfo(plant)
+            multi_output=processInverterInfo(plant)
 
         givtcpdata={}
         givtcpdata['Last_Updated_Time'] = datetime.datetime.now(datetime.UTC).isoformat()
         givtcpdata['status'] = "online"
         givtcpdata['Time_Since_Last_Update'] = 0
-        givtcpdata['GivTCP_Version']= "2.4.513beta"
+        givtcpdata['GivTCP_Version']= "2.4.611beta"
         multi_output['Stats']=givtcpdata
         with GivLUT.cachelock:
             if exists(GivLUT.regcache):      # if there is a cache then grab it
@@ -1513,7 +1512,7 @@ def processData(plant: Plant):
     except Exception:
         e = sys.exc_info()
         consecFails(e)
-        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+#        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         logger.error("inverter Update failed so using last known good data from cache: " + str(e))
         result['result'] = "processData Error processing registers: " + str(e)
         return json.dumps(result)
@@ -1921,11 +1920,11 @@ def dataSmoother2(dataNew, dataOld, lastUpdate):
     else:
         smoothRate = 0.50
         abssmooth=7000
-    if isinstance(newData, int) or isinstance(newData, float):
+    if isinstance(newData, (int, float)):
         with GivLUT.cachelock:
             with open(GivLUT.regcache, 'rb') as inp:
                 regCacheStack = pickle.load(inp)
-        if not '3PH' in finditem(regCacheStack[4],"Invertor_Type"):
+        if not '3ph' in str(finditem(regCacheStack[4],"Invertor_Type")).lower():
             if isinstance(lookup.min,str):
                 min=maxvalues.single_phase[lookup.min]
             else:

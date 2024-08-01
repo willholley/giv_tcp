@@ -5,18 +5,23 @@ export const useTcpStore = defineStore('givtcp-form', {
   state: () => ({
     inverters: useSessionStorage('inverters', {
       NUMINVERTORS: 1,
+      inverter_enable_1: true,
       invertorIP_1: "",
       serial_number_1: "",
       inverterName_1: "",
+      inverter_enable_2: false,
       invertorIP_2: "",
       serial_number_2: "",
       inverterName_2: "",
+      inverter_enable_3: false,
       invertorIP_3: "",
       serial_number_3: "",
       inverterName_3: "",
+      inverter_enable_4: false,
       invertorIP_4: "",
       serial_number_4: "",
       inverterName_4: "",
+      inverter_enable_5: false,
       invertorIP_5: "",
       serial_number_5: "",
       inverterName_5: "",
@@ -110,6 +115,14 @@ export const useCard = defineStore('card', {
           }
         },
         {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 1 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_1'
+          }
+        },
+        {
           type: 'text',
           options: {
             label: 'Inverter 1 IP Address',
@@ -131,6 +144,14 @@ export const useCard = defineStore('card', {
             label: 'Inverter 1 Friendly Name (HA Device Prefix)',
             parent: 'inverters',
             key: 'inverterName_1'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 2 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_2'
           }
         },
         {
@@ -158,6 +179,14 @@ export const useCard = defineStore('card', {
           }
         },
         {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 3 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_3'
+          }
+        },
+        {
           type: 'text',
           options: {
             label: 'Inverter 3 IP Address',
@@ -179,6 +208,13 @@ export const useCard = defineStore('card', {
             label: 'Inverter 3 Friendly Name (HA Device Prefix)',
             parent: 'inverters',
             key: 'inverterName_3'
+          }
+        },        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 4 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_4'
           }
         },
         {
@@ -203,6 +239,14 @@ export const useCard = defineStore('card', {
             label: 'Inverter 4 Friendly Name (HA Device Prefix)',
             parent: 'inverters',
             key: 'inverterName_4'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 5 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_5'
           }
         },
         {

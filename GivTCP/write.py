@@ -15,7 +15,7 @@ from GivLUT import GivLUT, GivQueue
 from givenergy_modbus_async.client import commands
 from givenergy_modbus_async.model import TimeSlot
 from givenergy_modbus.client import GivEnergyClient
-from givenergy_modbus_async.pdu import WriteHoldingRegisterResponse
+from givenergy_modbus_async.pdu import WriteHoldingRegisterResponse, TransparentRequest
 #import mqtt
 import requests
 import importlib
@@ -82,9 +82,11 @@ async def sendAsyncCommand(reqs,readloop):
         await asyncclient.connect()
 
     result= await asyncclient.execute(reqs,timeout=3,retries=6, return_exceptions=True)
-    for req in result:
+    for idx, req in enumerate(result):
         if not isinstance(req,WriteHoldingRegisterResponse):
-            output['error']="Error in write command"
+#            request = TransparentRequest
+#            request=reqs[idx]
+            output['error']="Error in write command: HR("+str(reqs[idx].register)+")"
             output['error_type']=type(req).__name__
             break
     if not readloop:
@@ -1315,34 +1317,47 @@ async def forceExport(exportTime,readloop=False):
         maxDischargeRate=int(finditem(regCacheStack[4],"Invertor_Max_Bat_Rate"))
         
         #In case somebody has set a high reserve value set the reserve rate to the default value to allow the battery to discharge
-        try:
-            payload={}
-            payload['reservePercent']=4
-            result=await setBatteryReserve(payload,readloop) 
-        except:
-            logger.debug("Error Setting Reserve to 4%")
+#        try:
+#            payload={}
+#            payload['reservePercent']=4
+#            result=await setBatteryReserve(payload,readloop)
+#        except:
+#            logger.debug("Error Setting Reserve to 4%")
 
+### is there a way of grabbing all register changes nd passing them to send command all at once?
+        reqs=commands.set_battery_soc_reserve(4)
         payload={}
         payload['start']=GivLUT.getTime(datetime.now())
         finish=GivLUT.getTime(datetime.now()+timedelta(minutes=exportTime))
         payload['finish']=finish
         payload['slot']=2
-        result=await setDischargeSlot(payload,readloop)
-        payload={}
-        payload['state']="enable"
-        result=await enableDischargeSchedule(payload,readloop)
-        payload={}
-        payload['mode']="Timed Export"
-        result=await setBatteryMode(payload,readloop)
-        payload={}
-        logger.debug("Max discharge rate for inverter is: " + str(maxDischargeRate))
-        payload['dischargeRate']=maxDischargeRate
-        result=await setDischargeRate(payload,readloop)
+        slot=TimeSlot
+        slot.start=datetime.strptime(payload['start'],"%H:%M")
+        slot.end=datetime.strptime(payload['finish'],"%H:%M")
+#        reqs.extend(commands._set_charge_slot(True,2,slot,False))
+#        result=await setDischargeSlot(payload,readloop)
+#        payload={}
+#        payload['state']="enable"
+#        reqs.extend(commands.set_enable_discharge(True))
+#        result=await enableDischargeSchedule(payload,readloop)
+#        payload={}
+#        payload['mode']="Timed Export"
+        reqs.extend(commands.set_mode_storage(discharge_slot_2=slot,discharge_for_export=True))
+#        result=await setBatteryMode(payload,readloop)
         # Set Battery Pause Mode
-        payload={}
-        payload['state']="Disabled"
-        result=await setBatteryPauseMode(payload,readloop)
-        
+#        payload={}
+#        payload['state']="Disabled"
+#        result=await setBatteryPauseMode(payload,readloop)
+        reqs.extend(commands.set_battery_pause_mode(0))
+#        payload={}
+#        logger.debug("Max discharge rate for inverter is: " + str(maxDischargeRate))
+#        payload['dischargeRate']=maxDischargeRate
+#        result=await setDischargeRate(payload,readloop)
+        reqs=commands.set_battery_discharge_limit(50)
+        result = await sendAsyncCommand(reqs,readloop)
+        if result:
+            raise Exception(result)
+#            temp['result']="Error forcing Export: "+str(result)
         if exists(".FERunning"):    # If a forcecharge is already running, change time of revert job to new end time.
             logger.info("Force Export already running, changing end time")
             revert=getFEArgs()[0]   # set new revert object and cancel old revert job
@@ -1447,22 +1462,34 @@ async def forceCharge(chargeTime, readloop=False):
         else:
             maxChargeRate=2500
 
-        payload['chargeRate']=maxChargeRate
-        result=await setChargeRate(payload,readloop)
+#        payload['chargeRate']=maxChargeRate
+#        result=await setChargeRate(payload,readloop)
+        reqs=commands.set_battery_discharge_limit(50)
         payload={}
         payload['start']=GivLUT.getTime(datetime.now())
         finish=GivLUT.getTime(datetime.now()+timedelta(minutes=chargeTime))
         payload['finish']=finish
-        payload['chargeToPercent']=100
-        payload['slot']=1
-        result=await setChargeSlot(payload,readloop)
-        payload={}
-        payload['state']="enable"
-        result=await enableChargeSchedule(payload,readloop)
+#        payload['chargeToPercent']=100
+        reqs.extend(commands.set_battery_soc_reserve(100))
+        #payload['slot']=1
+        #result=await setChargeSlot(payload,readloop)
+        slot=TimeSlot
+        slot.start=datetime.strptime(payload['start'],"%H:%M")
+        slot.end=datetime.strptime(payload['finish'],"%H:%M")
+        reqs.extend(commands._set_charge_slot(False,1,slot,False))
+#        payload={}
+#        payload['state']="enable"
+#        result=await enableChargeSchedule(payload,readloop)
+        reqs.extend(commands.set_enable_charge(True))
+
         # Set Battery Pause Mode
-        payload={}
-        payload['state']="Disabled"
-        result=await setBatteryPauseMode(payload,readloop)
+        #payload={}
+        #payload['state']="Disabled"
+        #result=await setBatteryPauseMode(payload,readloop)
+        reqs.extend(commands.set_battery_pause_mode(0))
+        result= await sendAsyncCommand(reqs,readloop)
+        if result:
+            raise Exception(result)
         if exists(".FCRunning"):    # If a forcecharge is already running, change time of revert job to new end time
             logger.info("Force Charge already running, changing end time")
             revert=getFCArgs()[0]   # set new revert object and cancel old revert job
