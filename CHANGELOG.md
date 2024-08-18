@@ -5,8 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
+## [2.4.4] - 2023-08-18
+### Fixed
+- Fix for broken 2.4.3, re-push no new features
 
-## [2.4.2] - 2023-11-24
+## [2.4.3] - 2023-11-24
 ### Fixed
 - Removed recurring MQTT error message at Midnight (type error)
 ### Added
