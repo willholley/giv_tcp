@@ -2,7 +2,7 @@
 # Change Log
 Future updates from v3 will be pushed to https://github.com/britkat1980/ha-addons. Please add this to your Home Assistant Addon Store to get the upcoming v3 release
 
-## [2.4.6] - 2023-08-18
+## [2.4.7] - 2023-08-18
 ### Fixed
 - Fix for broken 2.4.3, re-push no new features
 
