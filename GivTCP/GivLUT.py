@@ -4,6 +4,10 @@ from givenergy_modbus.client import GivEnergyClient
 from settings import GiV_Settings
 from givenergy_modbus.model import plant
 import logging
+import pickle
+from os.path import exists
+from os import remove
+from time import sleep
 
 from threading import Lock
 
@@ -103,6 +107,7 @@ class GivLUT:
     #Logging config
     import logging, os, zoneinfo
     from settings import GiV_Settings
+    import sys
     from logging.handlers import TimedRotatingFileHandler
     logging.basicConfig(format='%(asctime)s - Inv'+ str(GiV_Settings.givtcp_instance)+ \
                         ' - %(module)-11s -  [%(levelname)-8s] - %(message)s')
@@ -126,8 +131,56 @@ class GivLUT:
     cachelock=Lock()
     restlock=Lock()
 
+    def get_regcache():
+        try:
+            count=0
+            if exists(GivLUT.cachelockfile):
+                logger.debug("regcache in use, waiting...")
+                while True:
+                    count +=1
+                    sleep(0.5)
+                    if not exists(GivLUT.cachelockfile):
+                        logger.debug("regcache now available")
+                        break
+                    if count==10:
+                        # loop round for 5s waiting for it to become available
+                        logger.error("Timed out waiting for regcache")
+                        return None
+            open(GivLUT.cachelockfile, 'w').close() #create lock file
+            if exists(GivLUT.regcache):
+                logger.debug("Opening regcache at: "+str(GivLUT.regcache))
+                with open(GivLUT.regcache, 'rb') as inp:
+                    regCacheStack = pickle.load(inp)
+                remove(GivLUT.cachelockfile)
+                return regCacheStack
+            else:
+                remove(GivLUT.cachelockfile)
+                logger.debug("regcache doesn't exist...")
+                return None
+        except:
+            e=GivLUT.sys.exc_info()
+            logger.error("Failed to get Cache: "+str(e))
+            return None
+        
+    def put_regcache(regCacheStack):
+        count=0
+        if exists(GivLUT.cachelockfile):
+            while True:
+                count +=1
+                sleep(0.5)
+                if not exists(GivLUT.cachelockfile):
+                    break
+                if count==10:
+                    return
+        open(GivLUT.cachelockfile, 'w').close() #create lock file
+        with open(GivLUT.regcache, 'wb') as outp:
+            pickle.dump(regCacheStack, outp, pickle.HIGHEST_PROTOCOL)
+        remove(GivLUT.cachelockfile)
+
+
     # File paths for use
     lockfile=".lockfile"
+    cachelockfile=".regcache_lockfile_"+str(GiV_Settings.givtcp_instance)
     writerequests="writerequests.pkl"
     restresponse="restresponse.json"
     regcache=GiV_Settings.cache_location+"/regCache_"+str(GiV_Settings.givtcp_instance)+".pkl"

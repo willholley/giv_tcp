@@ -3,7 +3,6 @@ from os.path import exists
 import os, pickle, subprocess, logging,shutil, shlex, schedule
 from time import sleep
 import json
-#import rq_dashboard
 import zoneinfo
 import sys
 import requests
@@ -40,55 +39,78 @@ def validateEVC(HOST):
     SN=""
     try:
         client = ModbusTcpClient(HOST)
-        regs = client.read_holding_registers(97,6).registers
-        systime=datetime(regs[0],regs[1],regs[2],regs[3],regs[4],regs[5]).replace(tzinfo=timezone.utc).isoformat()
-        #get serial number here now and put in the settings file
-        sn_regs = client.read_holding_registers(38,31).registers
-        for num in sn_regs:
-            if not num==0:
-                SN=SN+chr(num)
-        #logger.info("EVC Serial Number is: "+ str(SN))
-        return SN
+        registers = client.read_holding_registers(97,6)
+        if hasattr(registers,"registers"):
+            regs=registers.registers
+            systime=datetime(regs[0],regs[1],regs[2],regs[3],regs[4],regs[5]).replace(tzinfo=timezone.utc).isoformat()
+            #get serial number here now and put in the settings file
+            sn_regs = client.read_holding_registers(38,31).registers
+            for num in sn_regs:
+                if not num==0:
+                    SN=SN+chr(num)
+            #logger.info("EVC Serial Number is: "+ str(SN))
+            return SN
+        else:
+            return False
     except:
         e=sys.exc_info()
         logger.info(e)
         return False
 
-def getInvDeets(HOST):
+def get_regcache(cachelocation,inv):
     try:
-        Stats={}
-        client=GivEnergyClient(host=HOST)
-        stats=client.get_inverter_stats()
-        logger.debug("Deets retrieved from found Inverter are: "+str(stats))
-        SN=stats[2]
-        gen=givenergy_modbus.model.inverter.Generation._missing_(stats[1])
-        model=givenergy_modbus.model.inverter.Model.from_device_type_code(stats[0])
-        fw=stats[1]
-        logger.info(f'Inverter {str(SN)} which is a {str(gen.value)} - {str(model)} has been found at: {str(HOST)}')
-        Stats['Serial_Number']=SN
-        Stats['Firmware']=fw
-        Stats['Model']=model
-        Stats['Generation']=gen
-        Stats['IP Address']=HOST
-        return Stats
-    except:
-        logger.debug("Device at " + str(HOST) + " is not an inverter, ignoring...")
+        cachefile=".regcache_lockfile_"+str(inv)
+        count=0
+        if exists(cachefile):
+            logger.debug("regcache in use, waiting...")
+            while True:
+                count +=1
+                sleep(0.5)
+                if not exists(cachefile):
+                    logger.debug("regcache now available")
+                    break
+                if count==10:
+                    # loop round for 5s waiting for it to become available
+                    logger.error("Timed out waiting for regcache")
+                    return None
+        open(cachefile, 'w').close() #create lock file
+        if exists(cachelocation):
+            logger.debug("Opening regcache at: "+str(cachelocation))
+            with open(cachelocation, 'rb') as inp:
+                regCacheStack = pickle.load(inp)
+            logger.debug("Removing lockfile")
+            if exists(cachefile):
+                os.remove(cachefile)
+            return regCacheStack
+        else:
+            os.remove(cachefile)
+            logger.debug("regcache doesn't exist...")
+            return None
+    except Exception:
+        e=sys.exc_info()
+        logger.error("Failed to get Cache: "+str(e))
         return None
 
-async def getInvDeets2(HOST):
+async def getInvDeets(HOST):
     try:
         Stats={}
         client=Client(HOST,8899,3)
         await client.connect()
         await client.detect_plant(additional=False)
         await client.close()
-        SN= client.plant.inverter.serial_number
-        #logger.debug("Deets retrieved from found Inverter are: "+str(stats))
-        #SN=stats[2]
-        gen=client.plant.inverter.generation
-        model=client.plant.inverter.model
-        fw=client.plant.inverter.arm_firmware_version
+        if not client.plant.inverter ==None:
+            GEInv=client.plant.inverter
+        elif not client.plant.ems ==None:
+            GEInv=client.plant.ems
+        elif not client.plant.gateway ==None:
+            GEInv=client.plant.gateway
+
+        SN= GEInv.serial_number
+        gen=GEInv.generation
+        model=GEInv.model
+        fw=GEInv.arm_firmware_version
         numbats=client.plant.number_batteries
+
         Stats['Serial_Number']=SN
         Stats['Firmware']=fw
         Stats['Model']=model
@@ -100,14 +122,14 @@ async def getInvDeets2(HOST):
     except:
         logger.debug("Gathering inverter details for " + str(HOST) + " failed.")
         return None
-    
+'''
 def isitoldfw(invstats):
-    '''Firmware Versions for each Model
-    AC coupled 5xx old, 2xx new. 28x, 29x beta
-    Gen1 4xx Old, 1xx New. 19x Beta
-    Gen 2 909+ New. 99x Beta   Schedule Pause only for Gen2+
-    Gen 3 303+ New 39x Beta    New has 10 slots
-    AIO 6xx New 69x Beta       ALL has 10 slots'''
+    # Firmware Versions for each Model
+    # AC coupled 5xx old, 2xx new. 28x, 29x beta
+    # Gen1 4xx Old, 1xx New. 19x Beta
+    # Gen 2 909+ New. 99x Beta   Schedule Pause only for Gen2+
+    # Gen 3 303+ New 39x Beta    New has 10 slots
+    # AIO 6xx New 69x Beta       ALL has 10 slots
     if invstats['Model']==Model.AC and int(invstats['Firmware'])>500:
         return True
     elif invstats['Model']==Model.ALL_IN_ONE and int(invstats['Firmware'])<600:
@@ -119,21 +141,26 @@ def isitoldfw(invstats):
     elif invstats['Generation']==Generation.GEN3 and int(invstats['Firmware'])<303:
         return True
     return False
+'''
 
 def createsettingsjson(inv):
     PATH= "/app/GivTCP_"+str(inv)
-    #SFILE="/app/ingress/allsettings.json"
     SFILE="/config/GivTCP/allsettings.json"
-    #SFILE="allsettings.json"
     logger.debug("Recreating settings.py for invertor "+str(inv))
     with open(SFILE, 'r') as f1:
         setts=json.load(f1)
 
+    if setts["Model_"+str(inv)]=="":
+        inverter_type= asyncio.run(getInvDeets(str(setts["invertorIP_"+str(inv)])))
+        setts["Model_"+str(inv)]= inverter_type['Model'].name.capitalize()
+        with open(SFILE, 'w') as f:
+            f.write(json.dumps(setts,indent=4))
+
     with open(PATH+"/settings.py", 'w') as outp:
-    #with open("settings.py", 'w') as outp:
         outp.write("class GiV_Settings:\n")
         outp.write("    invertorIP=\""+str(setts["invertorIP_"+str(inv)])+"\"\n")
         outp.write("    serial_number=\""+str(setts["serial_number_"+str(inv)])+"\"\n")
+        outp.write("    inverter_type=\""+str(setts["Model_"+str(inv)])+"\"\n")
         if hasMQTT:
             outp.write("    MQTT_Address=\""+str(mqtt_host)+"\"\n")
             outp.write("    MQTT_Username=\""+str(mqtt_username)+"\"\n")
@@ -259,7 +286,7 @@ def findinv(networks):
                             count=0
                             while not deets:
                                 if count<2:
-                                    deets=asyncio.run(getInvDeets2(invList[inv]))
+                                    deets=asyncio.run(getInvDeets(invList[inv]))
                                     if deets:
                                         inverterStats[inv]=deets
                                         break   #If we found the deets then don't try again
@@ -384,14 +411,8 @@ logger.debug("GivTCP isAddon: "+str(isAddon))
 redis=subprocess.Popen(["/usr/bin/redis-server","/app/redis.conf"])
 logger.debug("Running Redis")
 
-#rqdash=subprocess.Popen(["/usr/local/bin/rq-dashboard","-u redis://127.0.0.1:6379"])
-#logger.info("Running RQ Dashboard on port 9181")
-
 if not exists("/ssl/fullchain.pem"):
     shutil.copy("/app/ingress_no_ssl.conf","/etc/nginx/http.d/ingress.conf")
-
-#vueConfig=subprocess.Popen(["npm", "run", "dev","-- --host"],cwd="/app/ingress")
-#logger.info("Running Config Frontend")
 
 subprocess.Popen(["nginx","-g","daemon off;"])
 logger.debug("Running nginx")
@@ -410,13 +431,16 @@ logger.debug("Running nginx")
 
 PATH= "/app/GivTCP_"
 SFILE="/config/GivTCP/allsettings.json"
+v3upgrade=True      #Check if its a new upgrade or already has new json config file
 #SFILE="allsettings.json"
 if not exists(SFILE):
+    v3upgrade=False
     logger.debug("Copying in a template settings.json to: "+str(SFILE))
     #shutil.copyfile("/app/settings.json",SFILE)
     shutil.copyfile("settings.json",SFILE)
 else:
     # If theres already a settings file, make sure its got any new elements
+
     with open(SFILE, 'r') as f1:
         setts=json.load(f1)
     with open("/app/settings.json", 'r') as f2:
@@ -463,6 +487,7 @@ for inv in inverterStats:
                     logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " IP Address is different, updating: "+str(setts["invertorIP_"+str(num)])+" -> "+str(inverterStats[inv]['IP_Address']))
                     setts["invertorIP_"+str(num)]=inverterStats[inv]['IP_Address']
                 break
+    setts['Model_'+str(inv)]=inverterStats[inv]['Model'].name.capitalize()
         
 
 if len(evcList)>0:
@@ -471,9 +496,6 @@ if len(evcList)>0:
         setts["evc_ip_address"]=evcList[1][0]
     if setts["serial_number_evc"]=="":
         setts["serial_number_evc"]=evcList[1][1]
-#    setts["evc_enable"]=True           #Don't force this True
-#if int(setts["NUMINVERTORS"])<len(inverterStats):
-#    setts["NUMINVERTORS"]=len(inverterStats)   #update NUMINVERTORS if we've found more than are here
 
 with open(SFILE, 'w') as f:
     f.write(json.dumps(setts,indent=4))
@@ -490,16 +512,13 @@ if not exists(str(setts["cache_location"])):
 else:
     logger.debug("Config directory already exists")
 
-#for inv in range(1,int(len(finv[0])+1)):
-
 runninginv=[]
-#for inv in range(1,int(setts['NUMINVERTORS'])+1):
 
 # Change this to only use those inverters set to enabled in settings (INDENT)
 for inv in range(1,6):
     if setts['inverter_enable_'+str(inv)]:
         runninginv.append(inv)
-        logger.info ("Setting up invertor: "+str(inv))  #+" of "+str(setts['NUMINVERTORS']))
+        logger.info ("Setting up invertor: "+str(inv))
         PATH= "/app/GivTCP_"+str(inv)
     #    SFILE="/config/GivTCP/settings"+str(inv)+".json"
         firstrun="/config/GivTCP/.firstrun_"+str(inv)
@@ -513,7 +532,7 @@ for inv in range(1,6):
         if exists(PATH+"/settings.py"):
             os.remove(PATH+"/settings.py")
         if exists(firstrun):
-            logger.info("Removing firstrun")
+            logger.debug("Removing firstrun")
             os.remove(firstrun)
 
     #####################################################
@@ -541,11 +560,11 @@ for inv in range(1,6):
             else:
                 logger.debug("Rate Data exists but is from today so keeping it")
 
-    #####################################################
-    #         Run the various processes needed          #
-    # Check if settings.py exists then start processes  #
-    # Still need to run the below process per inverter  #
-    #####################################################
+        #####################################################
+        #         Run the various processes needed          #
+        # Check if settings.py exists then start processes  #
+        # Still need to run the below process per inverter  #
+        #####################################################
         logger.info("==============================================================")
         logger.info("====             Web Gui Config is at                     ====")
         logger.info("====     http://"+str(hostIP)+":8099/config.html             ====")
@@ -561,13 +580,13 @@ for inv in range(1,6):
             mqttBroker=subprocess.Popen(["/usr/sbin/mosquitto", "-c",PATH+"/mqtt.conf"])
 
         if setts['self_run']==True: # Don't autorun if isAddon to prevent autostart creating rubbish before its checked by a user
-            logger.info ("Running Invertor ("+str(setts["invertorIP_"+str(inv)])+") read loop every "+str(setts['self_run_timer'])+"/"+str(setts['self_run_timer_full'])+"s")
+            logger.info ("Running Invertor "+str(inv)+" ("+str(setts["serial_number_"+str(inv)])+") read loop every "+str(setts['self_run_timer'])+"/"+str(setts['self_run_timer_full'])+"s")
             selfRun[inv]=subprocess.Popen(["/usr/local/bin/python3",PATH+"/read.py", "start"])
         else:
             logger.info("======= Self Run is off, so no data collection is happening =======")
         
         GUPORT=6344+inv
-        logger.info ("Starting Gunicorn on port "+str(GUPORT))
+        logger.debug ("Starting Gunicorn on port "+str(GUPORT))
         command=shlex.split("/usr/local/bin/gunicorn -w 3 -b :"+str(GUPORT)+" REST:giv_api")
         gunicorn[inv]=subprocess.Popen(command)
 
@@ -578,7 +597,7 @@ if setts['evc_enable']==True:
 #            logger.info ("Subscribing MQTT Broker for EVC control")
 #            mqttClientEVC=subprocess.Popen(["/usr/local/bin/python3",PATH+"/mqtt_client_evc.py"])
         evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
-        logger.info ("Setting chargeMode loop to manage different charge modes every 60s")
+        logger.debug ("Setting chargeMode loop to manage different charge modes every 60s")
     else:
         logger.info("EVC IP is missing from config. Please update and restart GivTCP")
 
@@ -591,7 +610,7 @@ if setts['Web_Dash']==True:
         outp.write("{\n")
         outp.write("  \"givTcpHosts\": [\n")
 
-        for inv in range(1, int(setts['NUMINVERTORS']) + 1):
+        for inv in runninginv:
             GUPORT = 6344 + inv
             if inv > 1:
                 outp.write("  ,{\n")
@@ -619,19 +638,16 @@ if setts['Smart_Target']==True:
 # Loop round checking all processes are running
 while True:
     try:
-        if exists("/app/.reboot"):
-            os.remove("/app/.reboot")
-            exit()
-        #for inv in range(1,int(setts['NUMINVERTORS'])+1):
-
+        #if exists("/app/.reboot"):
+        #    logger.critical("Stopping container as requested...")
+        #    os.remove("/app/.reboot")
+        #    exit()
         for inv in runninginv:
-            regcache=setts['cache_location']+"/regCache_"+str(inv)+".pkl"
-            if exists(regcache):
-                with open(regcache, 'rb') as inp:
-                    regCacheStack = pickle.load(inp)
-                    timediff = datetime.now(UTC) - datetime.fromisoformat(regCacheStack[4]['Stats']['Last_Updated_Time'])
-                    timesince=(((timediff.seconds*1000000)+timediff.microseconds)/1000000)
-                    logger.debug("timesince last read= "+str(timesince))
+            regCacheStack=get_regcache(setts['cache_location']+"/regCache_"+str(inv)+".pkl",inv)
+            if regCacheStack:
+                timediff = datetime.now(UTC) - datetime.fromisoformat(regCacheStack[4]['Stats']['Last_Updated_Time'])
+                timesince=(((timediff.seconds*1000000)+timediff.microseconds)/1000000)
+                logger.debug("timesince last read= "+str(timesince))
             else:
                 sleep(10)       #wait for first regcache then go back round loop
                 continue
@@ -695,4 +711,4 @@ while True:
 
     #Run jobs for smart target
     schedule.run_pending()
-    sleep (10)
+    sleep (60)

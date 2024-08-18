@@ -113,6 +113,70 @@ class RegisterMap:
     BATTERY_PAUSE_MODE = 318
     BATTERY_PAUSE_SLOT_START = 319
     BATTERY_PAUSE_SLOT_END = 320
+    TPH_DISCHARGE_SLOT_1_START = 1118
+    TPH_DISCHARGE_SLOT_1_END = 1119
+    TPH_DISCHARGE_SLOT_2_START = 1120
+    TPH_DISCHARGE_SLOT_2_END = 1121
+    TPH_CHARGE_SLOT_1_START = 1113
+    TPH_CHARGE_SLOT_1_END = 1114
+    TPH_CHARGE_TARGET_SOC_1 = 242
+    TPH_CHARGE_SLOT_2_START = 1115
+    TPH_CHARGE_SLOT_2_END = 1116
+    # These are duplicates to make it easy to be TPH aware
+    TPH_CHARGE_TARGET_SOC_2 = 245
+    TPH_CHARGE_SLOT_3_START = 246
+    TPH_CHARGE_SLOT_3_END = 247
+    TPH_CHARGE_TARGET_SOC_3 = 248
+    TPH_CHARGE_SLOT_4_START = 249
+    TPH_CHARGE_SLOT_4_END = 250
+    TPH_CHARGE_TARGET_SOC_4 = 251
+    TPH_CHARGE_SLOT_5_START = 252
+    TPH_CHARGE_SLOT_5_END = 253
+    TPH_CHARGE_TARGET_SOC_5 = 254
+    TPH_CHARGE_SLOT_6_START = 255
+    TPH_CHARGE_SLOT_6_END = 256
+    TPH_CHARGE_TARGET_SOC_6 = 257
+    TPH_CHARGE_SLOT_7_START = 258
+    TPH_CHARGE_SLOT_7_END = 259
+    TPH_CHARGE_TARGET_SOC_7 = 260
+    TPH_CHARGE_SLOT_8_START = 261
+    TPH_CHARGE_SLOT_8_END = 262
+    TPH_CHARGE_TARGET_SOC_8 = 263
+    TPH_CHARGE_SLOT_9_START = 264
+    TPH_CHARGE_SLOT_9_END = 265
+    TPH_CHARGE_TARGET_SOC_9 = 266
+    TPH_CHARGE_SLOT_10_START = 267
+    TPH_CHARGE_SLOT_10_END = 268
+    TPH_CHARGE_TARGET_SOC_10 = 269
+    TPH_DISCHARGE_TARGET_SOC_1 = 272
+    TPH_DISCHARGE_TARGET_SOC_2 = 275
+    TPH_DISCHARGE_SLOT_3_START = 276
+    TPH_DISCHARGE_SLOT_3_END = 277
+    TPH_DISCHARGE_TARGET_SOC_3 = 278
+    TPH_DISCHARGE_SLOT_4_START = 279
+    TPH_DISCHARGE_SLOT_4_END = 280
+    TPH_DISCHARGE_TARGET_SOC_4 = 281
+    TPH_DISCHARGE_SLOT_5_START = 282
+    TPH_DISCHARGE_SLOT_5_END = 283
+    TPH_DISCHARGE_TARGET_SOC_5 = 284
+    TPH_DISCHARGE_SLOT_6_START = 285
+    TPH_DISCHARGE_SLOT_6_END = 286
+    TPH_DISCHARGE_TARGET_SOC_6 = 287
+    TPH_DISCHARGE_SLOT_7_START = 288
+    TPH_DISCHARGE_SLOT_7_END = 289
+    TPH_DISCHARGE_TARGET_SOC_7 = 290
+    TPH_DISCHARGE_SLOT_8_START = 291
+    TPH_DISCHARGE_SLOT_8_END = 292
+    TPH_DISCHARGE_TARGET_SOC_8 = 293
+    TPH_DISCHARGE_SLOT_9_START = 294
+    TPH_DISCHARGE_SLOT_9_END = 295
+    TPH_DISCHARGE_TARGET_SOC_9 = 296
+    TPH_DISCHARGE_SLOT_10_START = 297
+    TPH_DISCHARGE_SLOT_10_END = 298
+    TPH_DISCHARGE_TARGET_SOC_10 = 299
+    # End of duplicates
+    FORCE_DISCHARGE_ENABLE = 1122
+    FORCE_DISCHARGE_ENABLE = 1123
     EMS_DISCHARGE_SLOT_1_START = 2044
     EMS_DISCHARGE_SLOT_1_END = 2045
     EMS_DISCHARGE_TARGET_SOC_1 = 2046
@@ -323,12 +387,12 @@ def set_export_soc_target(idx: int, target_soc: int) -> list[TransparentRequest]
     reg = (getattr(RegisterMap, f'EXPORT_TARGET_SOC_{idx}'))
     return [WriteHoldingRegisterRequest(reg, target_soc)]
 
-def set_soc_target(discharge: bool, idx: int, target_soc: int, EMS: bool = False) -> list[TransparentRequest]:
+def set_soc_target(discharge: bool, idx: int, target_soc: int, inv_type: str) -> list[TransparentRequest]:
     """ Sets inverter SOC targets for any charge or discharge slot
     """
     if not 4 <= target_soc <= 100:
         raise ValueError(f" Target SOC ({target_soc}) must be in [4-100]%")
-    reg = (getattr(RegisterMap, f'{"EMS" if EMS else ""}{"DIS" if discharge else ""}CHARGE_TARGET_SOC_{idx}'))
+    reg = (getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}{"EMS_" if "ems" in inv_type else ""}{"DIS" if discharge else ""}CHARGE_TARGET_SOC_{idx}'))
     return [WriteHoldingRegisterRequest(reg, target_soc)]
 
 
@@ -491,11 +555,11 @@ def set_battery_pause_mode(val: BatteryPauseMode) -> list[TransparentRequest]:
 
 
 def _set_charge_slot(
-    discharge: bool, idx: int, slot: Optional[TimeSlot], EMS: bool=False
+    discharge: bool, idx: int, slot: Optional[TimeSlot], inv_type: str
 ) -> list[TransparentRequest]:
     hr_start, hr_end = (
-        getattr(RegisterMap, f'{"EMS_" if EMS else ""}{"DIS" if discharge else ""}CHARGE_SLOT_{idx}_START'),
-        getattr(RegisterMap, f'{"EMS_" if EMS else ""}{"DIS" if discharge else ""}CHARGE_SLOT_{idx}_END'),
+        getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}{"EMS_" if "ems"  in inv_type else ""}{"DIS" if discharge else ""}CHARGE_SLOT_{idx}_START'),
+        getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}{"EMS_" if "ems"  in inv_type else ""}{"DIS" if discharge else ""}CHARGE_SLOT_{idx}_END'),
     )
     if slot:
         return [
@@ -511,18 +575,18 @@ def _set_charge_slot(
 
 
 def set_charge_slot_start(
-    discharge: bool, idx: int, starttime: datetime, EMS: bool=False
+    discharge: bool, idx: int, starttime: datetime, inv_type: str
 ) -> list[TransparentRequest]:
     hr_start = (
-        getattr(RegisterMap, f'{"EMS_" if EMS else ""}{"DIS" if discharge else ""}CHARGE_SLOT_{idx}_START')
+        getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}{"EMS_" if "ems"  in inv_type else ""}{"DIS" if discharge else ""}CHARGE_SLOT_{idx}_START')
     )
     return [WriteHoldingRegisterRequest(hr_start, int(starttime.strftime("%H%M")))]
     
 def set_charge_slot_end(
-    discharge: bool, idx: int, endtime: datetime, EMS: bool=False
+    discharge: bool, idx: int, endtime: datetime, inv_type: str
 ) -> list[TransparentRequest]:
     hr_end = (
-        getattr(RegisterMap, f'{"EMS_" if EMS else ""}{"DIS" if discharge else ""}CHARGE_SLOT_{idx}_END')
+        getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}{"EMS_" if "ems"  in inv_type else ""}{"DIS" if discharge else ""}CHARGE_SLOT_{idx}_END')
     )
     return [WriteHoldingRegisterRequest(hr_end, int(endtime.strftime("%H%M")))]
 
@@ -658,6 +722,7 @@ def set_mode_storage(
     discharge_slot_1: Optional[TimeSlot] = None,
     discharge_slot_2: Optional[TimeSlot] = None,
     discharge_for_export: bool = False,
+    inv_type: str = ""
 ) -> list[TransparentRequest]:
     """Set system to storage mode with specific discharge slots(s).
 
@@ -679,9 +744,9 @@ def set_mode_storage(
     ret.extend(set_enable_discharge(True))  # r59=1
     #ret.extend(set_discharge_slot_1(discharge_slot_1))  # r56=1600, r57=700
     if discharge_slot_1:
-        ret.extend(set_discharge_slot_1(discharge_slot_1))  # r56=1600, r57=700
+        ret.extend(_set_charge_slot(True,1,discharge_slot_1,inv_type=inv_type))  # r56=1600, r57=700
     if discharge_slot_2:
-        ret.extend(set_discharge_slot_2(discharge_slot_2))  # r56=1600, r57=700
+        ret.extend(_set_charge_slot(True,2,discharge_slot_2,inv_type=inv_type))  # r56=1600, r57=700
     #else:
     #    ret.extend(reset_discharge_slot_2())
     return ret

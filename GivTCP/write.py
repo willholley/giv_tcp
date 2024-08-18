@@ -7,6 +7,7 @@ import datetime
 from datetime import datetime, timedelta
 from settings import GiV_Settings
 import settings
+import signal
 import time
 from os.path import exists
 import pickle,os
@@ -57,18 +58,20 @@ def updateControlCache(entity,value,isTime: bool=False):
     GivMQTT.single_MQTT_publish(Topic,str(value))
 
     # now update the pkl cache file
-    with GivLUT.cachelock:
-        if exists(GivLUT.regcache):      # if there is a cache then grab it
-            with open(GivLUT.regcache, 'rb') as inp:
-                regCacheStack = pickle.load(inp)
-            #find right object
-            if isTime:
-                regCacheStack[4]['Timeslots'][entity]=value
-            else:
-                regCacheStack[4]['Control'][entity]=value
-            with open(GivLUT.regcache, 'wb') as outp:
-                pickle.dump(regCacheStack, outp, pickle.HIGHEST_PROTOCOL)
-            logger.debug("Pushing control update to pkl cache: "+entity+" - "+str(value))
+#    with GivLUT.cachelock:
+#        if exists(GivLUT.regcache):      # if there is a cache then grab it
+#            with open(GivLUT.regcache, 'rb') as inp:
+#                regCacheStack = pickle.load(inp)
+    regCacheStack = GivLUT.get_regcache()
+    if regCacheStack:
+        #find right object
+        if isTime:
+            regCacheStack[4]['Timeslots'][entity]=value
+        else:
+            regCacheStack[4]['Control'][entity]=value
+        with open(GivLUT.regcache, 'wb') as outp:
+            pickle.dump(regCacheStack, outp, pickle.HIGHEST_PROTOCOL)
+        logger.debug("Pushing control update to pkl cache: "+entity+" - "+str(value))
     return
 
 async def sendAsyncCommand(reqs,readloop):
@@ -131,14 +134,14 @@ async def sem(enable,readloop=False):
         logger.error(temp['result'])
     return temp
 
-async def sst(target,slot,EMS,readloop=False):
+async def sst(target,slot,readloop=False):
     temp={}
     try:
-        reqs=commands.set_soc_target(False,slot,int(target),EMS)
+        reqs=commands.set_soc_target(False,slot,int(target),GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
-        if EMS:
+        if 'ems' in GiV_Settings.inverter_type.lower():
             updateControlCache("EMS_Charge_Target_SOC_"+str(slot),target)
         else:
             updateControlCache("Charge_Target_SOC_"+str(slot),target)
@@ -164,14 +167,14 @@ async def sest(target,slot,readloop=False):
         logger.error(temp['result'])
     return temp
 
-async def sdct(target,slot,EMS,readloop=False):
+async def sdct(target,slot,readloop=False):
     temp={}
     try:
-        reqs=commands.set_soc_target(True,slot,int(target),EMS)
+        reqs=commands.set_soc_target(True,slot,int(target),GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
-        if EMS:
+        if 'ems' in GiV_Settings.inverter_type.lower():
             updateControlCache("EMS_Discharge_Target_SOC_"+str(slot),target)
         else:
             updateControlCache("Discharge_Target_SOC_"+str(slot),target)
@@ -368,15 +371,13 @@ async def sbcl(target,readloop=False):
         if 'error' in result:
             raise Exception
         # Get cache and work out rate
-        if exists(GivLUT.regcache):      # if there is a cache then grab it
-            with GivLUT.cachelock:
-                with open(GivLUT.regcache, 'rb') as inp:
-                    regCacheStack = pickle.load(inp)
-                multi_output_old = regCacheStack[4]
-                batteryCapacity=int(multi_output_old[finditem(multi_output_old,"Invertor_Serial_Number")]['Battery_Capacity_kWh'])*1000
-                batmaxrate=int(multi_output_old[finditem(multi_output_old,"Invertor_Serial_Number")]['Invertor_Max_Bat_Rate'])
-            val=int(min((target/100)*(batteryCapacity), batmaxrate))
-            updateControlCache("Battery_Charge_Rate",val)
+        regCacheStack = GivLUT.get_regcache()
+        if regCacheStack:
+            multi_output_old = regCacheStack[4]
+        batteryCapacity=int(multi_output_old[finditem(multi_output_old,"Invertor_Serial_Number")]['Battery_Capacity_kWh'])*1000
+        batmaxrate=int(multi_output_old[finditem(multi_output_old,"Invertor_Serial_Number")]['Invertor_Max_Bat_Rate'])
+        val=int(min((target/100)*(batteryCapacity), batmaxrate))
+        updateControlCache("Battery_Charge_Rate",val)
         temp['result']="Setting battery charge rate "+str(target)+" was a success"
         logger.debug(temp['result'])
     except:
@@ -455,7 +456,7 @@ async def sms(target,readloop=False):
     temp={}
     try:
         
-        reqs=commands.set_mode_storage(discharge_for_export=False)
+        reqs=commands.set_mode_storage(discharge_for_export=False, inv_type=GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
@@ -469,7 +470,7 @@ async def sbdmd(readloop=False):
     temp={}
     try:
         
-        reqs=commands.set_mode_storage(discharge_for_export=False)
+        reqs=commands.set_mode_storage(discharge_for_export=False, inv_type=GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
@@ -484,7 +485,7 @@ async def sbdmmp(readloop=False):
     temp={}
     try:
         
-        reqs=commands.set_mode_storage(discharge_for_export=True)
+        reqs=commands.set_mode_storage(discharge_for_export=True, inv_type=GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
@@ -561,15 +562,11 @@ async def sds(payload,readloop=False):
         slot=TimeSlot
         slot.start=datetime.strptime(payload['start'],"%H:%M")
         slot.end=datetime.strptime(payload['finish'],"%H:%M")
-        if "EMS" in payload:
-            EMS=payload['EMS']
-        else:
-            EMS=False
-        reqs=commands._set_charge_slot(True,int(payload['slot']),slot,EMS)
+        reqs=commands._set_charge_slot(True,int(payload['slot']),slot,GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
-        if EMS:
+        if 'ems' in GiV_Settings.inverter_type.lower():
             updateControlCache("EMS_Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
             updateControlCache("EMS_Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
         else:
@@ -620,15 +617,12 @@ async def ses(payload,readloop=False):
 async def sdss(payload,readloop=False):
     temp={}
     try:
-        if "EMS" in payload:
-            EMS=payload['EMS']
-        else:
-            EMS=False
-        reqs=commands.set_charge_slot_start(True,int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"),EMS)
+
+        reqs=commands.set_charge_slot_start(True,int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"),GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
-        if EMS:
+        if 'ems' in GiV_Settings.inverter_type.lower():
             updateControlCache("EMS_Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
         else:
             updateControlCache("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
@@ -639,18 +633,16 @@ async def sdss(payload,readloop=False):
         logger.error(temp['result'])
     return temp
 
+
 async def sdse(payload,readloop=False):
     temp={}
     try:
-        if "EMS" in payload:
-            EMS=payload['EMS']
-        else:
-            EMS=False
-        reqs=commands.set_charge_slot_end(True,int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"),EMS)
+
+        reqs=commands.set_charge_slot_end(True,int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"),GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
-        if EMS:
+        if 'ems' in GiV_Settings.inverter_type.lower():
             updateControlCache("EMS_Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
         else:
             updateControlCache("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
@@ -720,15 +712,12 @@ async def scs(payload,readloop=False):
         slot=TimeSlot
         slot.start=datetime.strptime(payload['start'],"%H:%M")
         slot.end=datetime.strptime(payload['finish'],"%H:%M")
-        if "EMS" in payload:
-            EMS=payload['EMS']
-        else:
-            EMS=False
-        reqs=commands._set_charge_slot(False,int(payload['slot']),slot,EMS)
+
+        reqs=commands._set_charge_slot(False,int(payload['slot']),slot,GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
-        if EMS:
+        if 'ems' in GiV_Settings.inverter_type.lower():
             updateControlCache("EMS_Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
             updateControlCache("EMS_Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
         else:
@@ -775,11 +764,15 @@ async def sese(payload,readloop=False):
 async def scss(payload,readloop=False):
     temp={}
     try:
+        if "TPH" in payload:
+            TPH=payload['TPH']
+        else:
+            TPH=False
         if "EMS" in payload:
             EMS=payload['EMS']
         else:
             EMS=False
-        reqs=commands.set_charge_slot_start(False,int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"),EMS)
+        reqs=commands.set_charge_slot_start(False,int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"),GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
@@ -797,15 +790,12 @@ async def scss(payload,readloop=False):
 async def scse(payload,readloop=False):
     temp={}
     try:
-        if "EMS" in payload:
-            EMS=payload['EMS']
-        else:
-            EMS=False
-        reqs=commands.set_charge_slot_end(False,int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"),EMS)
+
+        reqs=commands.set_charge_slot_end(False,int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"),GiV_Settings.inverter_type)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
-        if EMS:
+        if 'ems' in GiV_Settings.inverter_type.lower():
             updateControlCache("EMS_Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
         else:
             updateControlCache("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
@@ -913,9 +903,16 @@ async def setChargeTarget2(payload,readloop=False):
         if type(payload) is not dict: payload=json.loads(payload)
         target=int(payload['chargeToPercent'])
         slot=int(payload['slot'])
-        EMS=bool(payload['EMS'])
+        if "EMS" in payload.keys():
+            EMS=bool(payload['EMS'])
+        else:
+            EMS=False
+        if "TPH" in payload:
+            TPH=payload['TPH']
+        else:
+            TPH=False
         logger.debug("Setting Charge Target "+str(slot) + " to: "+str(target))
-        temp= await sst(target,slot,EMS,readloop)
+        temp= await sst(target,slot,readloop)
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -944,9 +941,16 @@ async def setDischargeTarget(payload,readloop=False):
         if type(payload) is not dict: payload=json.loads(payload)
         target=int(payload['dischargeToPercent'])
         slot=int(payload['slot'])
-        EMS=bool(payload['EMS'])
+        if "EMS" in payload.keys():
+            EMS=bool(payload['EMS'])
+        else:
+            EMS=False
+        if "TPH" in payload:
+            TPH=payload['TPH']
+        else:
+            TPH=False
         logger.debug("Setting Discharge Target "+str(slot) + " to: "+str(target))
-        temp= await sdct(target,slot,EMS,readloop)
+        temp= await sdct(target,slot,readloop)
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -1106,6 +1110,7 @@ async def setChargeSlot(payload,readloop=False):
     try:
         logger.debug("Setting Charge Slot "+str(payload['slot'])+" to: "+str(payload['start'])+" - "+str(payload['finish']))
         temp= await scs(payload,readloop)
+        logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: "+ str(e)
@@ -1279,6 +1284,9 @@ async def FEResume(revert, readloop=False):
         payoad={}
         payload['state']=revert['discharge_schedule']
         result=await enableDischargeSchedule(payload,readloop)
+        payoad={}
+        payload['state']=revert['charge_schedule']
+        result=await enableChargeSchedule(payload,readloop)
         payload={}
         payload['reservePercent']=revert["reservePercent"]
         result=await setBatteryReserve(payload,readloop)
@@ -1313,6 +1321,7 @@ async def forceExport(exportTime,readloop=False):
             revert["reservePercent"]=regCacheStack[4]["Control"]["Battery_Power_Reserve"]
             revert["mode"]=regCacheStack[4]["Control"]["Mode"]
             revert['discharge_schedule']=regCacheStack[4]["Control"]["Enable_Discharge_Schedule"]
+            revert['charge_schedule']=regCacheStack[4]["Control"]["Enable_Charge_Schedule"]
             revert["batteryPauseMode"]=regCacheStack[4]["Control"]["Battery_pause_mode"]
         maxDischargeRate=int(finditem(regCacheStack[4],"Invertor_Max_Bat_Rate"))
         
@@ -1342,7 +1351,8 @@ async def forceExport(exportTime,readloop=False):
 #        result=await enableDischargeSchedule(payload,readloop)
 #        payload={}
 #        payload['mode']="Timed Export"
-        reqs.extend(commands.set_mode_storage(discharge_slot_2=slot,discharge_for_export=True))
+        reqs.extend(commands.set_enable_charge(False))  # turn off charge schedule
+        reqs.extend(commands.set_mode_storage(discharge_slot_2=slot,discharge_for_export=True, inv_type=GiV_Settings.inverter_type))
 #        result=await setBatteryMode(payload,readloop)
         # Set Battery Pause Mode
 #        payload={}
@@ -1353,8 +1363,9 @@ async def forceExport(exportTime,readloop=False):
 #        logger.debug("Max discharge rate for inverter is: " + str(maxDischargeRate))
 #        payload['dischargeRate']=maxDischargeRate
 #        result=await setDischargeRate(payload,readloop)
-        reqs=commands.set_battery_discharge_limit(50)
+        reqs.extend(commands.set_battery_discharge_limit(50))
         result = await sendAsyncCommand(reqs,readloop)
+        frtouch()   #Force full refresh on next run to update control status
         if result:
             raise Exception(result)
 #            temp['result']="Error forcing Export: "+str(result)
@@ -1452,6 +1463,9 @@ async def forceCharge(chargeTime, readloop=False):
             with GivLUT.cachelock:
                 with open(GivLUT.regcache, 'rb') as inp:
                     regCacheStack= pickle.load(inp)
+        regCacheStack = GivLUT.get_regcache()
+        if regCacheStack:
+            multi_output_old = regCacheStack[4]
             revert["start_time"]=regCacheStack[4]["Timeslots"]["Charge_start_time_slot_1"][:5]
             revert["end_time"]=regCacheStack[4]["Timeslots"]["Charge_end_time_slot_1"][:5]
             revert["chargeRate"]=regCacheStack[4]["Control"]["Battery_Charge_Rate"]
@@ -1476,7 +1490,7 @@ async def forceCharge(chargeTime, readloop=False):
         slot=TimeSlot
         slot.start=datetime.strptime(payload['start'],"%H:%M")
         slot.end=datetime.strptime(payload['finish'],"%H:%M")
-        reqs.extend(commands._set_charge_slot(False,1,slot,False))
+        reqs.extend(commands._set_charge_slot(False,1,slot, inv_type=GiV_Settings.inverter_type))
 #        payload={}
 #        payload['state']="enable"
 #        result=await enableChargeSchedule(payload,readloop)
@@ -1488,6 +1502,7 @@ async def forceCharge(chargeTime, readloop=False):
         #result=await setBatteryPauseMode(payload,readloop)
         reqs.extend(commands.set_battery_pause_mode(0))
         result= await sendAsyncCommand(reqs,readloop)
+        frtouch()   #Force full refresh on next run to update control status
         if result:
             raise Exception(result)
         if exists(".FCRunning"):    # If a forcecharge is already running, change time of revert job to new end time
@@ -1532,13 +1547,16 @@ async def tempPauseDischarge(pauseTime,readloop=False):
         payload['dischargeRate']=0
         result=await setDischargeRate(payload,readloop)
         #Update read data via pickle
-        with GivLUT.cachelock:
-            if exists(GivLUT.regcache):      # if there is a cache then grab it
-                with open(GivLUT.regcache, 'rb') as inp:
-                    regCacheStack= pickle.load(inp)
-                revertRate=regCacheStack[4]["Control"]["Battery_Discharge_Rate"]
-            else:
-                revertRate=2600
+#        with GivLUT.cachelock:
+#            if exists(GivLUT.regcache):      # if there is a cache then grab it
+#                with open(GivLUT.regcache, 'rb') as inp:
+#                    regCacheStack= pickle.load(inp)
+        regCacheStack = GivLUT.get_regcache()
+        if regCacheStack:
+            multi_output_old = regCacheStack[4]
+            revertRate=regCacheStack[4]["Control"]["Battery_Discharge_Rate"]
+        else:
+            revertRate=2600
         payload['dischargeRate']=revertRate
         delay=float(pauseTime*60)
         tpdjob=GivQueue.q.enqueue_in(timedelta(seconds=delay),tmpPDResume,payload)
@@ -1581,13 +1599,16 @@ async def tempPauseCharge(pauseTime, readloop=False):
         payload['chargeRate']=0
         result=await setChargeRate(payload,readloop)
         #Update read data via pickle
-        with GivLUT.cachelock:
-            if exists(GivLUT.regcache):      # if there is a cache then grab it
-                with open(GivLUT.regcache, 'rb') as inp:
-                    regCacheStack= pickle.load(inp)
-                revertRate=regCacheStack[4]["Control"]["Battery_Charge_Rate"]
-            else:
-                revertRate=2600
+#        with GivLUT.cachelock:
+#            if exists(GivLUT.regcache):      # if there is a cache then grab it
+#                with open(GivLUT.regcache, 'rb') as inp:
+#                    regCacheStack= pickle.load(inp)
+        regCacheStack = GivLUT.get_regcache()
+        if regCacheStack:
+            multi_output_old = regCacheStack[4]
+            revertRate=regCacheStack[4]["Control"]["Battery_Charge_Rate"]
+        else:
+            revertRate=2600
         payload['chargeRate']=revertRate
         delay=float(pauseTime*60)
         finishtime=GivLUT.getTime(datetime.now()+timedelta(minutes=pauseTime))
@@ -1718,9 +1739,10 @@ async def setDateTime(payload,readloop=False):
         logger.error (temp['result'])
     return json.dumps(temp)
 
-async def setCarChargeBoost(val, readloop=False):
+async def setCarChargeBoost(payload, readloop=False):
     temp={}
     targetresult="Success"
+    val=payload['boost']
     try:
         logger.debug("Setting Car Charge Boost to: "+str(val)+"w")
         temp= await sccb(val,readloop)
@@ -1793,10 +1815,12 @@ def rebootAddon():
                         'Authorization': 'Bearer {}'.format(access_token)})
             logger.info("Supervisor restart was: "+str(result))
         else:
-            open("/app/.reboot", 'w').close()
-            result="Container restarting within 60s"
-            logger.info("Container restart was: "+str(result))
-        
+            # Kill main process rather than request reboot to main loop
+            #open("/app/.reboot", 'w').close()
+            result="Please restart GivTCP Manually..."
+            #result="Container main process terminated..."
+            logger.info(result)          
+            #os.kill(1, signal.SIGILL)
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         temp['result']="Failed to reboot GivTCP: " + str(e) 

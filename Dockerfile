@@ -36,6 +36,7 @@ COPY WebDashboard ./WebDashboard
 # COPY givenergy_modbus/ /usr/local/lib/python3.11/site-packages/givenergy_modbus
 COPY GivTCP/givenergy_modbus_async/ /usr/local/lib/python3.11/site-packages/givenergy_modbus_async
 
+COPY api.json ./GivTCP/api.json
 COPY startup_2.py startup.py
 COPY redis.conf redis.conf
 COPY settings.json ./settings.json

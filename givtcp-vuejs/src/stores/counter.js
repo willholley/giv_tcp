@@ -4,7 +4,6 @@ import { useSessionStorage } from '@vueuse/core'
 export const useTcpStore = defineStore('givtcp-form', {
   state: () => ({
     inverters: useSessionStorage('inverters', {
-      NUMINVERTORS: 1,
       inverter_enable_1: true,
       invertorIP_1: "",
       serial_number_1: "",
@@ -106,14 +105,6 @@ export const useCard = defineStore('card', {
       title: 'Inverter Config',
       subtitle: 'Key Invertor details. Serial Number will be automatically added.',
       fields: [
-        {
-          type: 'text',
-          options: {
-            label: 'Number of Inverters',
-            parent: 'inverters',
-            key: 'NUMINVERTORS'
-          }
-        },
         {
           type: 'checkbox',
           options: {

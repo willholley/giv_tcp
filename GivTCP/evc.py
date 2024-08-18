@@ -553,10 +553,8 @@ def chargeMode(once=False):
                     logger.info("Session energy limit reached: "+str(evcRegCache['Charger']['Charge_Session_Energy'])+"kWh stopping charge")
                     setChargeControl("Stop")
                 if not int(evcRegCache['Charger']['Import_Cap'])==0 and evcRegCache['Charger']['Charging_State']=="Charging":
-                    if exists(GivLUT.regcache):
-                        with GivLUT.cachelock:
-                            with open(GivLUT.regcache, 'rb') as inp:
-                                invRegCache= pickle.load(inp)
+                    invRegCache = GivLUT.get_regcache()
+                    if invRegCache:
                         if float(invRegCache[4]['Power']['Power']['Grid_Current'])>(float(evcRegCache['Charger']['Import_Cap'])*0.95):
                             target=float(evcRegCache['Charger']['Import_Cap'])*0.9
                             reduction=(float(invRegCache[4]['Power']['Power']['Grid_Current']))-target
@@ -584,14 +582,13 @@ def hybridmode():
             with cacheLock:
                 with open(EVCLut.regcache, 'rb') as inp:
                     evcRegCache= pickle.load(inp)
-            with GivLUT.cachelock:
-                with open(GivLUT.regcache, 'rb') as inp:
-                    invRegCache= pickle.load(inp)
-            sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
-            spareCurrent=int(max((sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']),0)+6)   #Spare current cannot be negative
-            if not spareCurrent==evcRegCache['Charger']['Charge_Limit']:
-                logger.info("Topping up min charge with Solar curent ("+str(spareCurrent-6)+"A), setting EVC charge to: "+str(spareCurrent)+"A")
-                setCurrentLimit(spareCurrent)
+            invRegCache = GivLUT.get_regcache()
+            if invRegCache:
+                sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
+                spareCurrent=int(max((sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']),0)+6)   #Spare current cannot be negative
+                if not spareCurrent==evcRegCache['Charger']['Charge_Limit']:
+                    logger.info("Topping up min charge with Solar curent ("+str(spareCurrent-6)+"A), setting EVC charge to: "+str(spareCurrent)+"A")
+                    setCurrentLimit(spareCurrent)
     except:
         e=sys.exc_info()
         logger.error("Error in EVC hybrid mode: "+str(e))
@@ -607,20 +604,19 @@ def solarmode():
             with cacheLock:
                 with open(EVCLut.regcache, 'rb') as inp:
                     evcRegCache= pickle.load(inp)
-            with GivLUT.cachelock:
-                with open(GivLUT.regcache, 'rb') as inp:
-                    invRegCache= pickle.load(inp)
-            sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
-            spareCurrent=sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']
-            if sparePower>6:    #only if there's excess above min evse level
-                if not spareCurrent==evcRegCache['Charger']['Current_L1']:
-                    logger.info("Spare Solar curent ("+str(spareCurrent)+"), setting EVC charge to: "+str(spareCurrent)+"A")
-                    setChargeControl("Start")
-                    setCurrentLimit(spareCurrent)
-            else:
-                if not evcRegCache['Charger']['Charge_Control']=="Stop":
-                    logger.info("Solar excess dropped to below 6A, stopping charge")
-                    setChargeControl("Stop")
+            invRegCache = GivLUT.get_regcache()
+            if invRegCache:
+                sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
+                spareCurrent=sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']
+                if sparePower>6:    #only if there's excess above min evse level
+                    if not spareCurrent==evcRegCache['Charger']['Current_L1']:
+                        logger.info("Spare Solar curent ("+str(spareCurrent)+"), setting EVC charge to: "+str(spareCurrent)+"A")
+                        setChargeControl("Start")
+                        setCurrentLimit(spareCurrent)
+                else:
+                    if not evcRegCache['Charger']['Charge_Control']=="Stop":
+                        logger.info("Solar excess dropped to below 6A, stopping charge")
+                        setChargeControl("Stop")
     except:
         e=sys.exc_info()
         logger.error("Error setting EVC solar mode: "+str(e))

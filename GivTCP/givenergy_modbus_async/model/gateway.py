@@ -96,12 +96,21 @@ class Gateway(RegisterGetter, metaclass=DynamicDoc):
         "parallel_aio_num": Def(C.uint16, None, IR(1700)),
         "parallel_aio_online_num": Def(C.uint16, None, IR(1701)),
 
-
     ## Battery
         "e_battery_charge_today": Def(C.deci, None, IR(1795)),
         "e_battery_charge_total": Def(C.uint32, C.deci, IR(1796),IR(1797)),
         "e_battery_discharge_today": Def(C.deci, None, IR(1798)),
         "e_battery_discharge_total": Def(C.uint32, C.deci, IR(1799),IR(1800)),
+
+    #### Additional Holding Registers
+
+    ## EMS
+
+        "parallel_aio_soc": Def(C.uint16, None, HR(491)),
+        "parallel_aio_battery_power": Def(C.uint16, None, HR(492)),
+        "parallel_aio_load_power": Def(C.uint16, None, HR(493)),
+        "battery_nominal_capacity": Def(C.uint16, None, HR(512)),
+
     }
     REGISTER_LUT=dict(BaseInverter.REGISTER_LUT, **NEW_LUT)
 

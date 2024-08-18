@@ -71,7 +71,7 @@ class GivMQTT():
     def on_disconnect(_client, userdata, flags, reason_code, properties):
         _client.connected_flag=False #set flag
         _client.loop_stop()
-        logger.info("MQTT connection disconnected")
+        logger.debug("MQTT connection disconnected")
 
     def on_connect(_client, userdata, flags, reason_code, properties):
         if reason_code==0:
