@@ -43,11 +43,23 @@
             "usage": "Enable Discharge target schedule",
             "payload": "{'state':'enable' or 'disable'}"
         },
+        "setForceCharge": {
+            "url": "/setForceCharge",
+            "method": "POST",
+            "usage": "Enables Force Charge on Three Phase Inverters",
+            "payload": "{'state':'enabled' or \"disabled'}"
+        },
         "forceCharge": {
             "url": "/forceCharge",
             "method": "POST",
             "usage": "Forces battery to charge for the defined duration in Minutes or send Cancel command",
             "payload": "{'duration':'30' or 'Cancel'}"
+        },
+        "setForceDischarge": {
+            "url": "/setForceDischarge",
+            "method": "POST",
+            "usage": "Enables Force Discharge on Three Phase Inverters",
+            "payload": "{'state':'enabled' or \"disabled'}"
         },
         "forceExport": {
             "url": "/forceExport",
@@ -119,12 +131,6 @@
             "url": "/setBatteryPauseMode",
             "method": "POST",
             "usage": "Sets the battery pause mode setting, (requires pauseslot to be set)",
-            "payload": "{'state':'enable' or 'disable'}"
-        },
-        "setBatteryPowerMode": {
-            "url": "/setBatteryPowerMode",
-            "method": "POST",
-            "usage": "Toggles the battery 'Eco Mode' setting (otherwise known as 'winter mode')",
             "payload": "{'state':'enable' or 'disable'}"
         },
         "setBatteryReserve": {
@@ -208,8 +214,8 @@
         "setDischargeTarget": {
             "url": "/setDischargeTarget",
             "method": "POST",
-            "usage": "Set Discharge target SOC by defining which target slot and SOC. Select EMS if device is an EMS",
-            "payload": "{'exportToPercent':'45', 'slot':'1', 'EMS':'False' (optional)}"
+            "usage": "Set Discharge target SOC by defining which target slot and SOC.",
+            "payload": "{'exportToPercent':'45', 'slot':'1'}"
         },
         "setDischargeRate": {
             "url": "/setDischargeRate",
@@ -247,11 +253,29 @@
             "usage": "Set Battery pause control timeslot",
             "payload": "{'start':'16:00','finish':'19:00'}"
         },
+        "setACCharge": {
+            "url": "/setACCharge",
+            "method": "POST",
+            "usage": "Enables AC Charge on Three Phase Inverters",
+            "payload": "{'state':'enabled' or \"disabled'}"
+        },
+        "setEcoMode": {
+            "url": "/setEcoMode",
+            "method": "POST",
+            "usage": "Toggles the battery 'Eco Mode' setting (otherwise known as 'winter mode')",
+            "payload": "{'state':'enable' or 'disable'}"
+        },
         "switchRate": {
             "url": "/switchRate",
             "method": "POST",
             "usage": "Sets dynamic tariff rate",
             "payload": "{'rate':'day' or \"night'}"
+        },
+        "syncDateTime": {
+            "url": "/syncDateTime",
+            "method": "POST",
+            "usage": "Syncs the inverter system time and date with Container time",
+            "payload": "{'dateTime':'%d/%m/%Y %H:%M:%S'}"
         },
         "tempPauseCharge": {
             "url": "/tempPauseCharge",

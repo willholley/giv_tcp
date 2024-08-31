@@ -11,3 +11,5 @@ services:
     network_mode: "host"
     restart: always
     privileged: true
+    environment:
+      - TZ = "Europe/London"

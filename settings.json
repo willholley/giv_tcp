@@ -1,6 +1,7 @@
 {
+    "v3upgrade": true,
     "invertorIP_1": "",
-    "inverter_enable_1": true,
+    "inverter_enable_1": false,
     "Model_1": "",
     "serial_number_1": "",
     "inverterName_1":"GivTCP",

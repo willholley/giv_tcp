@@ -52,7 +52,7 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "variable_address": Def(C.uint16, None, HR(24)),
         "variable_value": Def(C.uint16, None, HR(25)),
         "grid_port_max_power_output": Def(C.uint16, None, HR(26)),
-        "battery_power_mode": Def(C.uint16, BatteryPowerMode, HR(27), valid=(0, 1)),
+        "eco_mode": Def(C.uint16, BatteryPowerMode, HR(27), valid=(0, 1)),
         "enable_60hz_freq_mode": Def(C.bool, None, HR(28)),
         "soc_force_adjust": Def(C.uint16, BatteryCalibrationStage, HR(29), valid=(0,3)),
         "modbus_address": Def(C.uint16, None, HR(30)),

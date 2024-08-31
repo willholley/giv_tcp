@@ -163,6 +163,7 @@ class Client:
         from ..pdu import ReadInputRegistersRequest
         
         # Get BAM data at 0xA0
+        self.plant.bcu_list=[]      #reset to no bcus at start of discovery
         req=[]
         req.append(
             ReadInputRegistersRequest(
@@ -235,9 +236,9 @@ class Client:
             self.plant.detect_meters()
         
             # Use that to detect the number of batteries
-        _logger.info("Batteries detected: %d", self.plant.bcu_list)
-        _logger.info("Meters detected: %d", self.plant.meter_list)
-        _logger.info("Slave address in use: "+ str(self.plant.slave_address))
+        _logger.debug("Batteries detected: %d", self.plant.number_batteries)
+        _logger.debug("Meters detected: %d", len(self.plant.meter_list))
+        _logger.debug("Slave address in use: "+ str(self.plant.slave_address))
 
         #Get Meter Product Info
 

@@ -2,7 +2,7 @@
 # version 2021.12.22
 from os.path import exists
 import sys
-from flask import Flask, request, send_from_directory, render_template, Response
+from flask import Flask, request, render_template, Response
 from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
@@ -165,7 +165,7 @@ def enChargeTrgt():
     payload = request.get_json(silent=True, force=True)
     requestcommand("enableChargeTarget",payload)
     return response("setChargeTarget")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/enableChargeSchedule', methods=['POST'])
 def enableChrgSchedule():
@@ -176,7 +176,7 @@ def enableChrgSchedule():
     payload = request.get_json(silent=True, force=True)
     requestcommand("enableChargeSchedule",payload)
     return response("enableChargeSchedule")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/enableDischargeSchedule', methods=['POST'])
 def enableDischrgSchedule():
@@ -187,7 +187,7 @@ def enableDischrgSchedule():
     payload = request.get_json(silent=True, force=True)
     requestcommand("enableDischargeSchedule",payload)
     return response("enableDischargeSchedule")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/enableDischarge', methods=['POST'])
 def enableBatDisharge():
@@ -198,7 +198,7 @@ def enableBatDisharge():
     payload = request.get_json(silent=True, force=True)
     requestcommand("enableDischarge",payload)
     return response("enableDischarge")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 ### Should this include a slot number and use setChargeTarget2 ###
 
@@ -211,7 +211,7 @@ def setChrgTarget():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setChargeTarget",payload)
     return response("setChargeTarget")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setExportTarget', methods=['POST'])
 def setExpTarget():
@@ -222,7 +222,7 @@ def setExpTarget():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setExportTarget",payload)
     return response("setExportTarget")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setDischargeTarget', methods=['POST'])
 def setDischrgTarget():
@@ -233,7 +233,7 @@ def setDischrgTarget():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setDischargeTarget",payload)
     return response("setDischargeTarget")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setBatteryReserve', methods=['POST'])
 def setBattReserve():
@@ -244,7 +244,7 @@ def setBattReserve():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setBatteryReserve",payload)
     return response("setBatteryReserve")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setBatteryCutoff', methods=['POST'])
 def setBattCut():
@@ -255,7 +255,7 @@ def setBattCut():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setBatteryCutoff",payload)
     return response("setBatteryCutoff")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setChargeRate', methods=['POST'])
 def setChrgeRate():
@@ -266,7 +266,7 @@ def setChrgeRate():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setChargeRate",payload)
     return response("setChargeRate")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setCarChargeBoost', methods=['POST'])
 def setCarBoost():
@@ -277,14 +277,14 @@ def setCarBoost():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setCarChargeBoost",payload)
     return response("setCarChargeBoost")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setExportLimit', methods=['POST'])
 def setExpLim():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setExportLimit",payload)
     return response("setExportLimit")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setDischargeRate', methods=['POST'])
 def setDischrgeRate():
@@ -295,7 +295,7 @@ def setDischrgeRate():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setDischargeRate",payload)
     return response("setDischargeRate")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setPauseSlot', methods=['POST'])
 def setPausSlot():
@@ -306,7 +306,7 @@ def setPausSlot():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setPauseSlot",payload)
     return response("setPauseSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 ### Should these now include a slot number as the input? ###
 
@@ -319,7 +319,7 @@ def setChrgSlot():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setChargeSlot",payload)
     return response("setChargeSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setChargeSlot1', methods=['POST'])
 def setChrgSlot1():
@@ -331,7 +331,7 @@ def setChrgSlot1():
     payload['slot']=1
     requestcommand("setChargeSlot",payload)
     return response("setChargeSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setChargeSlot2', methods=['POST'])
 def setChrgSlot2():
@@ -343,7 +343,7 @@ def setChrgSlot2():
     payload['slot']=2
     requestcommand("setChargeSlot",payload)
     return response("setChargeSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setChargeSlot3', methods=['POST'])
 def setChrgSlot3():
@@ -355,7 +355,7 @@ def setChrgSlot3():
     payload['slot']=3
     requestcommand("setChargeSlot",payload)
     return response("setChargeSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setDischargeSlot', methods=['POST'])
 def setDischrgSlot():
@@ -377,7 +377,7 @@ def setDischrgSlot1():
     payload['slot']=1
     requestcommand("setDischargeSlot",payload)
     return response("setDischargeSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setDischargeSlot2', methods=['POST'])
 def setDischrgSlot2():
@@ -389,7 +389,7 @@ def setDischrgSlot2():
     payload['slot']=2
     requestcommand("setDischargeSlot",payload)
     return response("setDischargeSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setDischargeSlot3', methods=['POST'])
 def setDischrgSlot3():
@@ -402,7 +402,7 @@ def setDischrgSlot3():
     payload['slot']=3
     requestcommand("setDischargeSlot",payload)
     return response("setDischargeSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setExportSlot1', methods=['POST'])
 def setExpSlot1():
@@ -414,7 +414,7 @@ def setExpSlot1():
     payload['slot']=1
     requestcommand("setExportSlot",payload)
     return response("setExportSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 @giv_api.route('/setExportSlot2', methods=['POST'])
 def setExpSlot2():
     """Set Export schedule timeslot 2
@@ -425,7 +425,7 @@ def setExpSlot2():
     payload['slot']=2
     requestcommand("setExportSlot",payload)
     return response("setExportSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 @giv_api.route('/setExportSlot3', methods=['POST'])
 def setExpSlot3():
     """Set Export schedule timeslot 3
@@ -436,7 +436,7 @@ def setExpSlot3():
     payload['slot']=3
     requestcommand("setExportSlot",payload)
     return response("setExportSlot")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/tempPauseDischarge', methods=['POST'])
 def tmpPauseDischrg():
@@ -446,7 +446,7 @@ def tmpPauseDischrg():
     """
     payload = request.get_json(silent=True, force=True)
     if payload['duration'] == "Cancel" or payload['duration'] == "0":
-        if exists(".tpdRunning"):
+        if exists(".tpdRunning_"+str(GiV_Settings.givtcp_instance)):
             jobid= str(open(".tpdRunning','r").readline().strip('\n'))
             logger.debug("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
             requestcommand("cancelJob",jobid)
@@ -457,7 +457,7 @@ def tmpPauseDischrg():
     else:
         requestcommand("tempPauseDischarge",int(payload['duration']))
         return response("tempPauseDischarge")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/tempPauseCharge', methods=['POST'])
 def tmpPauseChrg():
@@ -467,7 +467,7 @@ def tmpPauseChrg():
     """
     payload = request.get_json(silent=True, force=True)
     if payload['duration'] == "Cancel" or payload['duration'] == "0":
-        if exists(".tpcRunning"):
+        if exists(".tpcRunning_"+str(GiV_Settings.givtcp_instance)):
             jobid= str(open(".tpcRunning','r").readline().strip('\n'))
             logger.info("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
             requestcommand("cancelJob",jobid)
@@ -478,7 +478,7 @@ def tmpPauseChrg():
     else:
         requestcommand("tempPauseCharge",int(payload['duration']))
         return response("tempPauseCharge")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/forceCharge', methods=['POST'])
 def frceChrg():
@@ -489,8 +489,8 @@ def frceChrg():
     payload = request.get_json(silent=True, force=True)
     #Check if Cancel then return the right function
     if payload['duration'] == "Cancel" or payload['duration'] == "0":
-        if exists(".FCRunning"):
-            jobid= str(open(".FCRunning','r").readline()).strip('\n')
+        if exists(".FCRunning"+str(GiV_Settings.givtcp_instance)):
+            jobid= str(open(".FCRunning"+str(GiV_Settings.givtcp_instance),"r").readline()).strip('\n')
             logger.debug("Retrieved jobID to cancel Force Charge: "+ str(jobid))
             requestcommand("cancelJob",jobid)
             return response("cancelJob")
@@ -500,7 +500,7 @@ def frceChrg():
     else:
         requestcommand("forceCharge",int(payload['duration']))
         return response("forceCharge")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/forceExport', methods=['POST'])
 def frceExprt():
@@ -511,8 +511,8 @@ def frceExprt():
 
     payload = request.get_json(silent=True, force=True)
     if payload['duration'] == "Cancel" or payload['duration'] == "0":
-        if exists(".FERunning"):
-            jobid= str(open(".FERunning','r").readline()).strip('\n')
+        if exists(".FERunning"+str(GiV_Settings.givtcp_instance)):
+            jobid= str(open(".FERunning"+str(GiV_Settings.givtcp_instance),"r").readline()).strip('\n')
             logger.debug("Retrieved jobID to cancel Force Export: "+ str(jobid))
             requestcommand("cancelJob",jobid)
             return response("cancelJob")
@@ -522,7 +522,7 @@ def frceExprt():
     else:
         requestcommand("forceExport",int(payload['duration']))
         return response("forceExport")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setBatteryMode', methods=['POST'])
 def setBattMode():
@@ -533,18 +533,18 @@ def setBattMode():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setBatteryMode",payload)
     return response("setBatteryMode")
-    #return {'result':'Control command sent: "+str(payload)}
 
-@giv_api.route('/setBatteryPowerMode', methods=['POST'])
-def setBattPwrMode():
+
+@giv_api.route('/setEcoMode', methods=['POST'])
+def stEcoMde():
     """Toggles the battery 'Eco Mode' setting (otherwise known as 'winter mode')
 
     Payload: {'state':'enable' or 'disable'}
     """
     payload = request.get_json(silent=True, force=True)
-    requestcommand("setBatteryPowerMode",payload)
-    return response("setBatteryPowerMode")
-    #return {'result':'Control command sent: "+str(payload)}
+    requestcommand("setEcoMode",payload)
+    return response("setEcoMode")
+
 
 @giv_api.route('/setBatteryPauseMode', methods=['POST'])
 def setBattPausMode():
@@ -555,7 +555,7 @@ def setBattPausMode():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setBatteryPauseMode",payload)
     return response("setBatteryPauseMode")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setDateTime', methods=['POST'])
 def setDate():
@@ -566,7 +566,18 @@ def setDate():
     payload = request.get_json(silent=True, force=True)
     requestcommand("setDateTime",payload)
     return response("setDateTime")
-    #return {'result':'Control command sent: "+str(payload)}
+
+
+@giv_api.route('/syncDateTime', methods=['POST'])
+def syncDate():
+    """Syncs the inverter system time and date with Container time
+
+    Payload: {'dateTime':'%d/%m/%Y %H:%M:%S'}
+    """
+    payload = request.get_json(silent=True, force=True)
+    requestcommand("syncDateTime",payload)
+    return response("syncDateTime")
+
 
 @giv_api.route('/switchRate', methods=['POST'])
 def swRates():
@@ -577,7 +588,7 @@ def swRates():
     payload = request.get_json(silent=True, force=True)
     requestcommand("switchRate",payload['rate'])
     return response("switchRate")
-    #return {'result':'Control command sent: "+str(payload)}
+
 
 @giv_api.route('/setImportCap', methods=['POST'])
 def impCap():
@@ -596,6 +607,37 @@ def currLimit():
     """
     payload = request.get_json(silent=True, force=True)
     return evc.setCurrentLimit(payload['current'])
+
+@giv_api.route('/setForceDischarge', methods=['POST'])
+def frceDischarge():
+    """Enables Force Discharge on Three Phase Inverters
+
+    Payload: {'state':'enabled' or "disabled'}
+    """
+    payload = request.get_json(silent=True, force=True)
+    requestcommand("setForceDischarge",payload['state'])
+    return response("setForceDischarge")
+
+@giv_api.route('/setForceCharge', methods=['POST'])
+def frceCharge():
+    """Enables Force Charge on Three Phase Inverters
+
+    Payload: {'state':'enabled' or "disabled'}
+    """
+    payload = request.get_json(silent=True, force=True)
+    requestcommand("setForceCharge",payload['state'])
+    return response("setForceCharge")
+
+@giv_api.route('/setACCharge', methods=['POST'])
+def setSCChrg():
+    """Enables AC Charge on Three Phase Inverters
+
+    Payload: {'state':'enabled' or "disabled'}
+    """
+    payload = request.get_json(silent=True, force=True)
+    requestcommand("setACCharge",payload['state'])
+    return response("setACCharge")
+
 
 @giv_api.route('/setChargeControl', methods=['POST'])
 def chrgeControl():

@@ -61,6 +61,7 @@ class GivMQTT():
 
     def requestcommand(command,payload):
         requests=[]
+        logger.info("Requesting Control Action: "+str(command)+" - "+str(payload))
         if exists(GivLUT.writerequests):
             with open(GivLUT.writerequests,'rb') as inp:
                 requests=pickle.load(inp)
@@ -89,7 +90,7 @@ class GivMQTT():
                 #GivMQTT.connect()
                 logger.debug ("In wait loop (single_MQTT_publish)")
                 time.sleep(0.2)
-            GivMQTT.client.publish(Topic,value)
+            client.publish(Topic,value)
         except:
             e=sys.exc_info()[0].__name__, basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
@@ -155,6 +156,22 @@ class GivMQTT():
                 payload['chargeRate']=str(message.payload.decode("utf-8"))
                 #wr.setChargeRateAC(payload)
                 requestcommand(command,payload)
+            elif command=="syncDateTime":
+                payload['state']=str(message.payload.decode("utf-8"))
+                #wr.enableChargeSchedule(payload)
+                requestcommand(command,payload)
+            elif command=="setForceCharge":
+                payload['state']=str(message.payload.decode("utf-8"))
+                #wr.enableChargeSchedule(payload)
+                requestcommand(command,payload)
+            elif command=="setForceDischarge":
+                payload['state']=str(message.payload.decode("utf-8"))
+                #wr.enableChargeSchedule(payload)
+                requestcommand(command,payload)
+            elif command=="setACCharge":
+                payload['state']=str(message.payload.decode("utf-8"))
+                #wr.enableChargeSchedule(payload)
+                requestcommand(command,payload)
             elif command=="rebootInverter":
                 #wr.rebootinverter()
                 requestcommand(command,payload)
@@ -173,13 +190,13 @@ class GivMQTT():
                 payload['state']=str(message.payload.decode("utf-8"))
                 #wr.enableChargeSchedule(payload)
                 requestcommand(command,payload)
-            elif command=="enableDishargeSchedule":
+            elif command=="enableDischargeSchedule":
                 payload['state']=str(message.payload.decode("utf-8"))
                 #wr.enableDischargeSchedule(payload)
                 requestcommand(command,payload)
-            elif command=="setBatteryPowerMode":
+            elif command=="setEcoMode":
                 payload['state']=str(message.payload.decode("utf-8"))
-                #wr.setBatteryPowerMode(payload)
+                #wr.setEcoMode(payload)
                 requestcommand(command,payload)
             elif command=="setBatteryPauseMode":
                 payload['state']=str(message.payload.decode("utf-8"))
@@ -661,8 +678,8 @@ class GivMQTT():
             elif command=="tempPauseDischarge":
                 if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                     # Get the Job ID from the touchfile
-                    if exists(".tpdRunning"):
-                        jobid= str(open(".tpdRunning","r").readline().strip('\n'))
+                    if exists(".tpdRunning_"+str(GiV_Settings.givtcp_instance)):
+                        jobid= str(open(".tpdRunning_"+str(GiV_Settings.givtcp_instance),"r").readline().strip('\n'))
                         logger.debug("Retrieved jobID to cancel Temp Pause Discharge: "+ str(jobid))
                         result=wr.cancelJob(jobid)
                     else:
@@ -674,8 +691,8 @@ class GivMQTT():
             elif command=="tempPauseCharge":
                 if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                     # Get the Job ID from the touchfile
-                    if exists(".tpcRunning"):
-                        jobid= str(open(".tpcRunning","r").readline().strip('\n'))
+                    if exists(".tpcRunning_"+str(GiV_Settings.givtcp_instance)):
+                        jobid= str(open(".tpcRunning_"+str(GiV_Settings.givtcp_instance),"r").readline().strip('\n'))
                         logger.debug("Retrieved jobID to cancel Temp Pause Charge: "+ str(jobid))
                         result=wr.cancelJob(jobid)
                     else:
@@ -687,8 +704,8 @@ class GivMQTT():
             elif command=="forceCharge":
                 if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                     # Get the Job ID from the touchfile
-                    if exists(".FCRunning"):
-                        jobid= str(open(".FCRunning","r").readline().strip('\n'))
+                    if exists(".FCRunning"+str(GiV_Settings.givtcp_instance)):
+                        jobid= str(open(".FCRunning"+str(GiV_Settings.givtcp_instance),"r").readline().strip('\n'))
                         logger.info("Retrieved jobID to cancel Force Charge: "+ str(jobid))
                         requestcommand("cancelJob",jobid)
                     else:
@@ -700,8 +717,8 @@ class GivMQTT():
             elif command=="forceExport":
                 if message.payload.decode("utf-8") == "Cancel" or message.payload.decode("utf-8") == "Normal" or float(message.payload.decode("utf-8"))==0:
                     # Get the Job ID from the touchfile
-                    if exists(".FERunning"):
-                        jobid= str(open(".FERunning","r").readline().strip('\n'))
+                    if exists(".FERunning"+str(GiV_Settings.givtcp_instance)):
+                        jobid= str(open(".FERunning"+str(GiV_Settings.givtcp_instance),"r").readline().strip('\n'))
                         logger.info("Retrieved jobID to cancel Force Export: "+ str(jobid))
                         requestcommand("cancelJob",jobid)
                     else:

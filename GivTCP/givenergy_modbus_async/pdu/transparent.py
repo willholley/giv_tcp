@@ -86,7 +86,9 @@ class TransparentMessage(BasePDU, ABC):
         attrs["padding"] = decoder.decode_64bit_uint()
         attrs["slave_address"] = decoder.decode_8bit_uint()
         transparent_function_code = decoder.decode_8bit_uint()
-        if transparent_function_code & 0x80:
+        if transparent_function_code > 135:
+#         if transparent_function_code & 0x80:
+            _logger.critical("Function code response was: "+str(transparent_function_code))
             error = True
             transparent_function_code &= 0x7F
         else:
@@ -191,7 +193,10 @@ class TransparentResponse(TransparentMessage, ClientIncomingMessage, ABC):
             return ReadInputRegistersResponse
         elif transparent_function_code == 6:
             return WriteHoldingRegisterResponse
-        elif transparent_function_code == 22:       #This is meter product responses
+        elif transparent_function_code == 134:       #Accept as the broken AC3 BPM response
+            _logger.critical("")
+            return WriteHoldingRegisterResponse
+        elif transparent_function_code == 22:        #This is meter product responses - currently unused
             return ReadMeterProductRegistersResponse
         else:
             raise NotImplementedError(

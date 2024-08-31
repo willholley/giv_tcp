@@ -128,12 +128,18 @@ class Converter:
 
     @staticmethod
     def battery_capacity(nom_cap: int, model: int) -> Optional[str]:
-        """Represent ARM & DSP firmware versions in the same format as the dashboard."""
+        """Represent BCU capacity in kWh from Ah."""
         model=f"{model:0{4}x}"
         if model[0] in ['4','6','8']:
-            return round((nom_cap*307)/1000,2)
+            return round((nom_cap*317)/1000,2)
         else:
             return round((nom_cap*51.2)/1000,2)
+        
+    @staticmethod
+    def battery_capacity_hv(nom_cap: int) -> Optional[str]:
+        """Represent BCU capacity in kWh from Ah."""
+        return round((nom_cap*76.8)/1000,2)
+    
 
     @staticmethod
     def inverter_max_power(device_type_code: str) -> Optional[int]:
@@ -579,8 +585,8 @@ class BatteryPriority(IntEnum):
         return cls(0)
 
 class Enable(IntEnum):
-    DISABLED = 0
-    ENABLED = 1
+    DISABLE = 0
+    ENABLE = 1
 
     @classmethod
     def _missing_(cls, value):
@@ -610,7 +616,7 @@ class Model(StrEnum):
 
     @classmethod
     def _missing_(cls, value):
-        """Pick model from the first digit of the device type code."""
+        """Just return Hybrid."""
         return cls(value[0])
     
     @classmethod

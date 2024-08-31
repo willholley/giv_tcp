@@ -29,7 +29,7 @@ class RegisterMap:
     """Mapping of holding register function to location."""
 
     ENABLE_CHARGE_TARGET = 20
-    BATTERY_POWER_MODE = 27
+    ECO_MODE = 27
     SOC_FORCE_ADJUST = 29
     CHARGE_SLOT_2_START = 31
     CHARGE_SLOT_2_END = 32
@@ -49,10 +49,12 @@ class RegisterMap:
     CHARGE_SLOT_1_END = 95
     ENABLE_CHARGE = 96
     BATTERY_SOC_RESERVE = 110
+    TPH_BATTERY_SOC_RESERVE = 1109
     BATTERY_CHARGE_LIMIT = 111
     BATTERY_DISCHARGE_LIMIT = 112
     BATTERY_DISCHARGE_MIN_POWER_RESERVE = 114
     CHARGE_TARGET_SOC = 116
+    TPH_CHARGE_TARGET_SOC = 1111
     REBOOT = 163
     CHARGE_TARGET_SOC_1 = 242
     CHARGE_SLOT_2_START = 243
@@ -109,20 +111,17 @@ class RegisterMap:
     DISCHARGE_SLOT_10_END = 298
     DISCHARGE_TARGET_SOC_10 = 299
     BATTERY_CHARGE_LIMIT_AC = 313
+    TPH_BATTERY_CHARGE_LIMIT_AC = 1110
     BATTERY_DISCHARGE_LIMIT_AC = 314
+    TPH_BATTERY_DISCHARGE_LIMIT_AC = 1108
     BATTERY_PAUSE_MODE = 318
     BATTERY_PAUSE_SLOT_START = 319
     BATTERY_PAUSE_SLOT_END = 320
-    TPH_DISCHARGE_SLOT_1_START = 1118
-    TPH_DISCHARGE_SLOT_1_END = 1119
-    TPH_DISCHARGE_SLOT_2_START = 1120
-    TPH_DISCHARGE_SLOT_2_END = 1121
     TPH_CHARGE_SLOT_1_START = 1113
     TPH_CHARGE_SLOT_1_END = 1114
     TPH_CHARGE_TARGET_SOC_1 = 242
     TPH_CHARGE_SLOT_2_START = 1115
     TPH_CHARGE_SLOT_2_END = 1116
-    # These are duplicates to make it easy to be TPH aware
     TPH_CHARGE_TARGET_SOC_2 = 245
     TPH_CHARGE_SLOT_3_START = 246
     TPH_CHARGE_SLOT_3_END = 247
@@ -148,7 +147,11 @@ class RegisterMap:
     TPH_CHARGE_SLOT_10_START = 267
     TPH_CHARGE_SLOT_10_END = 268
     TPH_CHARGE_TARGET_SOC_10 = 269
+    TPH_DISCHARGE_SLOT_1_START = 1118
+    TPH_DISCHARGE_SLOT_1_END = 1119
     TPH_DISCHARGE_TARGET_SOC_1 = 272
+    TPH_DISCHARGE_SLOT_2_START = 1120
+    TPH_DISCHARGE_SLOT_2_END = 1121
     TPH_DISCHARGE_TARGET_SOC_2 = 275
     TPH_DISCHARGE_SLOT_3_START = 276
     TPH_DISCHARGE_SLOT_3_END = 277
@@ -175,8 +178,9 @@ class RegisterMap:
     TPH_DISCHARGE_SLOT_10_END = 298
     TPH_DISCHARGE_TARGET_SOC_10 = 299
     # End of duplicates
+    AC_CHARGE_ENABLE= 1112
     FORCE_DISCHARGE_ENABLE = 1122
-    FORCE_DISCHARGE_ENABLE = 1123
+    FORCE_CHARGE_ENABLE = 1123
     EMS_DISCHARGE_SLOT_1_START = 2044
     EMS_DISCHARGE_SLOT_1_END = 2045
     EMS_DISCHARGE_TARGET_SOC_1 = 2046
@@ -362,7 +366,7 @@ def enable_charge_target() -> list[TransparentRequest]:
     ]
 
 
-def set_charge_target(target_soc: int) -> list[TransparentRequest]:
+def set_charge_target(target_soc: int, inv_type: str="") -> list[TransparentRequest]:
     """Sets inverter to stop charging when SOC reaches the desired level. Also referred to as "winter mode"."""
     if not 4 <= target_soc <= 100:
         raise ValueError(f"Charge Target SOC ({target_soc}) must be in [4-100]%")
@@ -396,17 +400,29 @@ def set_soc_target(discharge: bool, idx: int, target_soc: int, inv_type: str) ->
     return [WriteHoldingRegisterRequest(reg, target_soc)]
 
 
-def set_charge_target_only(target_soc: int) -> list[TransparentRequest]:
+def set_charge_target_only(target_soc: int, inv_type: str="") -> list[TransparentRequest]:
     """Sets inverter to stop charging when SOC reaches the desired level on AC Charge."""
+    reg=getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}CHARGE_TARGET_SOC')
     target_soc = int(target_soc)
     if not 4 <= target_soc <= 100:
         raise ValueError(f"Specified SOC Limit ({target_soc}%) is not in [0-100]%")
-    return [WriteHoldingRegisterRequest(RegisterMap.CHARGE_TARGET_SOC, target_soc)]
+    return [WriteHoldingRegisterRequest(reg, target_soc)]
 
 def set_enable_charge(enabled: bool) -> list[TransparentRequest]:
     """Enable the battery to charge, depending on the mode and slots set."""
     return [WriteHoldingRegisterRequest(RegisterMap.ENABLE_CHARGE, enabled)]
 
+def set_force_charge(enabled: bool) -> list[TransparentRequest]:
+    """Enable the Three Phase battery to charge, depending on the mode and slots set."""
+    return [WriteHoldingRegisterRequest(RegisterMap.FORCE_CHARGE_ENABLE, enabled)]
+
+def set_force_discharge(enabled: bool) -> list[TransparentRequest]:
+    """Enable the Three Phase battery to charge, depending on the mode and slots set."""
+    return [WriteHoldingRegisterRequest(RegisterMap.FORCE_DISCHARGE_ENABLE, enabled)]
+
+def set_ac_charge(enabled: bool) -> list[TransparentRequest]:
+    """Enable the Three Phase battery to charge, depending on the mode and slots set."""
+    return [WriteHoldingRegisterRequest(RegisterMap.AC_CHARGE_ENABLE, enabled)]
 
 def set_enable_discharge(enabled: bool) -> list[TransparentRequest]:
     """Enable the battery to discharge, depending on the mode and slots set."""
@@ -459,12 +475,12 @@ def disable_discharge() -> list[TransparentRequest]:
 
 def set_discharge_mode_max_power() -> list[TransparentRequest]:
     """Set the battery discharge mode to maximum power, exporting to the grid if it exceeds load demand."""
-    return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_POWER_MODE, 0)]
+    return [WriteHoldingRegisterRequest(RegisterMap.ECO_MODE, 0)]
 
 
 def set_discharge_mode_to_match_demand() -> list[TransparentRequest]:
     """Set the battery discharge mode to match demand, avoiding exporting power to the grid."""
-    return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_POWER_MODE, 1)]
+    return [WriteHoldingRegisterRequest(RegisterMap.ECO_MODE, 1)]
 
 
 @deprecated("Use set_battery_soc_reserve(val) instead")
@@ -473,13 +489,14 @@ def set_shallow_charge(val: int) -> list[TransparentRequest]:
     return set_battery_soc_reserve(val)
 
 
-def set_battery_soc_reserve(val: int) -> list[TransparentRequest]:
+def set_battery_soc_reserve(val: int, inv_type: str="") -> list[TransparentRequest]:
     """Set the minimum level of charge to maintain."""
     # TODO what are valid values? 4-100?
+    reg=getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}BATTERY_SOC_RESERVE')
     val = int(val)
     if not 4 <= val <= 100:
         raise ValueError(f"Minimum SOC / shallow charge ({val}) must be in [4-100]%")
-    return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_SOC_RESERVE, val)]
+    return [WriteHoldingRegisterRequest(reg, val)]
 
 def set_car_charge_boost(val: int) -> list[TransparentRequest]:
     """Set the minimum level of charge to maintain."""
@@ -513,20 +530,23 @@ def set_battery_discharge_limit(val: int) -> list[TransparentRequest]:
         raise ValueError(f"Specified Discharge Limit ({val}%) is not in [0-50]%")
     return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_DISCHARGE_LIMIT, val)]
 
-def set_battery_charge_limit_ac(val: int) -> list[TransparentRequest]:
+def set_battery_charge_limit_ac(val: int, inv_type: str="") -> list[TransparentRequest]:
     """Set the battery AC charge power limit as percentage."""
+    reg=getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}BATTERY_CHARGE_LIMIT_AC')
     val = int(val)
     if not 0 <= val <= 100:
         raise ValueError(f"Specified Charge Limit ({val}%) is not in [0-100]%")
-    return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_CHARGE_LIMIT_AC, val)]
+    
+    return [WriteHoldingRegisterRequest(reg, val)]
 
 
-def set_battery_discharge_limit_ac(val: int) -> list[TransparentRequest]:
+def set_battery_discharge_limit_ac(val: int, inv_type: str="") -> list[TransparentRequest]:
     """Set the battery AC discharge power limit as percentage."""
+    reg=getattr(RegisterMap, f'{"TPH_" if "3ph" in inv_type else ""}BATTERY_DISCHARGE_LIMIT_AC')
     val = int(val)
     if not 0 <= val <= 100:
         raise ValueError(f"Specified Discharge Limit ({val}%) is not in [0-100]%")
-    return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_DISCHARGE_LIMIT_AC, val)]
+    return [WriteHoldingRegisterRequest(reg, val)]
 
 def set_battery_power_reserve(val: int) -> list[TransparentRequest]:
     """Set the battery power reserve to maintain."""
@@ -543,9 +563,9 @@ def set_battery_power_reserve(val: int) -> list[TransparentRequest]:
 def set_eco_mode(enabled: bool) -> list[TransparentRequest]:
     """enable eco mode."""
     if enabled:
-        return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_POWER_MODE, 1)]
+        return [WriteHoldingRegisterRequest(RegisterMap.ECO_MODE, 1)]
     else:
-        return [WriteHoldingRegisterRequest(RegisterMap.BATTERY_POWER_MODE, 0)]
+        return [WriteHoldingRegisterRequest(RegisterMap.ECO_MODE, 0)]
 
 def set_battery_pause_mode(val: BatteryPauseMode) -> list[TransparentRequest]:
     """Set the battery pause mode."""

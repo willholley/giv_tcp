@@ -33,11 +33,6 @@ class HAMQTT():
     
 
     def getinvbatmax():
-#        if exists(GivLUT.regcache):      # if there is a cache then grab it
-#            with GivLUT.cachelock:
-#                with open(GivLUT.regcache, 'rb') as inp:
-#                    regCacheStack = pickle.load(inp)
-#                    multi_output_old = regCacheStack[4]
         regCacheStack = GivLUT.get_regcache()
         if regCacheStack:
             multi_output_old = regCacheStack[4]
@@ -323,6 +318,7 @@ class CheckDisco():
     msgs={}
     def on_connect(client, userdata, flags, rc, properties):
         client.subscribe("homeassistant/#")
+        client.subscribe("GivEnergy/#")
 
     def on_message(client, userdata, msg):
         CheckDisco.msgs[str(msg.topic)]=str(msg.payload)
@@ -363,13 +359,20 @@ class CheckDisco():
             newmsg[message[0]]=message[1]
         count=0
         for msg in CheckDisco.msgs:
-            if SN in msg:
-                if msg in newmsg:
-                    old=newmsg[msg]
-                    new=CheckDisco.msgs[msg][2:-1]     #.split('}')[:0]
-                    if not old == new:       #if payload is different delete old one
-                        client.publish(msg)
-                        count+=1
+            if "GivEnergy" in msg:
+                if GiV_Settings.v3Upgrade:
+                    logger.debug("V3 Upgrade so dropping old Discovery Messages")
+                    client.publish(msg)     #delete regardless of if it has changed
+                else:
+                    if msg in newmsg:
+                        old=newmsg[msg]
+                        new=CheckDisco.msgs[msg][2:-1]     #.split('}')[:0]
+                        if not old == new:       #if payload is different delete old one
+                            client.publish(msg)
+                            count+=1
+            #elif "GivEnergy" in msg and GiV_Settings.v3Upgrade:
+            #    logger.info("V3 Upgrade so dropping old retained data messages")
+            #    client.publish(msg)     #delete if its GivEnergy message and V3 upgrade
         logger.debug(str(count)+" discovery messages changed and removed")
         time.sleep(2)
         client.loop_stop()

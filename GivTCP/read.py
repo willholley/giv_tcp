@@ -3,6 +3,7 @@ from givenergy_modbus_async.model.register import Model, Generation
 from givenergy_modbus_async.model.plant import Plant, Inverter
 from givenergy_modbus_async.client.client import commands
 from givenergy_modbus_async.model.register import HR
+from givenergy_modbus_async.exceptions import CommunicationError
 import sys
 import json
 import logging
@@ -11,6 +12,7 @@ import pickle
 import time
 import write
 import inspect
+import requests
 from GivLUT import GivLUT, maxvalues, InvType, GivClientAsync
 from settings import GiV_Settings
 from os.path import exists
@@ -27,6 +29,31 @@ sys.path.append(GiV_Settings.default_path)
 
 givLUT = GivLUT.entity_type
 logger = GivLUT.logger
+
+
+def commsFailure():
+    fname="commsfailure_"+str(GiV_Settings.givtcp_instance)+".pkl"
+    if exists(fname):
+        with open(fname, 'rb') as inp:
+            oldDataCount= pickle.load(inp)
+        oldDataCount = oldDataCount + 1
+    else:
+        oldDataCount = 1
+    with open(fname, 'wb') as outp:
+        pickle.dump(oldDataCount, outp, pickle.HIGHEST_PROTOCOL)
+    return oldDataCount
+
+def rebootaddon():
+    if GiV_Settings.isAddon:
+        access_token = os.getenv("SUPERVISOR_TOKEN")
+        url="http://supervisor/addons/self/restart"
+        result = requests.post(url,
+            headers={'Content-Type':'application/json',
+                    'Authorization': 'Bearer {}'.format(access_token)})
+        logger.info("Supervisor restart was: "+str(result))
+    else:
+        result="Please restart GivTCP Manually..."
+        logger.info(result)
 
 async def watch_plant(
         handler: Optional[Callable] = None,
@@ -47,12 +74,24 @@ async def watch_plant(
             await client.refresh_plant(True, number_batteries=client.plant.number_batteries,meter_list=client.plant.meter_list)
             #await client.close()
             logger.debug ("Running full refresh")
+            if exists("commsfailure_"+str(GiV_Settings.givtcp_instance)+".pkl"):
+                # Remove any failed counts if connection runs OK
+                os.remove("commsfailure_"+str(GiV_Settings.givtcp_instance)+".pkl")
             if handler:
                 try:
                     handler(client.plant)
                 except Exception:
                     e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
                     logger.error ("Error in calling handler: "+str(e))
+
+        except CommunicationError:
+            logger.error ("Unable to connect to inverter on: "+str(GiV_Settings.invertorIP))
+            failcount=commsFailure()
+            if failcount>=10:
+                logger.error("Lost communications with Inverter. Restarting container to detect IP change")
+                rebootaddon()
+            await client.close()
+            return
         except Exception:
             e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error ("Error in inital detect/refresh: "+str(e))
@@ -135,6 +174,15 @@ async def watch_plant(
                         timeoutErrors=0     # Reset timeouts if all is good this run
                         logger.debug("Data get was successful, now running handler if needed: ")
                         lastruntime=datetime.datetime.now()
+                        if exists("commsfailure_"+str(GiV_Settings.givtcp_instance)+".pkl"):
+                            # Remove any failed counts if connection runs OK
+                            os.remove("commsfailure_"+str(GiV_Settings.givtcp_instance)+".pkl")
+                    except CommunicationError:
+                        logger.error ("Unable to connect to inverter on: "+str(GiV_Settings.invertorIP))
+                        failcount=commsFailure()
+                        if failcount>=10:
+                            logger.error("Lost communications with Inverter. Restarting container to detect IP change")
+                            rebootaddon()
                     except Exception:
                         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
                         totalTimeoutErrors=totalTimeoutErrors+1
@@ -161,6 +209,25 @@ async def watch_plant(
                 logger.error ("Error in Watch Loop: "+str(e))
                 await client.close()
 
+def isitoldfw(inverter):
+    # Firmware Versions for each Model
+    # AC coupled 5xx old, 2xx new. 28x, 29x beta
+    # Gen1 4xx Old, 1xx New. 19x Beta
+    # Gen 2 909+ New. 99x Beta   Schedule Pause only for Gen2+
+    # Gen 3 303+ New 39x Beta    New has 10 slots
+    # AIO 6xx New 69x Beta       ALL has 10 slots
+    if inverter['Model']==Model.AC and int(inverter['Firmware'])>500:
+        return True
+    elif inverter['Model']==Model.ALL_IN_ONE and int(inverter['Firmware'])<600:
+        return True
+    elif inverter['Generation']==Generation.GEN1 and int(inverter['Firmware'])>400:
+        return True
+    elif inverter['Generation']==Generation.GEN2 and int(inverter['Firmware'])<909:
+        return True
+    elif inverter['Generation']==Generation.GEN3 and int(inverter['Firmware'])<303:
+        return True
+    return False
+
 def getInvModel(plant: Plant):
 ##### Feels like this needs reviewing and maybe moving to the device models
     inverterModel = InvType
@@ -183,15 +250,15 @@ def getInvModel(plant: Plant):
         elif inverterModel.model == Model.ALL_IN_ONE:
             maxBatChargeRate=6000
         else:
-            maxBatChargeRate=2600
+            maxBatChargeRate=2883
     else:
         if inverterModel.model == Model.AC:
             maxBatChargeRate=5000
         else:
             maxBatChargeRate=3600
     # Calc max charge rate
-    if inverterModel.phase == 3:
-        inverterModel.batmaxrate=GEInv.Battery_Max_Power
+    if inverterModel.model in[Model.AC_3PH,Model.HYBRID_3PH]:
+        inverterModel.batmaxrate=GEInv.battery_max_power
     else:
         inverterModel.batmaxrate=min(maxBatChargeRate, inverterModel.batterycapacity*1000/2)
     return inverterModel
@@ -327,6 +394,12 @@ def getBatteries(plant: Plant):
             bcudata['Stack_SOC_Low']=stack[0].battery_soc_min
             bcudata['Stack_Firmware']=stack[0].pack_software_version
             bcudata['BMS_Temperature']=GEInv.temp_battery
+            bcudata['Stack_Design_Capacity']=round((stack[0].battery_nominal_capacity*stack[0].number_of_module)*0.9,2)     # Usable kWh is 10% less than actual 
+            bcudata['Stack_SOC_kWh']=round((stack[0].remaining_battery_capacity*stack[0].number_of_module)*0.9,2)     # Usable kWh is 10% less than actual
+            bcudata['Stack_Discharge_Energy_Today_kWh']=stack[0].discharge_energy_today
+            bcudata['Stack_Charge_Energy_Today_kWh']=stack[0].charge_energy_today
+            bcudata['Stack_Discharge_Energy_Total_kWh']=stack[0].discharge_energy_total
+            bcudata['Stack_Charge_Energy_Total_kWh']=stack[0].charge_energy_total
             for b in stack[1]:
                 if b.is_valid():
                     sn=b.serial_number
@@ -434,6 +507,9 @@ def getTimeslots(plant: Plant):
 def getControls(plant,regCacheStack, inverterModel):
     controlmode={}
     temp={}
+    is3PH=False
+    if plant.device_type in (Model.AC_3PH, Model.HYBRID_3PH):
+        is3PH=True
     if not plant.inverter ==None:
         GEInv=plant.inverter
     elif not plant.ems ==None:
@@ -451,7 +527,7 @@ def getControls(plant,regCacheStack, inverterModel):
         discharge_schedule = "enable"
     else:
         discharge_schedule = "disable"
-    if GEInv.battery_power_mode == 1:
+    if GEInv.eco_mode == 1:
         batPowerMode="enable"
     else:
         batPowerMode="disable"
@@ -485,15 +561,17 @@ def getControls(plant,regCacheStack, inverterModel):
 
     battery_cutoff = GEInv.battery_discharge_min_power_reserve
     target_soc = GEInv.charge_target_soc
-    if GEInv.battery_soc_reserve <= GEInv.battery_percent:
-        discharge_enable = "enable"
-    else:
-        discharge_enable = "disable"
 
-    # Get Charge/Discharge Active status
-
-    discharge_rate = int(min((GEInv.battery_discharge_limit/100)*inverterModel.batterycapacity*1000, inverterModel.batmaxrate))
-    charge_rate = int(min((GEInv.battery_charge_limit/100)*inverterModel.batterycapacity*1000, inverterModel.batmaxrate))
+    # NON 3PH controls go here
+    if not is3PH:                                     #Not on 3Ph
+        discharge_rate = int(min((GEInv.battery_discharge_limit/100)*inverterModel.batterycapacity*1000, inverterModel.batmaxrate))
+        controlmode['Battery_Discharge_Rate'] = discharge_rate
+        charge_rate = int(min((GEInv.battery_charge_limit/100)*inverterModel.batterycapacity*1000, inverterModel.batmaxrate))
+        controlmode['Battery_Charge_Rate'] = charge_rate
+        controlmode['Enable_Charge_Schedule'] = charge_schedule
+        controlmode['Enable_Discharge_Schedule'] = discharge_schedule
+    
+    
     if GEInv.battery_discharge_limit_ac:
         discharge_rate_ac = int(GEInv.battery_discharge_limit_ac)          #not on old firmware
         controlmode['Battery_Discharge_Rate_AC'] = discharge_rate_ac
@@ -506,19 +584,19 @@ def getControls(plant,regCacheStack, inverterModel):
     logger.debug("Calculating Mode...")
     # Calc Mode
 
-    if GEInv.battery_power_mode == 1 and GEInv.enable_discharge == False and GEInv.battery_soc_reserve != 100:
+    if GEInv.eco_mode == 1 and GEInv.enable_discharge == False and GEInv.battery_soc_reserve != 100:
         # Dynamic r27=1 r110=4 r59=0
         mode = "Eco"
-    elif GEInv.battery_power_mode == 1 and GEInv.enable_discharge == False and GEInv.battery_soc_reserve == 100:
+    elif GEInv.eco_mode == 1 and GEInv.enable_discharge == False and GEInv.battery_soc_reserve == 100:
         # Dynamic r27=1 r110=4 r59=0
         mode = "Eco (Paused)"
-    elif GEInv.battery_power_mode == 1 and GEInv.enable_discharge == True:
+    elif GEInv.eco_mode == 1 and GEInv.enable_discharge == True:
         # Storage (demand) r27=1 r110=100 r59=1
         mode = "Timed Demand"
-    elif GEInv.battery_power_mode == 0 and GEInv.enable_discharge == True:
+    elif GEInv.eco_mode == 0 and GEInv.enable_discharge == True:
         # Storage (export) r27=0 r59=1
         mode = "Timed Export"
-    elif GEInv.battery_power_mode == 0 and GEInv.enable_discharge == False:
+    elif GEInv.eco_mode == 0 and GEInv.enable_discharge == False:
         # Dynamic r27=1 r110=4 r59=0
         mode = "Eco (Paused)"
     else:
@@ -529,18 +607,17 @@ def getControls(plant,regCacheStack, inverterModel):
     controlmode['Mode'] = mode
     controlmode['Battery_Power_Reserve'] = battery_reserve
     controlmode['Battery_Power_Cutoff'] = battery_cutoff
-    controlmode['Battery_Power_Mode'] = batPowerMode
+    controlmode['Eco_Mode'] = batPowerMode
     controlmode['Target_SOC'] = target_soc
+    controlmode['Sync_Time'] = "disable"
 
-    if not GEInv.battery_pause_mode == None:    #not on old firmware
+### How do I tell if inverter has BPM???? It always returns the read register, is it not on AC
+#    if not GEInv.battery_pause_mode == None:    #not on old firmware
+
+    if not GEInv.battery_pause_mode==None:    #Not in AC single phase
         controlmode['Battery_pause_mode'] = GivLUT.battery_pause_mode[int(GEInv.battery_pause_mode)]
 
     controlmode['Battery_Calibration'] = GivLUT.battery_calibration[GEInv.soc_force_adjust]
-    controlmode['Enable_Charge_Schedule'] = charge_schedule
-    controlmode['Enable_Discharge_Schedule'] = discharge_schedule
-    controlmode['Enable_Discharge'] = discharge_enable
-    controlmode['Battery_Charge_Rate'] = charge_rate
-    controlmode['Battery_Discharge_Rate'] = discharge_rate
     controlmode['Active_Power_Rate']= GEInv.active_power_rate
     controlmode['Reboot_Invertor']="disable"
     controlmode['Reboot_Addon']="disable"
@@ -555,41 +632,41 @@ def getControls(plant,regCacheStack, inverterModel):
 
 ### Implement Force number option here###
 
-    if exists(".FCRunning"):
+    if exists(".FCRunning"+str(GiV_Settings.givtcp_instance)):
         logger.debug("Force Charge is Running")
         controlmode['Force_Charge'] = "Running"
         #Get time left to run in mins and publish to number
-        minsremain=getJobFinish(".FCRunning")
+        minsremain=getJobFinish(".FCRunning"+str(GiV_Settings.givtcp_instance))
         logger.debug("Time remaining is" + str(minsremain))
-        controlmode['Force_Charge_Num']=int(minsremain)
+        controlmode['Force_Charge_Num']=max(0,int(minsremain))
     else:
         controlmode['Force_Charge'] = "Normal"
         controlmode['Force_Charge_Num']=0
-    if exists(".FERunning"):
+    if exists(".FERunning"+str(GiV_Settings.givtcp_instance)):
         logger.debug("Force_Export is Running")
         controlmode['Force_Export'] = "Running"
-        minsremain=getJobFinish(".FERunning")
+        minsremain=getJobFinish(".FERunning"+str(GiV_Settings.givtcp_instance))
         logger.debug("Time remaining is" + str(minsremain))
-        controlmode['Force_Export_Num']=int(minsremain)
+        controlmode['Force_Export_Num']=max(0,int(minsremain))
     else:
         logger.debug("Force Export is not Running")
         controlmode['Force_Export'] = "Normal"
         controlmode['Force_Export_Num']=0
-    if exists(".tpcRunning"):
+    if exists(".tpcRunning_"+str(GiV_Settings.givtcp_instance)):
         logger.debug("Temp Pause Charge is Running")
         controlmode['Temp_Pause_Charge'] = "Running"
-        minsremain=getJobFinish(".tpcRunning")
+        minsremain=getJobFinish(".tpcRunning_"+str(GiV_Settings.givtcp_instance))
         logger.debug("Time remaining is" + str(minsremain))
-        controlmode['Temp_Pause_Charge_Num']=int(minsremain)
+        controlmode['Temp_Pause_Charge_Num']=max(0,int(minsremain))
     else:
         controlmode['Temp_Pause_Charge'] = "Normal"
         controlmode['Temp_Pause_Charge_Num']=0
-    if exists(".tpdRunning"):
+    if exists(".tpdRunning_"+str(GiV_Settings.givtcp_instance)):
         logger.debug("Temp_Pause_Discharge is Running")
         controlmode['Temp_Pause_Discharge'] = "Running"
-        minsremain=getJobFinish(".tpdRunning")
+        minsremain=getJobFinish(".tpdRunning_"+str(GiV_Settings.givtcp_instance))
         logger.debug("Time remaining is" + str(minsremain))
-        controlmode['Temp_Pause_Discharge_Num']=int(minsremain)
+        controlmode['Temp_Pause_Discharge_Num']=max(0,int(minsremain))
     else:
         controlmode['Temp_Pause_Discharge'] = "Normal"
         controlmode['Temp_Pause_Discharge_Num']=0
@@ -616,12 +693,13 @@ def processInverterInfo(plant: Plant):
     logger.debug("Getting Total Energy Data")
     if not isHV:
         #if GEInv.e_battery_charge_total == 0 and GEInv.e_battery_discharge_total == 0 and not GiV_Settings.numBatteries==0:  # If no values in "nomal" registers then grab from back up registers - for some f/w versions
-        if GEBat[0].e_battery_charge_total == 0 and GEBat[0].e_battery_discharge_total == 0 and len(GEBat)>0:  # If no values in "nomal" registers then grab from back up registers - for some f/w versions
-            energy_total_output['Battery_Charge_Energy_Total_kWh'] = GEBat[0].e_battery_charge_total_2
-            energy_total_output['Battery_Discharge_Energy_Total_kWh'] = GEBat[0].e_battery_discharge_total_2
-        else:
-            energy_total_output['Battery_Charge_Energy_Total_kWh'] = GEBat[0].e_battery_charge_total
-            energy_total_output['Battery_Discharge_Energy_Total_kWh'] = GEBat[0].e_battery_discharge_total
+        if len(GEBat)>0:
+            if GEBat[0].e_battery_charge_total == 0 and GEBat[0].e_battery_discharge_total == 0:  # If no values in "nomal" registers then grab from back up registers - for some f/w versions
+                energy_total_output['Battery_Charge_Energy_Total_kWh'] = GEBat[0].e_battery_charge_total_2
+                energy_total_output['Battery_Discharge_Energy_Total_kWh'] = GEBat[0].e_battery_discharge_total_2
+            else:
+                energy_total_output['Battery_Charge_Energy_Total_kWh'] = GEBat[0].e_battery_charge_total
+                energy_total_output['Battery_Discharge_Energy_Total_kWh'] = GEBat[0].e_battery_discharge_total
     energy_total_output['Export_Energy_Total_kWh'] = GEInv.e_grid_out_total
     energy_total_output['Import_Energy_Total_kWh'] = GEInv.e_grid_in_total
     energy_total_output['Invertor_Energy_Total_kWh'] = GEInv.e_inverter_out_total
@@ -764,6 +842,8 @@ def processInverterInfo(plant: Plant):
     elif GEInv.battery_percent == 0 and not 'multi_output_old' in locals():
         power_output['SOC'] = 1
         logger.error("\"Battery SOC\" reported as: "+str(GEInv.battery_percent)+"% and no previous value so setting to 1%")
+## Added in temporarily to see if its needed...    
+    power_output['SOC'] = GEInv.battery_percent
     power_output['SOC_kWh'] = round((int(power_output['SOC'])*(inverterModel.batterycapacity))/100,2)
 
     # Energy Stats
@@ -911,6 +991,12 @@ def processInverterInfo(plant: Plant):
 
     batteries2 = {}
     batteries2.update(getBatteries(plant))
+    if isHV:
+        # Calc HV stack capacity as function of stacks
+        cap=0
+        for stack in batteries2:
+            cap=cap+batteries2[stack]['Stack_Design_Capacity']
+        inverter['Battery_Capacity_kWh_calc'] = cap
 
         ######## Create multioutput and publish #########
     energy = {}
@@ -939,7 +1025,7 @@ def processEMSInfo(plant: Plant):
     ems['Inverter_Count']=GEInv.inverter_count
     ems['Meter_Count']=GEInv.meter_count
     ems['Car_Charge_Count']=GEInv.expected_car_charger_count
-    ems['Plant_Status']=GEInv.plant_status.name.capitalize()  # Is this mode?
+    #ems['Plant_Status']=GEInv.plant_status.name.capitalize()  # Is this mode?
     ems['Serial_Number']=GEInv.getsn()
     ems['Invertor_Type'] = GEInv.generation + " - " + GEInv.model.name.capitalize()
     ems['Invertor_Firmware']=GEInv.firmware_version
@@ -1127,6 +1213,7 @@ def processGatewayInfo(plant: Plant):
     else:
         # Calc based on individual SOCs
         count=0
+        total=0
         if GEInv.aio1_soc:
             total=total+GEInv.aio1_soc
             count=count+1
@@ -1318,7 +1405,6 @@ def processThreePhaseInfo(plant: Plant):
     power_output['Grid_Phase3_Current']=GEInv.i_ac3
     power_output['Grid_Frequency']=GEInv.f_ac1
     power_output['SOC']=GEInv.battery_soc
-    power_output['SOC_kWh']=round(int(power_output['SOC'])*inverterModel.batterycapacity/100,2)
     power_output['Battery_Current']=GEInv.i_battery
     power_output['PCS_Voltage']=GEInv.v_battery_pcs
     power_output['BMS_Voltage']=GEInv.v_battery_bms
@@ -1329,6 +1415,14 @@ def processThreePhaseInfo(plant: Plant):
     batteries2 = {}
     batteries2=getBatteries(plant)
 
+    sockwh=0
+    count=0
+    for stack in batteries2:
+        sockwh=sockwh+batteries2[stack]['Stack_SOC_kWh']
+        count+=1
+    power_output['SOC_kWh'] = sockwh/count                                         # Average SOC of all stacks...
+    #power_output['SOC_kWh']=batteries2["Battery_Stack_1"]["Stack_SOC_kWh"]         # Usable kWh is 10% less than actual
+
     inverter={}
     inverter['status']=GEInv.status.name.capitalize()
     inverter['System_Mode']=GEInv.system_mode.name.capitalize()
@@ -1336,7 +1430,16 @@ def processThreePhaseInfo(plant: Plant):
     inverter['Power_Factor']=GEInv.power_factor
     inverter['Battery_Type'] = GEInv.battery_type.name.capitalize()
     inverter['Invertor_Type'] = "Gen 3 - " + GEInv.model.name.capitalize()
+    inverter['Invertor_Max_Bat_Rate'] = GEInv.battery_max_power
+    inverter['Invertor_Max_Inv_Rate'] = GEInv.inverter_max_power
     inverter['Battery_Priority']=GEInv.battery_priority.name.capitalize()
+    #inverter['Battery_Capacity_kWh'] = inverterModel.batterycapacity
+# Calc HV stack capacity as function of stacks
+    cap=0
+    for stack in batteries2:
+        cap=cap+batteries2[stack]['Stack_Design_Capacity']
+    inverter['Battery_Capacity_kWh'] = cap
+
     inverter['Inverter_Temperature']=GEInv.t_inverter
     inverter['Boost_Temperature']=GEInv.t_boost
     inverter['Buck_Boost_Temperature']=GEInv.t_buck_boost
@@ -1351,19 +1454,17 @@ def processThreePhaseInfo(plant: Plant):
     # do the standard control apply to 3ph?
 
     controlmode.update(getControls(plant,regCacheStack,inverterModel))
+    controlmode['Battery_Discharge_Rate']=int(GEInv.battery_max_power*(GEInv.battery_discharge_limit_ac/100))
+    controlmode['Battery_Charge_Rate']=int(GEInv.battery_max_power*(GEInv.battery_charge_limit_ac/100))
 
-    controlmode['Force_Discharge_Enable']=GEInv.force_discharge_enable.name.capitalize()
-    controlmode['Force_Charge_Enable']=GEInv.force_charge_enable.name.capitalize()
-    controlmode['Force_AC_Charge_Enable']=GEInv.ac_charge_enable.name.capitalize()
-    controlmode['Target_SOC']=GEInv.charge_stop_soc
-    controlmode['Battery_Charge_Rate_AC']=GEInv.p_charge_rate
-    controlmode['Discharge_Target_SOC']=GEInv.discharge_stop_soc
-    controlmode['Battery_Charge_Rate_AC']=GEInv.p_discharge_rate
-    controlmode['Max_Charge_Current']=GEInv.max_charge_current
-    controlmode['Load_Target_SOC']=GEInv.load_first_stop_soc
-    controlmode['Export_Limit_AC']=GEInv.p_export_limit
-    controlmode['Active_Power_Rate']=GEInv.active_rate
-    controlmode['Reactive_Power_Rate']=GEInv.reactive_rate
+    controlmode['Force_Discharge_Enable']=GEInv.force_discharge_enable.name.lower()
+    controlmode['Force_Charge_Enable']=GEInv.force_charge_enable.name.lower()
+    controlmode['Force_AC_Charge_Enable']=GEInv.ac_charge_enable.name.lower()
+    #controlmode['Max_Charge_Current']=GEInv.max_charge_current
+    #controlmode['Load_Target_SOC']=GEInv.load_first_stop_soc
+    #controlmode['Export_Limit_AC']=GEInv.p_export_limit
+    #controlmode['Active_Power_Rate']=GEInv.active_rate
+    #controlmode['Reactive_Power_Rate']=GEInv.reactive_rate
 
     ######## Get Meter Details ########
 
@@ -1413,7 +1514,7 @@ def processData(plant: Plant):
         givtcpdata['Last_Updated_Time'] = datetime.datetime.now(datetime.UTC).isoformat()
         givtcpdata['status'] = "online"
         givtcpdata['Time_Since_Last_Update'] = 0
-        givtcpdata['GivTCP_Version']= "2.4.640beta"
+        givtcpdata['GivTCP_Version']= "2.4.698beta"
         multi_output['Stats']=givtcpdata
         regCacheStack = GivLUT.get_regcache()
         if regCacheStack:
@@ -1492,9 +1593,9 @@ def processData(plant: Plant):
             os.remove(GivLUT.oldDataCount)
 
     except Exception:
-        e = sys.exc_info()
+        e = sys.exc_info() ,sys.exc_info()[2].tb_lineno
+        #e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         consecFails(e)
-#        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         logger.error("inverter Update failed so using last known good data from cache: " + str(e))
         result['result'] = "processData Error processing registers: " + str(e)
         return json.dumps(result)
@@ -1507,8 +1608,6 @@ def consecFails(e):
             with open(GivLUT.oldDataCount, 'rb') as inp:
                 oldDataCount= pickle.load(inp)
             oldDataCount = oldDataCount + 1
-            #if oldDataCount > 3:
-            #    logger.error("Consecutive failure count= "+str(oldDataCount) +" -- "+ str(e))
         else:
             oldDataCount = 1
         if oldDataCount>10:
@@ -1608,9 +1707,8 @@ def publishOutput(array, SN):
     if GiV_Settings.MQTT_Output:
         if not exists(GivLUT.firstrun):
             logger.debug("Running updateFirstRun with SN= "+str(SN))
-            updateFirstRun(SN)              # 09=July=23 - Always do this first irrespective of HA setting.
-            if GiV_Settings.HA_Auto_D:
-#### Should we remove old Givenergy messages here first, as updates seem to get stuck...                
+            updateFirstRun(SN)
+            if GiV_Settings.HA_Auto_D:               
                 logger.info("Publishing Home Assistant Discovery messages")
                 from HA_Discovery import HAMQTT
                 HAMQTT.publish_discovery2(tempoutput, SN)
@@ -1628,7 +1726,7 @@ def publishOutput(array, SN):
 
 def updateFirstRun(SN):
     isSN = False
-    script_dir = os.path.dirname(__file__)  # <-- absolute dir the script is in
+    script_dir = os.path.dirname(__file__)
     rel_path = "settings.py"
     abs_file_path = os.path.join(script_dir, rel_path)
     #check for settings lockfile before
@@ -1806,7 +1904,6 @@ def ratecalcs(multi_output, multi_output_old):
     if import_energy>import_energy_old: # Only run if there has been more import
         logger.debug("Imported more energy so calculating current tariff costs: "+str(import_energy_old)+" -> "+str(import_energy))
 
-#        if night_start <= datetime.datetime.now(GivLUT.timezone) < day_start:
         if exists(GivLUT.nightRate):
             logger.debug("Current Tariff is Night, calculating stats...")
             # Add change in energy this slot to previous rate_data
