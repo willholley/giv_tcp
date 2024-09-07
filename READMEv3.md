@@ -64,10 +64,10 @@ The addon assumes HA is running Mosquito as an addon, which also available to in
 GivTCP is designed to run continuously and has a self-run setting, which should be switched on once the settings have been reviewed.
 You can change the frequency of the data collection through the config , but its not recommended to drop the self_run loop time to below 30s.
 
-GivTCP will automatically create multiple devices in Home Assistant and you can view them through the Integration page under MQTT
+GivTCP will automatically create multiple devices in Home Assistant and you can view them through the Integration page under MQTT.
 
-  
-
+<img src="docs/images/config-4.png" width="400">
+ 
 ## Other Usage methods:
 
 GivTCP data and control is also available through either MQTT or REST to allow integration into other systems and processes.
