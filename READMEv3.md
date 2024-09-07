@@ -34,9 +34,12 @@ Typically run through the Home Assistant Addon, it is also possible to run as a 
  - Step through the config stages, noting that GivTCP should have auto populated inverter and mqtt details
  - Check settings are as you want them
  - Turn on "self_run"
+ - If you are using an MQTT broker outside HA progress to MQTT page to configure MQTT
  - Click "Save and Restart" (if you are running docker you will need to manually restart the container
 
---insert pictures--
+<img src="docs/images/config-1.png" width="400">
+<img src="docs/images/config-2.png" width="400">
+<img src="docs/images/config-3.png" width="400">
 
 GivTCP should be publishing data to your MQTT broker and Home Assistant should pick this up automatically.
 
