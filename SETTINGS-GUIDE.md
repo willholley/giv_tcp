@@ -3,6 +3,7 @@ GivTCP provides a wide range of control settings. Below provides a summary and d
 
 ## GivTCP Control
 
+<img src="docs/images/settings-1.png" width="400"> <img src="docs/images/settings-2.png" width="400">
 
 
 
