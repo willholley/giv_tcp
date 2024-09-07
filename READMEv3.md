@@ -52,7 +52,7 @@ GivTCP should be publishing data to your MQTT broker and Home Assistant should p
  
 You should now have lots of data points and controls available in HA and you can begin to integrate into your smart home.
 
-See [Settings Guide](https://pages.github.com/) for more detail on controls available and data points.
+See [Settings Guide](SETTINGS-GUIDE.md) for more detail on controls available and data points.
   
 ### Parallel AIO
 
