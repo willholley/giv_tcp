@@ -31,7 +31,7 @@ Typically run through the Home Assistant Addon, it is also possible to run as a 
 ### Configure GivTCP
 
  - Navigate to the web config address (which is typically: http://IPADDRESS:8099/config.html)
- - Step through the config stages, noting that GivTCP should have auto populated inverter and mqtt details
+ - Step through the config stages, noting that GivTCP should have auto populated inverter and MQTT details
  - Check settings are as you want them
  - Turn on "self_run"
  - If you are using an MQTT broker outside HA progress to MQTT page to configure MQTT
