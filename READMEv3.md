@@ -3,7 +3,7 @@
  - Hybrid inverter
  - AC Coupled inverter
  - Single and Three Phase inverters
- - Gateway (single or Parallel mode)
+ - Gateway (Single or Parallel mode)
  - EMS
  - EV Charger (EVC)
  - All-In-One
@@ -38,7 +38,7 @@ Typically run through the Home Assistant Addon, it is also possible to run as a 
 
 --insert pictures--
 
-GivTCP should not be publishing data to your MQTT broker and Home Assistant should pick this up automatically.
+GivTCP should be publishing data to your MQTT broker and Home Assistant should pick this up automatically.
 
 ### (optional) Check Home Assistant
 
