@@ -1,11 +1,40 @@
 # GivTCP Settings & Control Guide
-GivTCP provides a wide range of control settings. Below provides a summary and description of the key settings for inverters.
 
-## GivTCP Control
+## GivTCP Control (Inverters)
+GivTCP provides a wide range of inverter control settings. When using HA an MQTT device is automatically created for each inverter:
 
 <img src="docs/images/settings-1.png" width="400"> <img src="docs/images/settings-2.png" width="400">
 
+| Control Function | Description | GivEnergy Cloud Equivalent |
+| ------------- | ------------- | ------------- |
+| Active Power Rate  | Sets the maximum active power output as a % of inverter rating | Inverter Max Output Active Power Percent |
+| Battery Charge Rate | xxx | xxx |
+| Battery Charge Rate AC | xxx | xxx |
+| Battery Discharge Rate | xxx | xxx |
+| Battery Discharge Rate AC | xxx | xxx |
+| Battery Pause Mode | xxx | xxx |
+| Battery Power Cutoff | xxx | xxx |
+| Battery Power Reserve | xxx | xxx |
+Charge Target SOC (1-10) | xxx | xxx |
+| Discharge Target (SOC 1-10) | xxx | xxx |
+| Eco Mode | xxx | xxx |
+| Enable Charge Schedule | xxx | xxx |
+| Enable Discharge Schedule | xxx | xxx |
+| Force Charge | xxx | xxx |
+| Force Charge Num | xxx | xxx |
+| Force Export | xxx | xxx |
+| Force Export Num | xxx | xxx |
+| Mode | xxx | xxx |
+| Reboot Addon | xxx | xxx |
+| Reboot Invertor | xxx | xxx |
+| Sync Time | xxx | xxx |
+| Target SOC | xxx | xxx |
+| Temp Pause Charge | xxx | xxx |
+| Temp Pause Charge Num | xxx | xxx |
+| Temp Pause Discharge | xxx | xxx |
+| Temp Pause Discharge Num | xxx | xxx |
 
+## GivTCP MQTT Control (Inverters)
 
 | Function                | Description                                                                                                                                                                                               | REST URL                 | REST payload                                               | MQTT Topic              | MQTT Payload                                               |
 |-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|------------------------------------------------------------|-------------------------|------------------------------------------------------------|
