@@ -7,14 +7,14 @@ GivTCP provides a wide range of inverter control settings. When using HA an MQTT
 
 | Control Function | Description | GivEnergy Cloud Equivalent |
 | ------------- | ------------- | ------------- |
-| Active Power Rate  | Sets the maximum active power output as a % of inverter rating | Inverter Max Output Active Power Percent |
-| Battery Charge Rate | xxx | xxx |
-| Battery Charge Rate AC | xxx | xxx |
-| Battery Discharge Rate | xxx | xxx |
-| Battery Discharge Rate AC | xxx | xxx |
-| Battery Pause Mode | xxx | xxx |
-| Battery Power Cutoff | xxx | xxx |
-| Battery Power Reserve | xxx | xxx |
+| Active Power Rate  | Sets the maximum active power output as a precentage. 100% = inverter rating | Inverter Max Output Active Power Percent |
+| Battery Charge Rate | Sets the battery charge power in Watts | Battery Charge Power |
+| Battery Charge Rate AC | Sets the inverter AC charge power as a percentage. 100% = inverter rating | Inverter Charge Power Precentage |
+| Battery Discharge Rate | Sets the battery discharge power in Watts | Battery Discharge Power |
+| Battery Discharge Rate AC | Sets the inverter AC dischrage power as a percentage. 100% = inverter rating | Inverter Discharge Power Precentage |
+| Battery Pause Mode | Sets the battery operation mode. One of "Disabled","PauseCharge","PauseDischarge" or "PauseBoth" | Pause Battery |
+| Battery Power Cutoff | ???? | Battery Cutoff % Limit |
+| Battery Power Reserve | Sets the minimum battery discharge SOC as a precentage. 100% = battery capacity  | Battery Reserve % Limit |
 Charge Target SOC (1-10) | xxx | xxx |
 | Discharge Target (SOC 1-10) | xxx | xxx |
 | Eco Mode | xxx | xxx |
