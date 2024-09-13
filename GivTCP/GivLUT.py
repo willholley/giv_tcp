@@ -115,10 +115,12 @@ class GivLUT:
         '%(asctime)s - %(module)s - [%(levelname)s] - %(message)s')
     fh = TimedRotatingFileHandler(GiV_Settings.Debug_File_Location, when='midnight', backupCount=7)
     fh.setFormatter(formatter)
-    logger = logging.getLogger()
+    logger = logging.getLogger('read_logger')
     logger.addHandler(fh)
     if str(GiV_Settings.Log_Level).lower()=="debug":
         logger.setLevel(logging.DEBUG)
+    elif str(GiV_Settings.Log_Level).lower()=="write_debug":
+        logger.setLevel(logging.INFO)
     elif str(GiV_Settings.Log_Level).lower()=="info":
         logger.setLevel(logging.INFO)
     elif str(GiV_Settings.Log_Level).lower()=="critical":
@@ -201,7 +203,6 @@ class GivLUT:
     dayRateRequest=GiV_Settings.cache_location+"/.dayRateRequest_"+str(GiV_Settings.givtcp_instance)
     invippkl=GiV_Settings.cache_location+"/invIPList.pkl"
     firstrun=GiV_Settings.cache_location+"/.firstrun_"+str(GiV_Settings.givtcp_instance)
-
 
     if hasattr(GiV_Settings,'timezone'):                        # If in Addon, use the HA Supervisor timezone
         timezone=zoneinfo.ZoneInfo(key=GiV_Settings.timezone)

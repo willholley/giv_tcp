@@ -5,12 +5,12 @@ import os
 import time
 import json
 import paho.mqtt.client as paho_mqtt
+from socket import gaierror
 from settings import GiV_Settings
 from givenergy_modbus_async.model.register import Model
 from mqtt import GivMQTT
 from GivLUT import GivLUT
 from os.path import exists
-import pickle
 from read import finditem
 
 logger=GivLUT.logger
@@ -30,12 +30,10 @@ class HAMQTT():
     if GiV_Settings.MQTT_Topic=="":
         GiV_Settings.MQTT_Topic="GivEnergy"
 
-    
-
     def getinvbatmax():
         regCacheStack = GivLUT.get_regcache()
         if regCacheStack:
-            multi_output_old = regCacheStack[4]
+            multi_output_old = regCacheStack[-1]
             if 'Invertor_Max_Bat_Rate' in multi_output_old[finditem(multi_output_old,'Invertor_Serial_Number')]:
                 return int(multi_output_old[finditem(multi_output_old,'Invertor_Serial_Number')]['Invertor_Max_Bat_Rate'])
             else:
@@ -95,6 +93,8 @@ class HAMQTT():
                 if i==4:
                     logger.critical("Failed to publish all discovery data in 4 attempts. Check MQTT broker")
                     break
+        except gaierror:
+            logger.error("Error in to MQTT Address. Check config and update.")
         except:
             e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error connecting to MQTT Broker: " + str(e))
@@ -319,61 +319,95 @@ class CheckDisco():
     def on_connect(client, userdata, flags, rc, properties):
         client.subscribe("homeassistant/#")
         client.subscribe("GivEnergy/#")
+    
+    def on_disconnect(client, userdata, flags, rc, properties):
+        #clear cached messages on disconnect
+        CheckDisco.msgs={}
 
     def on_message(client, userdata, msg):
         CheckDisco.msgs[str(msg.topic)]=str(msg.payload)
 
     def checkdisco(array: str):
-        client = paho_mqtt.Client(paho_mqtt.CallbackAPIVersion.VERSION2,"GivEnergy_GivTCP_checkdisco_"+str(GiV_Settings.givtcp_instance))
-        client.on_connect = CheckDisco.on_connect
-        client.on_message = CheckDisco.on_message
-        if HAMQTT.MQTTCredentials:
-            client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
-        client.connect(GiV_Settings.MQTT_Address, GiV_Settings.MQTT_Port, 60)
+        try:
+            client = paho_mqtt.Client(paho_mqtt.CallbackAPIVersion.VERSION2,"GivEnergy_GivTCP_checkdisco_"+str(GiV_Settings.givtcp_instance))
+            client.on_connect = CheckDisco.on_connect
+            client.on_message = CheckDisco.on_message
+            #client.on_disconnect = CheckDisco.on_disconnect
+            if HAMQTT.MQTTCredentials:
+                client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
+            client.connect(GiV_Settings.MQTT_Address, GiV_Settings.MQTT_Port, 60)
 
-        client.loop_start()
-        time.sleep(3)
-        client.disconnect()
-        temp={}
-        logger.debug("Sent "+ str(len(array))+" discovery messages")
-        logger.debug("Found "+ str(len(CheckDisco.msgs))+" discovery messages")
-        unpub=[]
-        for m in array:     #check each item that was sent
-            if not m[0] in CheckDisco.msgs:    #if its not in what was received
-                unpub.append([m[0],m[1]])      #take the one that was sent but not received and add to unpub
-        return unpub
+            client.loop_start()
+            time.sleep(5)
+            client.disconnect()
+            temp={}
+            logger.debug("Sent "+ str(len(array))+" discovery messages")
+            logger.debug("Found "+ str(len(CheckDisco.msgs))+" discovery messages")
+            unpub=[]
+            for m in array:     #check each item that was sent
+                if not m[0] in CheckDisco.msgs:    #if its not in what was received
+                    unpub.append([m[0],m[1]])      #take the one that was sent but not received and add to unpub
+            return unpub
+        except gaierror:
+            logger.error("Error in to MQTT Address. Check config and update.")
+            client.disconnect()
+        except:
+            e=sys.exc_info()[0].__name__, sys.exc_info()[2].tb_lineno
+            logger.error("Error connecting to MQTT Broker: " + str(e))
+            client.disconnect()
     
     def removedisco(SN,messages):
-        client = paho_mqtt.Client(paho_mqtt.CallbackAPIVersion.VERSION2,"GivEnergy_GivTCP_removedisco_"+str(GiV_Settings.givtcp_instance))
-        client.on_connect = CheckDisco.on_connect
-        client.on_message = CheckDisco.on_message
-        if HAMQTT.MQTTCredentials:
-            client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
-        client.connect(GiV_Settings.MQTT_Address, GiV_Settings.MQTT_Port, 60)
+        try:
+            foundmessages=0
+            client = paho_mqtt.Client(paho_mqtt.CallbackAPIVersion.VERSION2,"GivEnergy_GivTCP_removedisco_"+str(GiV_Settings.givtcp_instance))
+            client.on_connect = CheckDisco.on_connect
+            client.on_message = CheckDisco.on_message
+            #client.on_disconnect = CheckDisco.on_disconnect
+            if HAMQTT.MQTTCredentials:
+                client.username_pw_set(HAMQTT.MQTT_Username,HAMQTT.MQTT_Password)
+            client.connect(GiV_Settings.MQTT_Address, GiV_Settings.MQTT_Port, 60)
 
-        client.loop_start()
-        time.sleep(3)
-        #Loop through all msgs and remove if they are GivTCP ones
-        newmsg={}
-        for message in messages:
-            newmsg[message[0]]=message[1]
-        count=0
-        for msg in CheckDisco.msgs:
-            if "GivEnergy" in msg:
-                if GiV_Settings.v3Upgrade:
-                    logger.debug("V3 Upgrade so dropping old Discovery Messages")
-                    client.publish(msg)     #delete regardless of if it has changed
-                else:
-                    if msg in newmsg:
-                        old=newmsg[msg]
-                        new=CheckDisco.msgs[msg][2:-1]     #.split('}')[:0]
-                        if not old == new:       #if payload is different delete old one
-                            client.publish(msg)
-                            count+=1
-            #elif "GivEnergy" in msg and GiV_Settings.v3Upgrade:
-            #    logger.info("V3 Upgrade so dropping old retained data messages")
-            #    client.publish(msg)     #delete if its GivEnergy message and V3 upgrade
-        logger.debug(str(count)+" discovery messages changed and removed")
-        time.sleep(2)
-        client.loop_stop()
-        client.disconnect()
+            client.loop_start()
+
+            ## Can we check here to see when num of messages stops increasing?
+            loop=1
+            count=0
+            while True:
+                time.sleep(1)
+                moremessages=len(CheckDisco.msgs)
+                logger.debug("Foundmessages= "+str(foundmessages))
+                logger.debug("Moremessages= "+str(moremessages))
+                if moremessages == foundmessages:
+                    count+=1
+                if count==5 or loop==10:
+                    break
+                loop+=1
+                foundmessages=moremessages
+            #Loop through all msgs and remove if they are GivTCP ones
+            newmsg={}
+            for message in messages:
+                newmsg[message[0]]=message[1]
+            count=0
+            for msg in CheckDisco.msgs:
+                if SN in msg or SN in CheckDisco.msgs[msg]: # ("GivEnergy" in msg or GiV_Settings.MQTT_Topic in msg):
+                    if exists('/config/GivTCP/.v3upgrade_'+str(GiV_Settings.givtcp_instance)):
+                        logger.debug("V3 Upgrade so dropping old Discovery Messages")
+                        client.publish(msg)     #delete regardless of if it has changed
+                    else:
+                        if msg in newmsg:
+                            old=newmsg[msg]
+                            new=CheckDisco.msgs[msg][2:-1]     #.split('}')[:0]
+                            if not old == new:       #if payload is different delete old one
+                                client.publish(msg)
+                                count+=1
+            logger.debug(str(count)+" discovery messages changed and removed")
+            time.sleep(2)
+            client.loop_stop()
+            client.disconnect()
+        except gaierror:
+            logger.error("Error in to MQTT Address. Check config and update.")
+            client.disconnect()
+        except:
+            e=sys.exc_info()[0].__name__, sys.exc_info()[2].tb_lineno
+            logger.error("Error connecting to MQTT Broker: " + str(e))
+            client.disconnect()

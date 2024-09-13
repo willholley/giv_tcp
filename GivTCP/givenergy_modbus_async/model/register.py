@@ -128,11 +128,13 @@ class Converter:
 
     @staticmethod
     def battery_capacity(nom_cap: int, model: int) -> Optional[str]:
-        """Represent BCU capacity in kWh from Ah."""
+        """Represent BMU capacity in kWh from Ah."""
         model=f"{model:0{4}x}"
-        if model[0] in ['4','6','8']:
+        if model[0] in ['8']:                       #AIO
             return round((nom_cap*317)/1000,2)
-        else:
+        elif model[0] in ['4','6']:                 #3PH
+            return round((nom_cap*76.8)/1000,2)
+        else:                                       #LV
             return round((nom_cap*51.2)/1000,2)
         
     @staticmethod
@@ -154,11 +156,15 @@ class Converter:
             "4002": 8000,
             "4003": 10000,
             "4004": 11000,
-            "7001": 6000,
+            "7001": 12000,
             "8001": 6000,
         }
         return dtc_to_power.get(device_type_code)
-
+    
+    @staticmethod
+    def inverter_max_power_new(moduleH: int) -> Optional[int]:
+        return moduleH*100
+    
     @staticmethod
     def threeph_inverter_max_power(inp: str) -> Optional[int]:
         """Determine max inverter power from device_type_code."""
@@ -618,10 +624,39 @@ class Model(StrEnum):
     def _missing_(cls, value):
         """Just return Hybrid."""
         return cls(value[0])
-    
+
+    @classmethod
+    def core_regs(cls, value):
+        """Return core registers for each model to be pulled in a "partial" refresh. (IR,HR)"""
+
+        '''
+        HR 180-240 - Inverter Errors??
+        HR 240-300 - 10 Timeslots
+        HR 300-360 - 
+        HR 480-540 - Gateway Controls
+        HR 1000 - 1180 - Three Phase Control
+        HR 2040 - EMS Controls
+        
+        IR 240-300 - 
+        IR 2040 - EMS Data
+        IR 1000 - 1420 - Three Phase Data
+        IR 1600 - 1900 - Gateway Data
+        '''
+        regs={
+            '2': ([0, 60, 120, 180],[0, 60, 120, 120]),    #Hybrid
+            '3': ([0, 60, 120, 180],[0, 60, 120, 120]),    #AC
+            '4': ([0, 60, 120, 180, 240,1000,1060,1120,1180,1240,1300,1360],[180,240,1000,1060,1120]),   #"Hybrid - 3ph"
+            '5': ([2040],[2040]),   #EMS
+            '6': ([0, 60, 120, 180, 240,1000,1060,1120,1180,1240,1300,1360],[180,240,1000,1060,1120]),   #AC - 3ph
+            '7': ([0, 60, 120, 180,1600,1660,1720,1780,1840],[0, 60, 120, 120,180,240,300,480]),   #Gateway
+            '8': ([0, 60, 120, 180, 240],[0, 60, 120, 120, 180, 240, 300]),   #All in One
+        }
+        return regs.get(value)
+
     @classmethod
     def add_regs(cls, value):
-        """Return possible additional registers."""
+############# THS NEEDS RESTRUCTURING TO ALLOW INDIVIDUAL "CORE" REGS TO BE GOT EVERYTIME (eg GATEWAY, EMS AND 3PH) #############
+        """Return possible additional registers to be pulled in a "complete" refresh.(IR,HR)"""
         regs={
             '2': ([240],[180,240,300]),    #Hybrid
             '3': ([],[180,240,300]),    #AC

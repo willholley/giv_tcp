@@ -9,12 +9,12 @@
 
 # Stop the build file being published
 buildx.sh
+
 .venv
 .vscode
 GivTCP/__pycache__
 givenergy_modbus/__pycache__
 givenergy_modbus/model/__pycache__
-GivTCP/givenergy_modbus_2
 GivTCP/asyncclient.py
 GivTCP/testdata.json
 .dockerignore
@@ -26,7 +26,8 @@ settings.py
 *.pkl
 .dayRate*
 .nightRate*
-.FCRunning
+.firstrun*
+.FCRunning*
 __pycache__
 givenergy_modbus/model/__pycache__/inverter.cpython-310.pyc
 givenergy_modbus/model/__pycache__/plant.cpython-310.pyc

@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import time
 from enum import IntEnum
 from typing import TYPE_CHECKING
+import json
 
 if TYPE_CHECKING:
     from .register_cache import (
@@ -65,3 +66,10 @@ class TimeSlot:
         except:
             # if there's garbage data return midnight
             return cls(time(0,0), time(0,0))
+        
+    @classmethod
+    def toJson(cls, start: int | str, end: int | str):
+        slot={}
+        slot['start']=start.strftime("%H:%M")
+        slot['end']=end.strftime("%H:%M")
+        return json.dumps(slot)

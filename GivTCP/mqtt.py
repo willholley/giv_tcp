@@ -39,19 +39,23 @@ class GivMQTT():
         MQTT_Topic=GiV_Settings.MQTT_Topic
 
     def get_connection():
-        global _mqttclient
-        if not _mqttclient.connected_flag:
-            logger.debug("MQTT Connection appears closed, re-opening")
-            if GivMQTT.MQTTCredentials:
-                _mqttclient.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)
-            _mqttclient.on_connect=GivMQTT.on_connect     			#bind call back function
-            _mqttclient.on_disconnect=GivMQTT.on_disconnect     	   #bind call back function
-            _mqttclient.on_message=GivMQTT.on_message               #bind call back function
-            logger.debug("Opening MQTT Connection to "+str(GivMQTT.MQTT_Address))
-            _mqttclient.connect(GivMQTT.MQTT_Address,port=GivMQTT.MQTT_Port)
-            _mqttclient.loop_start()
-        return _mqttclient
-    
+        try:
+            global _mqttclient
+            if not _mqttclient.connected_flag:
+                logger.debug("MQTT Connection appears closed, re-opening")
+                if GivMQTT.MQTTCredentials:
+                    _mqttclient.username_pw_set(GivMQTT.MQTT_Username,GivMQTT.MQTT_Password)
+                _mqttclient.on_connect=GivMQTT.on_connect     			#bind call back function
+                _mqttclient.on_disconnect=GivMQTT.on_disconnect     	   #bind call back function
+                _mqttclient.on_message=GivMQTT.on_message               #bind call back function
+                logger.debug("Opening MQTT Connection to "+str(GivMQTT.MQTT_Address))
+                _mqttclient.connect(GivMQTT.MQTT_Address,port=GivMQTT.MQTT_Port)
+                _mqttclient.loop_start()
+            return _mqttclient
+        except:
+            e=sys.exc_info()[0].__name__, basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+            logger.error("Error getting connection to MQTT Broker: " + str(e))
+
     def isfloat(num):
         try:
             float(num)
@@ -295,10 +299,6 @@ class GivMQTT():
             elif command=="setDateTime":
                 payload['dateTime']=str(message.payload.decode("utf-8"))
                 #wr.setDateTime(payload)
-                requestcommand(command,payload)
-            elif command=="setShallowCharge":
-                payload['val']=str(message.payload.decode("utf-8"))
-                #wr.setShallowCharge(payload)
                 requestcommand(command,payload)
             elif command=="setChargeStart1":
                 payload['start']=message.payload.decode("utf-8")[:5]

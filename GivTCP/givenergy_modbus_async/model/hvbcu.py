@@ -10,6 +10,7 @@ from .register import (
     DynamicDoc,
     RegisterDefinition as Def,
     IR,
+    HR,
     RegisterGetter,
 )
 

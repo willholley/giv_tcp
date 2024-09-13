@@ -111,7 +111,7 @@ class Plant:
             i = 0
             for i in range(6):
                 try:
-                        assert Battery(self.register_caches[i + 0x32]).is_valid()
+                    assert Battery(self.register_caches[i + 0x32]).is_valid()
                 except (KeyError, AssertionError):
                     break
             self.number_batteries = i
@@ -175,27 +175,11 @@ class Plant:
     @property
     def batteries(self) -> list[Battery]:
         """Return LV Battery models for the Plant."""
-    #    if self.isHV:
-    #        bats: list[Battery]=[]
-    #        for bcu in self.bcu_list:
-    #            for bmu in range(bcu[1]):
-    #                bats.append(BMU(self.register_caches[bmu + 0x50],bcu[0]))
-    #        return bats
-    #    else:
         if not self.isHV:
             return [
                 Battery(self.register_caches[i + 0x32])
                 for i in range(self.number_batteries)
             ]
-        
-    #@property
-    #def bcu(self) -> list[BCU]:
-    #    """Return HV Battery models for the Plant."""
-    #    if self.isHV:
-    #        return [    
-    #            BCU(self.register_caches[i + 0x70])
-    #            for i in range(self.number_bcus)
-    #        ]
         
     @property
     def meters(self) -> dict[Meter]:

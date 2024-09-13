@@ -288,6 +288,12 @@ def refresh_plant_data(
             base_register=180, register_count=60, slave_address=slave_addr
         ),
     ]
+    #Always grab these regs for Inverter time
+    requests.append(
+        ReadHoldingRegistersRequest(
+            base_register=0, register_count=60, slave_address=slave_addr
+        )
+    )
 
     for i in meter_list:
         requests.append(
@@ -301,11 +307,6 @@ def refresh_plant_data(
             requests.extend(refresh_additional_input_registers(ir, slave_addr))
 
     if complete:
-        requests.append(
-            ReadHoldingRegistersRequest(
-                base_register=0, register_count=60, slave_address=slave_addr
-            )
-        )
         requests.append(
             ReadHoldingRegistersRequest(
                 base_register=60, register_count=60, slave_address=slave_addr
@@ -408,9 +409,14 @@ def set_charge_target_only(target_soc: int, inv_type: str="") -> list[Transparen
         raise ValueError(f"Specified SOC Limit ({target_soc}%) is not in [0-100]%")
     return [WriteHoldingRegisterRequest(reg, target_soc)]
 
-def set_enable_charge(enabled: bool) -> list[TransparentRequest]:
+def set_enable_charge(enabled: bool, inv_type: str="") -> list[TransparentRequest]:
     """Enable the battery to charge, depending on the mode and slots set."""
-    return [WriteHoldingRegisterRequest(RegisterMap.ENABLE_CHARGE, enabled)]
+    if "3ph" in inv_type:
+        reqs=[WriteHoldingRegisterRequest(RegisterMap.FORCE_CHARGE_ENABLE, enabled)]
+        reqs.extend(WriteHoldingRegisterRequest(RegisterMap.AC_CHARGE_ENABLE, enabled))
+        return reqs
+    else:
+        return [WriteHoldingRegisterRequest(RegisterMap.ENABLE_CHARGE, enabled)]
 
 def set_force_charge(enabled: bool) -> list[TransparentRequest]:
     """Enable the Three Phase battery to charge, depending on the mode and slots set."""
@@ -424,9 +430,12 @@ def set_ac_charge(enabled: bool) -> list[TransparentRequest]:
     """Enable the Three Phase battery to charge, depending on the mode and slots set."""
     return [WriteHoldingRegisterRequest(RegisterMap.AC_CHARGE_ENABLE, enabled)]
 
-def set_enable_discharge(enabled: bool) -> list[TransparentRequest]:
+def set_enable_discharge(enabled: bool, inv_type: str="") -> list[TransparentRequest]:
     """Enable the battery to discharge, depending on the mode and slots set."""
-    return [WriteHoldingRegisterRequest(RegisterMap.ENABLE_DISCHARGE, enabled)]
+    if "3ph" in inv_type:
+        return [WriteHoldingRegisterRequest(RegisterMap.FORCE_DISCHARGE_ENABLE, enabled)]
+    else:
+        return [WriteHoldingRegisterRequest(RegisterMap.ENABLE_DISCHARGE, enabled)]
 
 
 def set_inverter_reboot() -> list[TransparentRequest]:
@@ -725,15 +734,11 @@ def set_mode_dynamic(paused: bool = False) -> list[TransparentRequest]:
     and minimise the amount of energy drawn from the grid.
     """
     # r27=1 r110=4 r59=0
+    reqs=set_discharge_mode_to_match_demand()
+    reqs.extend(set_enable_discharge(False))
     if paused: 
-        target=100
-    else:
-        target=4
-    return (
-        set_discharge_mode_to_match_demand()
-        + set_battery_soc_reserve(target)
-        + set_enable_discharge(False)
-    )
+        reqs.extend(set_battery_soc_reserve(100))       #Only change soc target is paused
+    return reqs
 
 
 def set_mode_storage(

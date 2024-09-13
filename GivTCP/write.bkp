@@ -20,34 +20,13 @@ from givenergy_modbus_async.pdu import WriteHoldingRegisterResponse, Transparent
 import requests
 import importlib
 import asyncio
-from logging.handlers import TimedRotatingFileHandler
 
 from GivLUT import GivClientAsync
 
 logging.getLogger("givenergy_modbus_async").setLevel(logging.CRITICAL)
 client=GivEnergyClient(host=GiV_Settings.invertorIP)
 
- 
-logging.basicConfig(format='%(asctime)s - Inv'+ str(GiV_Settings.givtcp_instance)+ \
-                    ' - %(module)-11s -  [%(levelname)-8s] - %(message)s')
-formatter = logging.Formatter(
-    '%(asctime)s - %(module)s - [%(levelname)s] - %(message)s')
-fhw = TimedRotatingFileHandler(GiV_Settings.Debug_File_Location_Write, when='midnight', backupCount=7)
-fhw.setFormatter(formatter)
-logger = logging.getLogger('write_logger')
-logger.addHandler(fhw)
-if str(GiV_Settings.Log_Level).lower()=="debug":
-    logger.setLevel(logging.DEBUG)
-elif str(GiV_Settings.Log_Level).lower()=="write_debug":
-    logger.setLevel(logging.DEBUG)
-elif str(GiV_Settings.Log_Level).lower()=="info":
-    logger.setLevel(logging.INFO)
-elif str(GiV_Settings.Log_Level).lower()=="critical":
-    logger.setLevel(logging.CRITICAL)
-elif str(GiV_Settings.Log_Level).lower()=="warning":
-    logger.setLevel(logging.WARNING)
-else:
-    logger.setLevel(logging.ERROR)
+logger = GivLUT.logger
 
 def finditem(obj, key):
     if key in obj: return obj[key]
@@ -59,9 +38,8 @@ def finditem(obj, key):
     return None
 
 def frtouch():
-    if not exists(".fullrefresh"):
-        with open(".fullrefresh",'w') as fp:
-            pass
+    with open(".fullrefresh",'w') as fp:
+        pass
 
 def updateControlCache(entity,value,isTime: bool=False):
     from mqtt import GivMQTT
@@ -111,6 +89,285 @@ async def sendAsyncCommand(reqs,readloop):
         await asyncclient.close()
     return output
 
+async def sct(target, readloop=False):
+    """ Not suitable for AIO, use sst()"""
+    temp={}
+    try:
+        reqs=commands.set_charge_target_only(int(target), inv_type=GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Target_SOC",target)
+        temp['result']="Setting Charge Target "+str(target)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Charge Target "+str(target)+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+'''
+    async def sem(enable,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_eco_mode(enable)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if enable:
+            updateControlCache("Eco_Mode","enable")
+        else:
+            updateControlCache("Eco_Mode","disable")
+        temp['result']="Setting Eco Mode "+str(enable)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Eco Mode "+str(enable)+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def sst(target,slot,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_soc_target(False,slot,int(target),GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if 'ems' in GiV_Settings.inverter_type.lower():
+            updateControlCache("EMS_Charge_Target_SOC_"+str(slot),target)
+        else:
+            updateControlCache("Charge_Target_SOC_"+str(slot),target)
+        temp['result']="Setting Charge Target "+str(slot) + " was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Charge Target "+str(slot) + " failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def sest(target,slot,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_export_soc_target(False,slot,int(target))
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Export_Target_SOC_"+str(slot),target)
+        temp['result']="Setting Export Target "+str(slot) + " was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Export Target "+str(slot) + " failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def sdct(target,slot,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_soc_target(True,slot,int(target),GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if 'ems' in GiV_Settings.inverter_type.lower():
+            updateControlCache("EMS_Discharge_Target_SOC_"+str(slot),target)
+        else:
+            updateControlCache("Discharge_Target_SOC_"+str(slot),target)
+        temp['result']="Setting Discharge Target "+str(slot) + " was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Discharge Target "+str(slot) + " failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def ect(readloop=False):
+    temp={}
+    try:
+        reqs=commands.enable_charge_target()
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception           
+        temp['result']="Enabling Charge Target was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Enabling Charge Target failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def dct(readloop=False):
+    temp={}
+    try:
+        reqs=commands.disable_charge_target()
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception   
+        updateControlCache("Target_SOC",100)
+        temp['result']="Disabling Charge Target was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Disabling Charge Target failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+async def ed(readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_enable_discharge(True)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception   
+        updateControlCache("Enable_Discharge_Schedule","enable")
+        temp['result']="Enabling Discharge Schedule was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Enabling Discharge Schedule failed: "+str(result['error_type'])
+        logger.error(temp['result'])   
+    return temp
+async def dd(readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_enable_discharge(False)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception   
+        updateControlCache("Enable_Discharge_Schedule","disable")
+        temp['result']="Disabling Discharge Schedule was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Disabling Discharge Schedule failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def ec(readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_enable_charge(True)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception        
+        updateControlCache("Enable_Charge_Schedule","enable")
+        temp['result']="Enabling Charge Schedule was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Enabling Charge Schedule failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def dc(readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_enable_charge(False)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception 
+        updateControlCache("Enable_Charge_Schedule","disable")
+        temp['result']="Disabling Charge Schedule was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Disabling Charge Schedule failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+def slcm(val):
+    temp={}
+    try:
+        client.set_local_control_mode(val)
+        updateControlCache("Local_control_mode",str(GivLUT.local_control_mode[int(val)]))
+        temp['result']="Setting Local Control Mode to " +str(GivLUT.local_control_mode[val])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Local Control Mode to " +str(GivLUT.local_control_mode[val])+" failed"
+        logger.error(temp['result'])
+    return temp
+
+async def sbpm(val,readloop=False):
+    temp={}
+    try:
+        
+
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Battery Pause Mode to " +str(GivLUT.battery_pause_mode[val])+" failed"
+        logger.error(temp['result'])
+    return temp
+
+async def ssc(target,readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_battery_soc_reserve(target, inv_type=GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Battery_Power_Reserve",target)
+        temp['result']="Setting battery reserve "+str(target)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting battery reserve "+str(target)+" failed"
+        logger.error(temp['result'])
+    return temp
+
+async def sbpr(target,readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_battery_power_reserve(target)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Battery_Power_Cutoff",target)
+        temp['result']="Setting battery power reserve to "+str(target)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting battery power reserve "+str(target)+" failed"
+        logger.error(temp['result'])
+    return temp
+async def ri(readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_inverter_reboot()
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        temp['result']="Rebooting Inverter was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Rebooting Inverter failed"
+        logger.error(temp['result'])
+    return temp
+
+async def sapr(target,readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_active_power_rate(target)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Active_Power_Rate",target)
+        temp['result']="Setting active power rate "+str(target)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting active power rate "+str(target)+" failed"
+        logger.error(temp['result'])
+    return temp
+'''
+async def sbcl(target,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_battery_charge_limit(target)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        # Get cache and work out rate
+        regCacheStack = GivLUT.get_regcache()
+        if "regCacheStack" in locals():
+            multi_output_old = regCacheStack[-1]
+        batteryCapacity=int(multi_output_old[finditem(multi_output_old,"Invertor_Serial_Number")]['Battery_Capacity_kWh'])*1000
+        batmaxrate=int(multi_output_old[finditem(multi_output_old,"Invertor_Serial_Number")]['Invertor_Max_Bat_Rate'])
+        val=int(min((target/100)*(batteryCapacity), batmaxrate))
+        updateControlCache("Battery_Charge_Rate",val)
+        temp['result']="Setting battery charge rate "+str(target)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting battery charge rate "+str(target)+" failed"
+        logger.error(temp['result'])
+    return temp
 async def sbcla(target,readloop=False):
     temp={}
     try:
@@ -124,6 +381,28 @@ async def sbcla(target,readloop=False):
     except:
         temp['result']="Setting battery charge rate "+str(target)+" failed"
         logger.error(temp['result'])
+    return temp
+
+async def sbdl(target,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_battery_discharge_limit(target)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        # Get cache and work out rate
+        if exists(GivLUT.regcache):      # if there is a cache then grab it
+            regCacheStack=GivLUT.get_regcache()
+            multi_output_old = regCacheStack[-1]
+            batteryCapacity=int(multi_output_old[finditem(multi_output_old,'Invertor_Serial_Number')]['Battery_Capacity_kWh'])*1000
+            batmaxrate=int(multi_output_old[finditem(multi_output_old,'Invertor_Serial_Number')]['Invertor_Max_Bat_Rate'])
+            val=int(min((target/100)*(batteryCapacity), batmaxrate))
+            updateControlCache("Battery_Discharge_Rate",val)
+        temp['result']="Setting battery discharge limit "+str(target)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting battery discharge limit "+str(target)+" failed"
+        logger.error(temp['result'])   
     return temp
 
 async def sbdla(target,readloop=False):
@@ -141,7 +420,366 @@ async def sbdla(target,readloop=False):
         temp['result']="Setting battery discharge rate "+str(target)+" failed"
         logger.error(temp['result'])
     return temp
+'''
+async def smd(paused,readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_mode_dynamic(paused)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        temp['result']="Setting dynamic mode was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting dynamic mode failed"
+        logger.error(temp['result'])
+    return temp
 
+async def sms(target,readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_mode_storage(discharge_for_export=False, inv_type=GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        temp['result']="Setting storage mode "+str(target)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting storage mode "+str(target)+" failed"
+        logger.error(temp['result'])
+    return temp
+
+async def sbdmd(readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_mode_storage(discharge_for_export=False, inv_type=GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Mode","Timed Demand")
+        temp['result']="Setting demand mode was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting demand mode failed"
+        logger.error(temp['result'])
+    return temp
+async def sbdmmp(readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_mode_storage(discharge_for_export=True, inv_type=GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Mode","Timed Export")
+        temp['result']="Setting export mode was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting export mode failed"
+        logger.error(temp['result'])   
+    return temp
+
+async def spvim(val):
+    temp={}
+    try:
+        client.set_pv_input_mode(val)
+        updateControlCache("PV_input_mode",str(GivLUT.pv_input_mode[int(val)]))
+        temp['result']="Setting PV Input mode to "+str(GivLUT.pv_input_mode[val])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting PV Input mode to "+str(GivLUT.pv_input_mode[val])+" failed"
+        logger.error(temp['result'])  
+    return temp
+
+async def sccb(val,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_car_charge_boost(discharge_for_export=True)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Car_Charge_Boost",val)
+        temp['result']="Setting Car Charge Boost to "+str(val)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Car Charge Boost to "+str(val)+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])  
+    return temp
+
+async def sel(val,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_export_limit(discharge_for_export=True)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Export_Power_Limit",val)
+        temp['result']="Setting Car Charge Boost to "+str(val)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Car Charge Boost to "+str(val)+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])  
+    return temp
+async def sdt(idateTime: datetime,readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_system_date_time(idateTime)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        temp['result']="Setting inverter time was a success"
+        updateControlCache("Invertor_Time",idateTime.strftime("%d-%m-%Y %H:%M:%S.%f"))
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting inverter time failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+'''
+async def sds(payload,readloop=False):
+    temp={}
+    try:
+        # create Timeslot object forslot in func
+        slot=TimeSlot
+        slot.start=datetime.strptime(payload['start'],"%H:%M")
+        slot.end=datetime.strptime(payload['finish'],"%H:%M")
+        reqs=commands._set_charge_slot(True,int(payload['slot']),slot,GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if 'ems' in GiV_Settings.inverter_type.lower():
+            updateControlCache("EMS_Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+            updateControlCache("EMS_Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        else:
+            updateControlCache("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+            updateControlCache("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        temp['result']="Setting Discharge Slot "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Discharge Slot "+str(payload['slot'])+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+'''
+async def sbc(val,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_calibrate_battery_soc(int(val))
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Battery_Calibration",str(GivLUT.battery_calibration[val]))
+        temp['result']="Setting Battery Calibration "+str(val)+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Battery Calibration "+str(val)+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def ses(payload,readloop=False):
+    temp={}
+    try:
+        # create Timeslot object forslot in func
+        slot=TimeSlot
+        slot.start=datetime.strptime(payload['start'],"%H:%M")
+        slot.end=datetime.strptime(payload['finish'],"%H:%M")
+        reqs=commands.set_export_slot(int(payload['slot']),slot)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Export_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+        updateControlCache("Export_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        temp['result']="Setting Export Slot "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Export Slot "+str(payload['slot'])+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def sdss(payload,readloop=False):
+    temp={}
+    try:
+
+        reqs=commands.set_charge_slot_start(True,int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"),GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if 'ems' in GiV_Settings.inverter_type.lower():
+            updateControlCache("EMS_Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+        else:
+            updateControlCache("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+        temp['result']="Setting Discharge Slot Start "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Discharge Slot Start "+str(payload['slot'])+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def sdse(payload,readloop=False):
+    temp={}
+    try:
+
+        reqs=commands.set_charge_slot_end(True,int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"),GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if 'ems' in GiV_Settings.inverter_type.lower():
+            updateControlCache("EMS_Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        else:
+            updateControlCache("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def sps(payload,readloop=False):
+    temp={}
+    try:
+        slot=TimeSlot
+        slot.start=datetime.strptime(payload['start'],"%H:%M")
+        slot.end=datetime.strptime(payload['finish'],"%H:%M")
+        reqs=commands.set_pause_slot(slot)
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        updateControlCache("Battery_pause_start_time_slot",str(datetime.strptime(payload['start'],"%H:%M")))
+        updateControlCache("Battery_pause_end_time_slot",str(datetime.strptime(payload['finish'],"%H:%M")))
+        temp['result']="Setting Battery Pause Slot was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Battery Pause Slot failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def spss(payload,readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_pause_slot_start(datetime.strptime(payload['start'],"%H:%M"))
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception(result)
+        updateControlCache("Battery_pause_start_time_slot",str(datetime.strptime(payload['start'],"%H:%M")),True)
+        temp['result']="Setting Pause Slot Start was a success"
+        logger.debug(temp['result'])
+    except:
+        e=sys.exc_info()[1].args[0], os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        temp['result']="Setting Pause Slot Start failed: " + str(e)
+        logger.error(temp['result'])
+    return temp
+
+async def spse(payload,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_pause_slot_end(datetime.strptime(payload['finish'],"%H:%M"))
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception(result)
+        updateControlCache("Battery_pause_end_time_slot",str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        temp['result']="Setting Pause Slot End was a success"
+        logger.debug(temp['result'])
+    except:
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        temp['result']="Setting Pause Slot End failed: " + str(e)
+        logger.error(temp['result'])
+    return temp
+
+async def scs(payload,readloop=False):
+    temp={}
+    try:
+        slot=TimeSlot
+        slot.start=datetime.strptime(payload['start'],"%H:%M")
+        slot.end=datetime.strptime(payload['finish'],"%H:%M")
+
+        reqs=commands._set_charge_slot(False,int(payload['slot']),slot,GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if 'ems' in GiV_Settings.inverter_type.lower():
+            updateControlCache("EMS_Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+            updateControlCache("EMS_Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        else:
+            updateControlCache("Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+            updateControlCache("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        temp['result']="Setting Charge Slot "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Charge Slot "+str(payload['slot'])+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])   
+    return temp
+
+async def sess(payload,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_export_slot_start(int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"))
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception        
+        updateControlCache("Export_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+        temp['result']="Setting Export Slot Start "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Export Slot Start "+str(payload['slot'])+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def sese(payload,readloop=False):
+    temp={}
+    try:
+        
+        reqs=commands.set_export_slot_end(int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"))
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception         
+        updateControlCache("Export_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        temp['result']="Setting Export Slot End "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Export Slot End "+str(payload['slot'])+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def scss(payload,readloop=False):
+    temp={}
+    try:
+        reqs=commands.set_charge_slot_start(False,int(payload['slot']),datetime.strptime(payload['start'],"%H:%M"),GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if EMS:
+            updateControlCache("EMS_Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+        else:
+            updateControlCache("Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
+        temp['result']="Setting Charge Slot Start "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Charge Slot Start "+str(payload['slot'])+" failed: "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+
+async def scse(payload,readloop=False):
+    temp={}
+    try:
+
+        reqs=commands.set_charge_slot_end(False,int(payload['slot']),datetime.strptime(payload['finish'],"%H:%M"),GiV_Settings.inverter_type.lower())
+        result= await sendAsyncCommand(reqs,readloop)
+        if 'error' in result:
+            raise Exception
+        if 'ems' in GiV_Settings.inverter_type.lower():
+            updateControlCache("EMS_Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        else:
+            updateControlCache("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
+        temp['result']="Setting Charge Slot End "+str(payload['slot'])+" was a success"
+        logger.debug(temp['result'])
+    except:
+        temp['result']="Setting Charge Slot End "+str(payload['slot'])+" failed: : "+str(result['error_type'])
+        logger.error(temp['result'])
+    return temp
+'''
 async def setForceCharge(payload,readloop=False):
     temp={}
     try:
@@ -199,11 +837,11 @@ async def enableDischargeSchedule(payload,readloop=False):
         if payload['state']=="enable":
             logger.debug("Enabling Disharge Schedule")
             #temp= await ed(readloop)
-            reqs=commands.set_enable_discharge(True,GiV_Settings.inverter_type.lower())
+            reqs=commands.set_enable_discharge(False)
         elif payload['state']=="disable":
             logger.debug("Disabling Discharge Schedule")
             #temp= await dd(readloop)
-            reqs=commands.set_enable_discharge(False,GiV_Settings.inverter_type.lower())
+            reqs=commands.set_enable_discharge(False)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception   
@@ -212,7 +850,7 @@ async def enableDischargeSchedule(payload,readloop=False):
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-        temp['result']="Setting Discharge Schedule failed: " + str(e)
+        temp['result']="Setting Charge Schedule failed: " + str(e)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -222,11 +860,11 @@ async def enableChargeSchedule(payload,readloop=False):
         if payload['state']=="enable":
             logger.debug("Enabling Charge Schedule")
             #temp= await ec(readloop)
-            reqs=commands.set_enable_charge(True,GiV_Settings.inverter_type.lower())
+            reqs=commands.set_enable_charge(True)
         elif payload['state']=="disable":
             logger.debug("Disabling Charge Schedule")
             #temp= await dc(readloop)
-            reqs=commands.set_enable_charge(False,GiV_Settings.inverter_type.lower())
+            reqs=commands.set_enable_charge(False)
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception        
@@ -264,20 +902,45 @@ async def enableChargeTarget(payload,readloop=False):
         temp['result']="Setting Charge Target failed: " + str(e)
         logger.error (temp['result'])
     return json.dumps(temp)
+'''
+async def enableDischarge(payload,readloop=False):
+    temp={}
+    saved_battery_reserve = getSavedBatteryReservePercentage()
+    try:
+        if payload['state']=="enable":
+            logger.debug("Enabling Discharge")
+            temp= await ssc(saved_battery_reserve,readloop)
+            updateControlCache("Enable_Discharge","enable")
+        elif payload['state']=="disable":
+            logger.debug("Disabling Discharge")
+            temp= await ssc(100,readloop)
+            updateControlCache("Enable_Discharge","disable")
+        logger.info(temp['result'])
+    except:
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        temp['result']="Setting Discharge Enable failed: " + str(e)
+        logger.error (temp['result'])
+    return json.dumps(temp)
 
+async def setShallowCharge(payload,readloop=False):
+    temp={}
+    try:
+        logger.debug("Setting Shallow Charge to: "+ str(payload['val']))
+        temp= await ssc(int(payload['val']),readloop)
+        logger.info(temp['result'])
+    except:
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        temp['result']="Setting shallow charge failed: " + str(e)
+        logger.error (temp['result'])
+    return json.dumps(temp)
+'''
 async def setChargeTarget(payload,readloop=False):
     temp={}
     try:
         if type(payload) is not dict: payload=json.loads(payload)
         target=int(payload['chargeToPercent'])
         logger.debug("Setting Charge Target to: "+str(target))
-        #temp=await sct(target,readloop)
-        reqs=commands.set_charge_target_only(int(target), inv_type=GiV_Settings.inverter_type.lower())
-        result= await sendAsyncCommand(reqs,readloop)
-        if 'error' in result:
-            raise Exception
-        updateControlCache("Target_SOC",target)
-        temp['result']="Setting Charge Target "+str(target)+" was a success"
+        temp=await sct(target,readloop)
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -438,7 +1101,7 @@ async def setActivePowerRate(payload,readloop=False):
 async def setChargeRate(payload,readloop=False):
     temp={}
     if type(payload) is not dict: payload=json.loads(payload)
-    
+
     # Get inverter max bat power
     if exists(GivLUT.regcache):      # if there is a cache then grab it
         regCacheStack=GivLUT.get_regcache()
@@ -446,28 +1109,16 @@ async def setChargeRate(payload,readloop=False):
         invmaxrate=finditem(multi_output_old,'Invertor_Max_Bat_Rate')
         batcap=float(finditem(multi_output_old,'Battery_Capacity_kWh'))*1000
         try:
-            if "3ph" in GiV_Settings.inverter_type.lower() or "gateway" in GiV_Settings.inverter_type.lower():
-                target= round((int(payload['chargeRate'])/invmaxrate)*100,0)
-                logger.debug ("Setting battery charge rate ac to: " + str(payload['chargeRate'])+" ("+str(target)+")")
-                reqs=commands.set_battery_charge_limit_ac(target, inv_type=GiV_Settings.inverter_type.lower())
+            if "3ph" in GiV_Settings.inverter_type.lower():
+                target= round(int(payload['chargeRate'])/invmaxrate,0)
+                temp = await sbcla(target, readloop)
             else:
                 if int(payload['chargeRate']) < int(invmaxrate):
                     target=int(min((int(payload['chargeRate'])/(batcap/2))*50,50))
                 else:
                     target=50
-                logger.debug ("Setting battery charge rate to: " + str(payload['chargeRate'])+" ("+str(target)+")")
-                #temp= await sbcl(target,readloop)
-                reqs=commands.set_battery_charge_limit(target)
-            result= await sendAsyncCommand(reqs,readloop)
-            if 'error' in result:
-                raise Exception
-            if "3ph" in GiV_Settings.inverter_type.lower() or "gateway" in GiV_Settings.inverter_type.lower():
-                updateControlCache("Battery_Charge_Rate_AC",target)
-                updateControlCache("Battery_Charge_Rate",int(payload['chargeRate']))
-            else:
-                val=int(min((target/100)*(batcap), invmaxrate))
-                updateControlCache("Battery_Charge_Rate",val)
-            temp['result']="Setting battery charge rate "+str(payload['chargeRate'])+" was a success"
+                temp= await sbcl(target,readloop)
+            logger.debug ("Setting battery charge rate to: " + str(payload['chargeRate'])+" ("+str(target)+")")
             logger.info(temp['result'])
         except:
             e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -485,13 +1136,6 @@ async def setChargeRateAC(payload,readloop=False):
         target=int(payload['chargeRate'])
         logger.debug ("Setting AC battery charge rate to: " + str(target))
         temp= await sbcla(target,readloop)
-        if "3ph" in GiV_Settings.inverter_type.lower() or "gateway" in GiV_Settings.inverter_type.lower():
-            # Recreate Battery Watt rate and push to MQTT
-            regCacheStack=GivLUT.get_regcache()
-            multi_output_old = regCacheStack[-1]
-            invmaxrate=finditem(multi_output_old,'Invertor_Max_Bat_Rate')
-            val=int((target/100)*invmaxrate)
-            updateControlCache("Battery_Charge_Rate",val)
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -511,28 +1155,15 @@ async def setDischargeRate(payload,readloop=False):
         invmaxrate=int(finditem(multi_output_old,"Invertor_Max_Bat_Rate"))
         batcap=float(finditem(multi_output_old,'Battery_Capacity_kWh'))*1000
         try:
-            if "3ph" in GiV_Settings.inverter_type.lower() or "gateway" in GiV_Settings.inverter_type.lower():
-                target= round((int(payload['dischargeRate'])/invmaxrate)*100,0)
-                reqs=commands.set_battery_discharge_limit_ac(target, inv_type=GiV_Settings.inverter_type.lower())
+            if "3ph" in GiV_Settings.inverter_type.lower():
+                target= round(int(payload['dischargeRate'])/invmaxrate,0)
+                temp = await sbdla(target, readloop)
             else:
                 if int(payload['dischargeRate']) < int(invmaxrate):
                     target=int(min((int(payload['dischargeRate'])/(batcap/2))*50,50))
                 else:
                     target=50
-                #temp= await sbdl(target,readloop)
-                reqs=commands.set_battery_discharge_limit(target)
-            result= await sendAsyncCommand(reqs,readloop)
-            if 'error' in result:
-                raise Exception
-            val=int(min((target/100)*(batcap), invmaxrate))
-            updateControlCache("Battery_Discharge_Rate",val)
-            if "3ph" in GiV_Settings.inverter_type.lower() or "gateway" in GiV_Settings.inverter_type.lower():
-                updateControlCache("Battery_Discharge_Rate_AC",target)
-                updateControlCache("Battery_Discharge_Rate",int(payload['dischargeRate']))
-            else:
-                val=int(min((target/100)*(batcap), invmaxrate))
-                updateControlCache("Battery_Discharge_Rate",val)
-            temp['result']="Setting battery discharge limit "+str(payload['dischargeRate'])+" was a success"
+                temp= await sbdl(target,readloop)
             logger.debug ("Setting battery discharge rate to: " + str(payload['dischargeRate'])+" ("+str(target)+")")
             
             logger.info(temp['result'])
@@ -552,13 +1183,6 @@ async def setDischargeRateAC(payload,readloop=False):
         target=int(payload['dischargeRate'])
         logger.debug ("Setting AC battery discharge rate to: " + str(target))
         temp= await sbdla(target,readloop)
-        if "3ph" in GiV_Settings.inverter_type.lower() or "gateway" in GiV_Settings.inverter_type.lower():
-            # Recreate Battery Watt rate and push to MQTT
-            regCacheStack=GivLUT.get_regcache()
-            multi_output_old = regCacheStack[-1]
-            invmaxrate=finditem(multi_output_old,'Invertor_Max_Bat_Rate')
-            val=int((target/100)*invmaxrate)
-            updateControlCache("Battery_Discharge_Rate",val)
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -569,6 +1193,8 @@ async def setDischargeRateAC(payload,readloop=False):
 async def setChargeSlot(payload,readloop=False):
     temp={}
     if type(payload) is not dict: payload=json.loads(payload)
+    if 'chargeToPercent' in payload.keys():
+        temp= await sct(int(payload['chargeToPercent']),readloop)
     try:
         logger.debug("Setting Charge Slot "+str(payload['slot'])+" to: "+str(payload['start'])+" - "+str(payload['finish']))
         #temp= await scs(payload,readloop)
@@ -576,8 +1202,6 @@ async def setChargeSlot(payload,readloop=False):
         slot.start=datetime.strptime(payload['start'],"%H:%M")
         slot.end=datetime.strptime(payload['finish'],"%H:%M")
         reqs=commands._set_charge_slot(False,int(payload['slot']),slot,GiV_Settings.inverter_type.lower())
-        if 'chargeToPercent' in payload.keys():
-            reqs.extend(commands.set_charge_target_only(int(payload['chargeToPercent']), inv_type=GiV_Settings.inverter_type.lower()))
         result= await sendAsyncCommand(reqs,readloop)
         if 'error' in result:
             raise Exception
@@ -587,7 +1211,7 @@ async def setChargeSlot(payload,readloop=False):
         else:
             updateControlCache("Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
             updateControlCache("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
-        temp['result']="Setting Charge Slot "+str(payload['slot'])+" to: "+str(payload['start'])+" - "+str(payload['finish'])+" was a success"
+        temp['result']="Setting Charge Slot "+str(payload['slot'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -610,7 +1234,7 @@ async def setPauseSlot(payload,readloop=False):
             raise Exception
         updateControlCache("Battery_pause_start_time_slot",str(datetime.strptime(payload['start'],"%H:%M")))
         updateControlCache("Battery_pause_end_time_slot",str(datetime.strptime(payload['finish'],"%H:%M")))
-        temp['result']="Setting Pause Slot "+str(payload['slot'])+" to: "+str(payload['start'])+" - "+str(payload['finish'])+" was a success"
+        temp['result']="Setting Battery Pause Slot was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -632,7 +1256,7 @@ async def setChargeSlotStart(payload,readloop=False):
             updateControlCache("EMS_Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
         else:
             updateControlCache("Charge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
-        temp['result']="Setting Charge Slot "+str(payload['slot'])+" Start to: "+str(payload['start'])+" was a success"
+        temp['result']="Setting Charge Slot Start "+str(payload['slot'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -654,7 +1278,7 @@ async def setChargeSlotEnd(payload,readloop=False):
             updateControlCache("EMS_Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
         else:
             updateControlCache("Charge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
-        temp['result']="Setting Charge Slot End "+str(payload['slot'])+" to: "+str(payload['finish'])+" was a success"
+        temp['result']="Setting Charge Slot End "+str(payload['slot'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -673,7 +1297,7 @@ async def setExportSlotStart(payload,readloop=False):
         if 'error' in result:
             raise Exception        
         updateControlCache("Export_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
-        temp['result']="Setting Export Slot "+str(payload['slot'])+" Start to: "+str(payload['start'])+" was a success"
+        temp['result']="Setting Export Slot Start "+str(payload['slot'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -692,7 +1316,7 @@ async def setExportSlotEnd(payload,readloop=False):
         if 'error' in result:
             raise Exception         
         updateControlCache("Export_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
-        temp['result']="Setting Export Slot End "+str(payload['slot'])+" to: "+str(payload['finish'])+" was a success"
+        temp['result']="Setting Export Slot End "+str(payload['slot'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -709,23 +1333,10 @@ async def setDischargeSlot(payload,readloop=False):
         pload['reservePercent']=payload['dischargeToPercent']
         result=await setBatteryReserve(pload,readloop)
     try:
-
+        strt=datetime.strptime(payload['start'],"%H:%M")
+        fnsh=datetime.strptime(payload['finish'],"%H:%M")
         logger.debug("Setting Discharge Slot "+str(payload['slot'])+" to: "+str(payload['start'])+" - "+str(payload['finish']))
-        #temp= await sds(payload,readloop)
-        slot=TimeSlot
-        slot.start=datetime.strptime(payload['start'],"%H:%M")
-        slot.end=datetime.strptime(payload['finish'],"%H:%M")
-        reqs=commands._set_charge_slot(True,int(payload['slot']),slot,GiV_Settings.inverter_type.lower())
-        result= await sendAsyncCommand(reqs,readloop)
-        if 'error' in result:
-            raise Exception
-        if 'ems' in GiV_Settings.inverter_type.lower():
-            updateControlCache("EMS_Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
-            updateControlCache("EMS_Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
-        else:
-            updateControlCache("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
-            updateControlCache("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
-        temp['result']="Setting Discharge Slot "+str(payload['slot'])+" to: "+str(payload['start'])+" - "+str(payload['finish'])+" was a success"
+        temp= await sds(payload,readloop)
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -748,7 +1359,7 @@ async def setExportSlot(payload,readloop=False):
             raise Exception
         updateControlCache("Export_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
         updateControlCache("Export_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
-        temp['result']="Setting Export Slot "+str(payload['slot'])+" to: "+str(payload['start'])+" - "+str(payload['finish'])+" was a success"
+        temp['result']="Setting Export Slot "+str(payload['slot'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -770,7 +1381,7 @@ async def setDischargeSlotStart(payload,readloop=False):
             updateControlCache("EMS_Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
         else:
             updateControlCache("Discharge_start_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['start'],"%H:%M")),True)
-        temp['result']="Setting Discharge Slot start "+str(payload['slot'])+" Start to: "+str(payload['start'])+" was a success"
+        temp['result']="Setting Discharge Slot Start "+str(payload['slot'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -792,7 +1403,7 @@ async def setDischargeSlotEnd(payload,readloop=False):
             updateControlCache("EMS_Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
         else:
             updateControlCache("Discharge_end_time_slot_"+str(payload['slot']),str(datetime.strptime(payload['finish'],"%H:%M")),True)
-        temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" to: "+str(payload['finish'])+" was a success"
+        temp['result']="Setting Discharge Slot End "+str(payload['slot'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -811,7 +1422,7 @@ async def setPauseStart(payload,readloop=False):
         if 'error' in result:
             raise Exception(result)
         updateControlCache("Battery_pause_start_time_slot",str(datetime.strptime(payload['start'],"%H:%M")),True)
-        temp['result']="Setting Pause Slot Start to: "+str(payload['start'])+" was a success"
+        temp['result']="Setting Pause Slot Start was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -830,7 +1441,6 @@ async def setPauseEnd(payload,readloop=False):
         if 'error' in result:
             raise Exception(result)
         updateControlCache("Battery_pause_end_time_slot",str(datetime.strptime(payload['finish'],"%H:%M")),True)
-        temp['result']="Setting Pause Slot End to: "+str(payload['finish'])+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
@@ -849,12 +1459,12 @@ async def FEResume(revert, readloop=False):
         slot=TimeSlot
         slot.start=datetime.strptime(revert['start_time'],"%H:%M")
         slot.end=datetime.strptime(revert['end_time'],"%H:%M")
-        reqs.extend(commands._set_charge_slot(True,2,slot,GiV_Settings.inverter_type.lower()))
+        reqs.extend(commands._set_charge_slot(True,2,slot,GiV_Settings.inverter_type))
         if revert["discharge_schedule"]=="enable":
             enabled=True
         else:
             enabled=False
-        reqs.extend(commands.set_enable_discharge(enabled,GiV_Settings.inverter_type.lower()))
+        reqs.extend(commands.set_enable_discharge(enabled))
         if "dischargeRate" in revert:
             target=50
             if exists(GivLUT.regcache):      # if there is a cache then grab it
@@ -1304,14 +1914,15 @@ async def setBatteryMode(payload,readloop=False):
             #temp= await smd(False,readloop)
             saved_battery_reserve = getSavedBatteryReservePercentage()
             #temp= await ssc(saved_battery_reserve,readloop)
-            reqs=commands.set_mode_dynamic(False)
-            reqs.extend(commands.set_battery_soc_reserve(saved_battery_reserve, inv_type=GiV_Settings.inverter_type.lower()))
+            reqs=commands.set_battery_soc_reserve(saved_battery_reserve, inv_type=GiV_Settings.inverter_type.lower())
+            reqs.extend(commands.set_mode_dynamic(False))
             result= await sendAsyncCommand(reqs,readloop)
             if 'error' in result:
                 raise Exception
             updateControlCache("Battery_Power_Reserve",saved_battery_reserve)
-            temp['result']="Setting Eco mode was a success"
+            temp['result']="Setting dynamic mode was a success"
         elif payload['mode']=="Eco (Paused)":
+            #temp= await smd(True,readloop)
             reqs=commands.set_mode_dynamic(True)
             result= await sendAsyncCommand(reqs,readloop)
             if 'error' in result:
@@ -1320,18 +1931,20 @@ async def setBatteryMode(payload,readloop=False):
         elif payload['mode']=="Timed Demand":
             #temp= await sbdmd(readloop)
             reqs=commands.set_mode_storage(discharge_for_export=False, inv_type=GiV_Settings.inverter_type.lower())
+            reqs.extend(commands.set_enable_discharge(True))
             result= await sendAsyncCommand(reqs,readloop)
             if 'error' in result:
                 raise Exception
-            temp['result']="Setting Timed Demand mode was a success"            
+            temp['result']="Setting demand mode was a success"            
             #temp= await ed(readloop)
         elif payload['mode']=="Timed Export":
             #temp= await sbdmmp(readloop)
             reqs=commands.set_mode_storage(discharge_for_export=True, inv_type=GiV_Settings.inverter_type.lower())
+            reqs.extend(commands.set_enable_discharge(True))
             result= await sendAsyncCommand(reqs,readloop)
             if 'error' in result:
                 raise Exception
-            temp['result']="Setting Timed Export mode was a success"
+            temp['result']="Setting export mode was a success"
             #temp= await ed(readloop)
         else:
             temp['result']="Invalid Mode requested"+ payload['mode']
@@ -1342,6 +1955,24 @@ async def setBatteryMode(payload,readloop=False):
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         temp['result']="Setting Battery Mode failed: " + str(e)
+        logger.error (temp['result'])
+    return json.dumps(temp)
+
+async def setPVInputMode(payload,readloop=False):
+    temp={}
+    if type(payload) is not dict: payload=json.loads(payload)
+    try:
+        logger.debug("Setting PV Input mode to: "+ str(payload['state']))
+        if payload['state'] in GivLUT.pv_input_mode:
+            temp= await spvim(GivLUT.pv_input_mode.index(payload['state']),readloop)
+            temp['result']="Setting PV Input Mode was a success"
+        else:
+            logger.error ("Invalid Mode requested: "+ payload['state'])
+            temp['result']="Invalid Mode requested"
+        logger.info(temp['result'])
+    except:
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        temp['result']="Setting PV Input Mode failed: " + str(e)
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -1400,6 +2031,20 @@ async def setDateTime(payload,readloop=False):
         logger.error (temp['result'])
     return json.dumps(temp)
 
+async def setCarChargeBoost(payload, readloop=False):
+    temp={}
+    targetresult="Success"
+    val=payload['boost']
+    try:
+        logger.debug("Setting Car Charge Boost to: "+str(val)+"w")
+        temp= await sccb(val,readloop)
+        logger.info(temp['result'])
+    except:
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        temp['result']="Setting Car Charge Boost failed: " + str(e) 
+        logger.error (temp['result'])
+    return json.dumps(temp)
+
 async def setBatteryCalibration(payload,readloop=False):
     """Kicks off a Battery Calibration using a value in the range: [0:'Off',1:'Start',3:'Charge Only']
 
@@ -1418,11 +2063,25 @@ async def setBatteryCalibration(payload,readloop=False):
         if 'error' in result:
             raise Exception
         updateControlCache("Battery_Calibration",str(GivLUT.battery_calibration[val]))
-        temp['result']="Setting Battery Calibration "+str(payload['state'])+" was a success"
+        temp['result']="Setting Battery Calibration "+str(val)+" was a success"
         logger.info(temp['result'])
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         temp['result']="Setting Battery Calibration failed: " + str(e) 
+        logger.error (temp['result'])
+    return json.dumps(temp)
+
+async def setExportLimit(val, readloop=False):
+    temp={}
+    targetresult="Success"
+    try:
+        logger.debug("Setting Export Limit to: "+str(val)+"w")
+        #Set Date and Time on inverter
+        temp= await sel(val,readloop)
+        logger.info(temp['result'])
+    except:
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        temp['result']="Setting Export Limit failed: " + str(e) 
         logger.error (temp['result'])
     return json.dumps(temp)
 
@@ -1480,86 +2139,6 @@ def getSavedBatteryReservePercentage():
         with open(GivLUT.reservepkl, 'rb') as inp:
             saved_battery_reserve= pickle.load(inp)
     return saved_battery_reserve
-
-##### ARCHIVED FUNCTIONS FOR REVIEW OR REMOVAL ######
-'''
-async def enableDischarge(payload,readloop=False):
-    temp={}
-    saved_battery_reserve = getSavedBatteryReservePercentage()
-    try:
-        if payload['state']=="enable":
-            logger.debug("Enabling Discharge")
-            temp= await ssc(saved_battery_reserve,readloop)
-            updateControlCache("Enable_Discharge","enable")
-        elif payload['state']=="disable":
-            logger.debug("Disabling Discharge")
-            temp= await ssc(100,readloop)
-            updateControlCache("Enable_Discharge","disable")
-        logger.info(temp['result'])
-    except:
-        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-        temp['result']="Setting Discharge Enable failed: " + str(e)
-        logger.error (temp['result'])
-    return json.dumps(temp)
-
-async def setShallowCharge(payload,readloop=False):
-    temp={}
-    try:
-        logger.debug("Setting Shallow Charge to: "+ str(payload['val']))
-        temp= await ssc(int(payload['val']),readloop)
-        logger.info(temp['result'])
-    except:
-        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-        temp['result']="Setting shallow charge failed: " + str(e)
-        logger.error (temp['result'])
-    return json.dumps(temp)
-
-async def setPVInputMode(payload,readloop=False):
-    temp={}
-    if type(payload) is not dict: payload=json.loads(payload)
-    try:
-        logger.debug("Setting PV Input mode to: "+ str(payload['state']))
-        if payload['state'] in GivLUT.pv_input_mode:
-            temp= await spvim(GivLUT.pv_input_mode.index(payload['state']),readloop)
-            temp['result']="Setting PV Input Mode was a success"
-        else:
-            logger.error ("Invalid Mode requested: "+ payload['state'])
-            temp['result']="Invalid Mode requested"
-        logger.info(temp['result'])
-    except:
-        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-        temp['result']="Setting PV Input Mode failed: " + str(e)
-        logger.error (temp['result'])
-    return json.dumps(temp)
-
-async def setCarChargeBoost(payload, readloop=False):
-    temp={}
-    targetresult="Success"
-    val=payload['boost']
-    try:
-        logger.debug("Setting Car Charge Boost to: "+str(val)+"w")
-        temp= await sccb(val,readloop)
-        logger.info(temp['result'])
-    except:
-        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-        temp['result']="Setting Car Charge Boost failed: " + str(e) 
-        logger.error (temp['result'])
-    return json.dumps(temp)
-
-async def setExportLimit(val, readloop=False):
-    temp={}
-    targetresult="Success"
-    try:
-        logger.debug("Setting Export Limit to: "+str(val)+"w")
-        #Set Date and Time on inverter
-        temp= await sel(val,readloop)
-        logger.info(temp['result'])
-    except:
-        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
-        temp['result']="Setting Export Limit failed: " + str(e) 
-        logger.error (temp['result'])
-    return json.dumps(temp)
-'''
 
 if __name__ == '__main__':
     if len(sys.argv)==2:

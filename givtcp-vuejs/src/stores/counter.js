@@ -87,7 +87,6 @@ export const useTcpStore = defineStore('givtcp-form', {
       Log_Level: "Info",
       queue_retries: 2,
       data_smoother: "medium",
-      cache_location: "/config/GivTCP"
     })
   })
 })
@@ -653,7 +652,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'Log Level',
             parent: 'misc',
-            items: ["critical", "info", "debug"],
+            items: ["critical", "info", "debug","write_debug"],
             key: 'Log_Level'
           }
         },
@@ -680,14 +679,6 @@ export const useCard = defineStore('card', {
             parent: 'misc',
             items: ["high", "medium", "low","none"],
             key: 'data_smoother'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Cache Location',
-            parent: 'misc',
-            key: 'cache_location'
           }
         },
         {

@@ -105,11 +105,12 @@ class Gateway(RegisterGetter, metaclass=DynamicDoc):
     #### Additional Holding Registers
 
     ## EMS
-
+        "eco_mode": Def(C.uint16, BatteryPowerMode, HR(481), valid=(0, 1)),
+        "soc_force_adjust": Def(C.uint16, BatteryCalibrationStage, HR(482), valid=(0,3)),
         "parallel_aio_soc": Def(C.uint16, None, HR(491)),
         "parallel_aio_battery_power": Def(C.uint16, None, HR(492)),
         "parallel_aio_load_power": Def(C.uint16, None, HR(493)),
-        "battery_nominal_capacity": Def(C.uint16, None, HR(512)),
+        "battery_nominal_capacity": Def(C.battery_capacity, None, HR(512),HR(0)),
 
     }
     REGISTER_LUT=dict(BaseInverter.REGISTER_LUT, **NEW_LUT)

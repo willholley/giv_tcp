@@ -50,42 +50,6 @@ def validateEVC(HOST):
         logger.error(e)
         return False
 
-def get_regcache(cachelocation,inv):
-    try:
-        cachefile=".regcache_lockfile_"+str(inv)
-        count=0
-        if exists(cachefile):
-            logger.debug("regcache in use, waiting...")
-            while True:
-                count +=1
-                sleep(0.5)
-                if not exists(cachefile):
-                    logger.debug("regcache now available")
-                    break
-                if count==20:
-                    # loop round for 5s waiting for it to become available
-                    logger.error("Timed out waiting for regcache")
-                    return None
-        open(cachefile, 'w').close() #create lock file
-        if exists(cachelocation):
-            logger.debug("Opening regcache at: "+str(cachelocation))
-            with open(cachelocation, 'rb') as inp:
-                regCacheStack = pickle.load(inp)
-            logger.debug("Removing lockfile")
-            if exists(cachefile):
-                os.remove(cachefile)
-            return regCacheStack
-        else:
-            os.remove(cachefile)
-            logger.debug("regcache doesn't exist...")
-            return None
-    except Exception:
-        if exists(cachefile):
-            os.remove(cachefile)
-        e=sys.exc_info()
-        logger.error("Failed to get Cache: "+str(e))
-        return None
-
 async def getInvDeets(HOST):
     try:
         Stats={}
@@ -132,21 +96,13 @@ def createsettingsjson(inv):
 
     with open(PATH+"/settings.py", 'w') as outp:
         outp.write("class GiV_Settings:\n")
-        
-        outp.write("    v3Upgrade="+str(setts["v3upgrade"])+"\n")
         outp.write("    invertorIP=\""+str(setts["invertorIP_"+str(inv)])+"\"\n")
         outp.write("    serial_number=\""+str(setts["serial_number_"+str(inv)])+"\"\n")
         outp.write("    inverter_type=\""+str(setts["Model_"+str(inv)])+"\"\n")
-        if hasMQTT:
-            outp.write("    MQTT_Address=\""+str(mqtt_host)+"\"\n")
-            outp.write("    MQTT_Username=\""+str(mqtt_username)+"\"\n")
-            outp.write("    MQTT_Password=\""+str(mqtt_password)+"\"\n")
-            outp.write("    MQTT_Port="+str(mqtt_port)+"\n")
-        else:
-            outp.write("    MQTT_Address=\""+str(setts["MQTT_Address"])+"\"\n")
-            outp.write("    MQTT_Username=\""+str(setts["MQTT_Username"])+"\"\n")
-            outp.write("    MQTT_Password=\""+str(setts["MQTT_Password"])+"\"\n")
-            outp.write("    MQTT_Port="+str(setts["MQTT_Port"])+"\n")
+        outp.write("    MQTT_Address=\""+str(setts["MQTT_Address"])+"\"\n")
+        outp.write("    MQTT_Username=\""+str(setts["MQTT_Username"])+"\"\n")
+        outp.write("    MQTT_Password=\""+str(setts["MQTT_Password"])+"\"\n")
+        outp.write("    MQTT_Port="+str(setts["MQTT_Port"])+"\n")
         outp.write("    MQTT_Retain="+str(setts["MQTT_Retain"]).capitalize()+"\n")
         outp.write("    MQTT_Topic=\""+str(setts["MQTT_Topic"])+"\"\n")
         if isAddon:
@@ -181,6 +137,7 @@ def createsettingsjson(inv):
         outp.write("    data_smoother=\""+str(setts["data_smoother"])+"\"\n")
         outp.write("    cache_location=\"/config/GivTCP\"\n")
         outp.write("    Debug_File_Location=\"/config/GivTCP/log_inv_"+str(inv)+".log\"\n")
+        outp.write("    Debug_File_Location_Write=\"/config/GivTCP/write_log_inv_"+str(inv)+".log\"\n")
         outp.write("    inverter_num=\""+str(inv)+"\"\n")
         outp.write("    Smart_Target="+str(setts["dynamic_tariff"]).capitalize()+"\n")
         outp.write("    GE_API=\""+str(setts["GE_API"])+"\"\n")
@@ -432,12 +389,12 @@ else:
     for setting in templatesetts:
         if not setting in setts:
             setts[setting]=templatesetts[setting]
-            setts["v3upgrade"]=v3upgrade
     with open(SFILE, 'w') as f:
         f.write(json.dumps(setts,indent=4))
 
+
 # Update json object with found data
-logger.debug ("Creating master settings.json for all inverters.")
+logger.debug ("Creating master allsettings.json for all inverters.")
 with open(SFILE, 'r') as f:
     setts=json.load(f)
 if SuperTimezone: setts["TZ"]=str(SuperTimezone)
@@ -450,6 +407,7 @@ if hasMQTT:
     if setts["MQTT_Password"]=="": setts["MQTT_Password"]=mqtt_password
     setts["MQTT_Port"]=mqtt_port
 if setts["MQTT_Address"]=="": setts['MQTT_Output']=False
+
 for inv in inverterStats:
     logger.debug("Using found Inverter data to autosetup settings.json")
     # Check if serial number is already here and only update if IP address has changed
@@ -466,7 +424,7 @@ for inv in inverterStats:
     else:
         for num in range(1,6):
             if inverterStats[inv]['Serial_Number'] == setts["serial_number_"+str(num)]:
-                logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " already found in settings file (slot "+str(num)+"), checking IP address is unchanged...")
+                logger.debug("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " already found in settings file (slot "+str(num)+"), checking IP address is unchanged...")
                 if not setts["invertorIP_"+str(num)] == inverterStats[inv]['IP_Address']:
                     #If IP has changed, update it
                     logger.info("Inverter "+ str(inverterStats[inv]['Serial_Number'])+ " IP Address is different, updating: "+str(setts["invertorIP_"+str(num)])+" -> "+str(inverterStats[inv]['IP_Address']))
@@ -481,6 +439,58 @@ if len(evcList)>0:
         setts["evc_ip_address"]=evcList[1][0]
     if setts["serial_number_evc"]=="":
         setts["serial_number_evc"]=evcList[1][1]
+
+## Get legacy settings if they exist
+if exists("/config/GivTCP/v2env.pkl") and v3upgrade:
+    logger.info("v2 settings found, importing into v3...")
+    with open('/config/GivTCP/v2env.pkl','rb') as inp:
+        envs=pickle.load(inp)
+    #logger.info("Version 2 settings found, importing into new settings")
+    v2invertersettings=[]
+    for inv in envs[1]:
+        invertersett={}
+        num=int(envs[0]['NUMINVERTORS'])
+        for inv2 in range(1,num+1):
+            if envs[0]['INVERTOR_IP_'+str(inv)]==envs[1][inv]['IP_Address']:
+                invertersett['IP_Address']=envs[1][inv]['IP_Address']
+                invertersett['Serial_Number']=envs[1][inv]['Serial_Number']
+                if inv==1:
+                    invertersett['Prefix']=envs[0]['HADEVICEPREFIX']
+                else:
+                    invertersett['Prefix']=envs[0]['HADEVICEPREFIX_'+str(inv)]
+        v2invertersettings.append(invertersett)
+    setts["GE_API"]=envs[0]["GEAPI"]
+    setts["PALM_WINTER"]=envs[0]["PALM_WINTER"]
+    setts["PALM_SHOULDER"]=envs[0]["PALM_SHOULDER"]
+    setts["PALM_MIN_SOC_TARGET"]=envs[0]["PALM_MIN_SOC_TARGET"]
+    setts["PALM_MAX_SOC_TARGET"]=envs[0]["PALM_MAX_SOC_TARGET"]
+    setts["PALM_BATT_RESERVE"]=envs[0]["PALM_BATT_RESERVE"]
+    setts["PALM_BATT_UTILISATION"]=envs[0]["PALM_BATT_UTILISATION"]
+    setts["SOLCASTAPI"]=envs[0]["SOLCASTAPI"]
+    setts["SOLCASTSITEID"]=envs[0]["SOLCASTSITEID"]
+    setts["SOLCASTSITEID2"]=envs[0]["SOLCASTSITEID2"]
+    setts["PALM_WEIGHT"]=envs[0]["PALM_WEIGHT"]
+    setts["LOAD_HIST_WEIGHT"]=envs[0]["LOAD_HIST_WEIGHT"]
+    setts["dynamic_tariff"]=envs[0]["DYNAMICTARIFF"]
+    setts["day_rate"]=envs[0]["DAYRATE"]
+    setts["night_rate"]=envs[0]["NIGHTRATE"]
+    setts["export_rate"]=envs[0]["EXPORTRATE"]
+    setts["day_rate_start"]=envs[0]["DAYRATESTART"]
+    setts["night_rate_start"]=envs[0]["NIGHTRATESTART"]
+    setts["influxURL"]=envs[0]["INFLUX_URL"]
+    setts["influxToken"]=envs[0]["INFLUX_TOKEN"]
+    setts["influxBucket"]=envs[0]["INFLUX_BUCKET"]
+    setts["influxOrg"]=envs[0]["INFLUX_ORG"]
+    setts["self_run"]=True
+    setts['evc_enable']=bool(envs[0]["EVC_ENABLE"])
+    setts['evc_self_run_timer']=envs[0]["EVC_SELF_RUN_TIMER"]
+
+    ## Match HAPREFIX to inverterIP
+    for num in range(1,6):
+        for inv in range(0, len(v2invertersettings)):
+            if setts["invertorIP_"+str(num)]==v2invertersettings[inv]['IP_Address']:
+                setts["inverterName_"+str(num)]=v2invertersettings[inv]["Prefix"]
+
 
 with open(SFILE, 'w') as f:
     f.write(json.dumps(setts,indent=4))
@@ -502,6 +512,10 @@ runninginv=[]
 # Change this to only use those inverters set to enabled in settings (INDENT)
 for inv in range(1,6):
     if setts['inverter_enable_'+str(inv)]==True:
+        #Set up v3upgrade file
+        if v3upgrade:
+            logger.info("v3 upgrade detected...")
+            open('/config/GivTCP/.v3upgrade_'+str(inv), 'w').close()
         runninginv.append(inv)
         logger.info ("Setting up invertor: "+str(inv))
         PATH= "/app/GivTCP_"+str(inv)
@@ -526,7 +540,7 @@ for inv in range(1,6):
         #  Always delete lockfiles and FCRunning etc... but only delete pkl if too old?
         for file in os.listdir(setts["cache_location"]):
             filename = os.fsdecode(file)
-            if not filename.endswith(".log") and not filename.startswith("rateData") and not filename.startswith(".dayRate") and not filename.startswith(".nightRate") and not filename.startswith("allsettings"): 
+            if not filename.__contains__("log") and not filename.startswith("rateData") and not filename.startswith(".dayRate") and not filename.startswith(".nightRate") and not filename.startswith("allsettings") and not filename.startswith("v2env") and not filename.startswith(".v3upgrade"):
                 os.remove(setts['cache_location']+"/"+file)
         if exists(setts["cache_location"]+"/rateData_"+str(inv)+".pkl"):
             if "TZ" in os.environ:
@@ -619,11 +633,13 @@ if setts['Smart_Target']==True:
 while True:
     try:
         for inv in runninginv:
-            regCacheStack=get_regcache(setts['cache_location']+"/regCache_"+str(inv)+".pkl",inv)
-            if regCacheStack:
-                timediff = datetime.now(UTC) - datetime.fromisoformat(regCacheStack[4]['Stats']['Last_Updated_Time'])
-                timesince=(((timediff.seconds*1000000)+timediff.microseconds)/1000000)
-                logger.debug("timesince last read= "+str(timesince))
+            #regCacheStack=get_regcache(setts['cache_location']+"/regCache_"+str(inv)+".pkl",inv)
+            if exists(setts['cache_location']+"/lastUpdate_"+str(inv)+".pkl"):
+                with open(setts['cache_location']+"/lastUpdate_"+str(inv)+".pkl", 'rb') as inp:
+                    previousUpdate = pickle.load(inp)
+                    timediff = datetime.now(UTC) - datetime.fromisoformat(previousUpdate)
+                    timesince=(((timediff.seconds*1000000)+timediff.microseconds)/1000000)
+                    logger.debug("timesince last read= "+str(timesince))
             else:
                 sleep(10)       #wait for first regcache then go back round loop
                 continue
@@ -681,6 +697,8 @@ while True:
                 os.chdir(PATH)
                 logger.info ("Restarting EVC chargeMode loop every 60s")
                 evcChargeModeLoop=subprocess.Popen(["/usr/local/bin/python3",PATH+"/evc.py", "chargeMode"])
+
+        ## Could we run a periodic Time Sync check? Maybe a config item??
     except:
         e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         logger.error("Error in watchdog loop: "+str(e))

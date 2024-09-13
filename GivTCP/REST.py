@@ -2,7 +2,7 @@
 # version 2021.12.22
 from os.path import exists
 import sys
-from flask import Flask, request, render_template, Response
+from flask import Flask, request, render_template, Response, send_file
 from flask_cors import CORS
 import read as rd       #grab passthrough functions from main read file
 import write as wr      #grab passthrough functions from main write file
@@ -96,6 +96,20 @@ def returnsetts():
     with open(SFILE, 'r') as f1:
         setts=json.load(f1)
         return setts
+
+@giv_api.route('/fullCache', methods=['GET'])
+def fullcache():
+    """Return full cache History as a json file
+    """
+    output=rd.fullCache()
+    filename="regCacheStack_"+str(GiV_Settings.givtcp_instance)+".json"
+    with open(filename,'w') as outp:
+        outp.write(output)
+    if output == None:
+        return "{\"Result\":\"Error, no data available\"}"
+    else:
+        return send_file(filename, download_name=filename, as_attachment=True )
+    
 
 @giv_api.route('/runAll', methods=['GET'])
 def getAll():

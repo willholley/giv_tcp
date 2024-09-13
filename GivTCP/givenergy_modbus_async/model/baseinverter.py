@@ -30,9 +30,10 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         #
         "device_type_code": Def(C.hex, None, HR(0)),
         "inverter_max_power": Def(C.hex, C.inverter_max_power, HR(0)),
+        "inverter_max_power_new": Def((C.hexfield,2,2), C.inverter_max_power_new, HR(2)),
         "model": Def(C.hex, Model, HR(0)),
         "certification_type": Def((C.hexfield,0,2), Certification, HR(2)),
-        "inv_max_power": Def((C.hexfield,2,2), None, HR(2)),
+        #"battery_max_power": Def((C.hexfield,2,2), C.battery_max_power, HR(2)),
         "num_mppt": Def((C.duint8, 0), None, HR(3)),
         "num_phases": Def((C.duint8, 1), None, HR(3)),
         # HR(4-6) unused
@@ -286,10 +287,10 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "battery_errors": Def(C.battery_fault_code, None, IR(56)),
         "i_grid_port": Def(C.centi, None, IR(58)),
         "battery_percent": Def(C.uint16, None, IR(59)),
-        "e_battery_discharge_total2": Def(C.deci, None, HR(180)),
-        "e_battery_charge_total2": Def(C.deci, None, IR(181)),
-        "e_battery_discharge_today2": Def(C.deci, None, IR(182)),
-        "e_battery_charge_today2": Def(C.deci, None, IR(183)),
+        "e_battery_discharge_total_2": Def(C.deci, None, HR(180)),
+        "e_battery_charge_total_2": Def(C.deci, None, IR(181)),
+        "e_battery_discharge_today_2": Def(C.deci, None, IR(182)),
+        "e_battery_charge_today_2": Def(C.deci, None, IR(183)),
         #
         # Input Registers, block 240-300
         # Gen3
