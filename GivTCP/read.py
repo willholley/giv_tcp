@@ -337,95 +337,104 @@ def getMeters(plant: Plant):
     return meters
 
 def getBatteries(plant: Plant, multi_output_old):
-    if not plant.inverter ==None:
-        GEInv: Inverter =plant.inverter
-    elif not plant.ems ==None:
-        GEInv=plant.ems
-    elif not plant.gateway ==None:
-        GEInv=plant.gateway
-    isHV=plant.isHV
-    batteries2={}
-    stack={}
-    logger.debug("Getting Battery Details")
-    if not isHV:
-        GEBat=plant.batteries
-        for b in GEBat:
-            if b.is_valid():          # Check for empty battery object responses and only process if they are complete (have a serial number)
-                logger.debug("Building battery output: ")
-                battery = {}
-                battery['Battery_Serial_Number'] = b.serial_number
-                if b.soc != 0:
-                    battery['Battery_SOC'] = b.soc
-                elif b.soc == 0 and not multi_output_old==[]:
-                    battery['Battery_SOC'] = multi_output_old['Battery_Details'][b.serial_number]['Battery_SOC']
-                else:
-                    battery['Battery_SOC'] = 1
-                battery['Battery_Capacity'] = b.cap_calibrated
-                battery['Battery_Design_Capacity'] = b.cap_design
-                battery['Battery_Remaining_Capacity'] = b.cap_remaining
-                battery['Battery_Firmware_Version'] = b.bms_firmware_version
-                battery['Battery_Cells'] = b.num_cells
-                battery['Battery_Cycles'] = b.num_cycles
-                battery['Battery_USB_present'] = b.usb_device_inserted
-                battery['Battery_Temperature'] = b.t_bms_mosfet
-                battery['Battery_Voltage'] = b.v_cells_sum
-                for i in range(16):
-                    battery['Battery_Cell_'+str(i+1)+'_Voltage'] = b.get('v_cell_'+str(i+1).zfill(2))
-                battery['Battery_Cell_1_Temperature'] = b.t_cells_01_04
-                battery['Battery_Cell_2_Temperature'] = b.t_cells_05_08
-                battery['Battery_Cell_3_Temperature'] = b.t_cells_09_12
-                battery['Battery_Cell_4_Temperature'] = b.t_cells_13_16
-                stack[b.serial_number] = battery
-                logger.debug("Battery "+str(b.serial_number)+" added")
-            else:
-                logger.error("Battery Object empty so skipping")
-            
-            stack['BMS_Temperature']=GEInv.temp_battery
-            stack['BMS_Voltage']=GEInv.v_battery
-            # Make this always Battery_Stack_1
-            batteries2['Battery_Stack_1']=stack
-    else:
-        HVStack=plant.HVStack
-        for num,stack in enumerate(HVStack):
-            bcudata={}
-            bcudata['Stack_Voltage']=stack[0].battery_voltage
-            bcudata['Stack_Current']=stack[0].battery_current
-            bcudata['Stack_Power']=stack[0].battery_power
-            bcudata['Stack_SOH']=stack[0].battery_soh
-            bcudata['Stack_Load_Voltage']=stack[0].load_voltage
-            bcudata['Stack_Cycles']=stack[0].number_of_cycles
-            bcudata['Stack_SOC_Difference']=stack[0].battery_soc_max-stack[0].battery_soc_min
-            bcudata['Stack_SOC_High']=stack[0].battery_soc_max
-            bcudata['Stack_SOC_Low']=stack[0].battery_soc_min
-            bcudata['Stack_Firmware']=stack[0].pack_software_version
-            bcudata['BMS_Temperature']=GEInv.temp_battery
-            bcudata['Stack_Design_Capacity']=round((stack[0].battery_nominal_capacity*stack[0].number_of_module)*0.9,2)     # Usable kWh is 10% less than actual 
-            bcudata['Stack_SOC_kWh']=round((stack[0].remaining_battery_capacity*stack[0].number_of_module)*0.9,2)     # Usable kWh is 10% less than actual
-            bcudata['Stack_Discharge_Energy_Today_kWh']=stack[0].discharge_energy_today
-            bcudata['Stack_Charge_Energy_Today_kWh']=stack[0].charge_energy_today
-            bcudata['Stack_Discharge_Energy_Total_kWh']=stack[0].discharge_energy_total
-            bcudata['Stack_Charge_Energy_Total_kWh']=stack[0].charge_energy_total
-            for b in stack[1]:
-                if b.is_valid():
-                    sn=b.serial_number
-                else:
-                    sn=b.getsn()
-                if sn.upper().isupper():          # Check for empty battery object responses and only process if they are complete (have a serial number)
+    try:
+        if not plant.inverter ==None:
+            GEInv: Inverter =plant.inverter
+        elif not plant.ems ==None:
+            GEInv=plant.ems
+        elif not plant.gateway ==None:
+            GEInv=plant.gateway
+        isHV=plant.isHV
+        batteries2={}
+        stack={}
+        logger.debug("Getting Battery Details")
+        if not isHV:
+            GEBat=plant.batteries
+            for b in GEBat:
+                if b.is_valid():          # Check for empty battery object responses and only process if they are complete (have a serial number)
                     logger.debug("Building battery output: ")
                     battery = {}
-                    battery['Battery_Serial_Number'] = sn
-                    for i in range(24):
+                    battery['Battery_Serial_Number'] = b.serial_number
+                    if b.soc != 0:
+                        battery['Battery_SOC'] = b.soc
+                    elif b.soc == 0 and not multi_output_old==[]:
+                        if b.serial_number in multi_output_old['Battery_Details']:
+                            battery['Battery_SOC'] = multi_output_old['Battery_Details'][b.serial_number]['Battery_SOC']
+                        else:
+                            battery['Battery_SOC'] = 1
+                    else:
+                        battery['Battery_SOC'] = 1
+                    battery['Battery_Capacity'] = b.cap_calibrated
+                    battery['Battery_Design_Capacity'] = b.cap_design
+                    battery['Battery_Remaining_Capacity'] = b.cap_remaining
+                    battery['Battery_Firmware_Version'] = b.bms_firmware_version
+                    battery['Battery_Cells'] = b.num_cells
+                    battery['Battery_Cycles'] = b.num_cycles
+                    battery['Battery_USB_present'] = b.usb_device_inserted
+                    battery['Battery_Temperature'] = b.t_bms_mosfet
+                    battery['Battery_Voltage'] = b.v_cells_sum
+                    for i in range(16):
                         battery['Battery_Cell_'+str(i+1)+'_Voltage'] = b.get('v_cell_'+str(i+1).zfill(2))
-                    
-                    for i in range(12):
-                        battery['Battery_Cell_'+str(i+1)+'_Temperature'] = b.get('t_cell_'+str(i+1).zfill(2))
-                    
-                    bcudata[sn] = battery
-                    logger.debug("Battery "+str(sn)+" added")
+                    battery['Battery_Cell_1_Temperature'] = b.t_cells_01_04
+                    battery['Battery_Cell_2_Temperature'] = b.t_cells_05_08
+                    battery['Battery_Cell_3_Temperature'] = b.t_cells_09_12
+                    battery['Battery_Cell_4_Temperature'] = b.t_cells_13_16
+                    stack[b.serial_number] = battery
+                    logger.debug("Battery "+str(b.serial_number)+" added")
                 else:
                     logger.error("Battery Object empty so skipping")
-            batteries2['Battery_Stack_'+str(num+1)]=bcudata
-    return batteries2
+                
+                stack['BMS_Temperature']=GEInv.temp_battery
+                stack['BMS_Voltage']=GEInv.v_battery
+                # Make this always Battery_Stack_1
+                batteries2['Battery_Stack_1']=stack
+        else:
+            HVStack=plant.HVStack
+            for num,stack in enumerate(HVStack):
+                bcudata={}
+                bcudata['Stack_Voltage']=stack[0].battery_voltage
+                bcudata['Stack_Current']=stack[0].battery_current
+                bcudata['Stack_Power']=stack[0].battery_power
+                bcudata['Stack_SOH']=stack[0].battery_soh
+                bcudata['Stack_Load_Voltage']=stack[0].load_voltage
+                bcudata['Stack_Cycles']=stack[0].number_of_cycles
+                bcudata['Stack_SOC_Difference']=stack[0].battery_soc_max-stack[0].battery_soc_min
+                bcudata['Stack_SOC_High']=stack[0].battery_soc_max
+                bcudata['Stack_SOC_Low']=stack[0].battery_soc_min
+                bcudata['Stack_Firmware']=stack[0].pack_software_version
+                bcudata['BMS_Temperature']=GEInv.temp_battery
+                bcudata['Stack_Design_Capacity']=round((stack[0].battery_nominal_capacity*stack[0].number_of_module)*0.9,2)     # Usable kWh is 10% less than actual 
+                bcudata['Stack_SOC_kWh']=round((stack[0].remaining_battery_capacity*stack[0].number_of_module)*0.9,2)     # Usable kWh is 10% less than actual
+                bcudata['Stack_Discharge_Energy_Today_kWh']=stack[0].discharge_energy_today
+                bcudata['Stack_Charge_Energy_Today_kWh']=stack[0].charge_energy_today
+                bcudata['Stack_Discharge_Energy_Total_kWh']=stack[0].discharge_energy_total
+                bcudata['Stack_Charge_Energy_Total_kWh']=stack[0].charge_energy_total
+                for b in stack[1]:
+                    if b.is_valid():
+                        sn=b.serial_number
+                    else:
+                        sn=b.getsn()
+                    if sn.upper().isupper():          # Check for empty battery object responses and only process if they are complete (have a serial number)
+                        logger.debug("Building battery output: ")
+                        battery = {}
+                        battery['Battery_Serial_Number'] = sn
+                        for i in range(24):
+                            battery['Battery_Cell_'+str(i+1)+'_Voltage'] = b.get('v_cell_'+str(i+1).zfill(2))
+                        
+                        for i in range(12):
+                            battery['Battery_Cell_'+str(i+1)+'_Temperature'] = b.get('t_cell_'+str(i+1).zfill(2))
+                        
+                        bcudata[sn] = battery
+                        logger.debug("Battery "+str(sn)+" added")
+                    else:
+                        logger.error("Battery Object empty so skipping")
+                batteries2['Battery_Stack_'+str(num+1)]=bcudata
+        return batteries2
+    except Exception:
+        e = sys.exc_info() ,sys.exc_info()[2].tb_lineno
+        #e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        logger.error("Error getting Battery Data: " + str(e))
+        return None
 
 def getTimeslots(plant: Plant):
     timeslots={}
@@ -1234,7 +1243,7 @@ def processGatewayInfo(plant: Plant):
         power_output['PV_Power']=GEInv.p_pv
         power_output['Load_Power']=GEInv.p_load
         #power_output['Parallel_Load_Power']=GEInv.parallel_aio_load_power
-        power_output['Battery_Power']=-GEInv.p_aio_total - GEInv.p_pv       # For Gateway we proxy battery by invertor power minus PV
+        power_output['Battery_Power']=-GEInv.p_aio_total      # For Gateway we proxy battery by invertor power minus PV
         power_output['Liberty_Power']=-GEInv.p_liberty      #invert to get negative for export
         power_output['Grid_Relay_Voltage']=GEInv.v_grid_relay
         power_output['Inverter_Relay_Voltage']=GEInv.v_inverter_relay
