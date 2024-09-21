@@ -185,10 +185,10 @@ class HAMQTT():
             if entity_type.sensorClass=="energy":
                 tempObj['unit_of_meas']="kWh"
                 tempObj['device_class']="Energy"
-                if "soc" in str(topic.split("/")[-1]).lower():
-                    tempObj['state_class']="measurement"
-                else:
+                if entity_type.onlyIncrease:        #"soc" in str(topic.split("/")[-1]).lower() or "today" in str(topic.split("/")[-1]).lower():
                     tempObj['state_class']="total_increasing"
+                else:
+                    tempObj['state_class']="measurement"
             if entity_type.sensorClass=="money":
                 if "ppkwh" in str(topic).lower() or "rate" in str(topic).lower():
                     tempObj['unit_of_meas']="{GBP}/kWh"
@@ -388,17 +388,18 @@ class CheckDisco():
             for message in messages:
                 newmsg[message[0]]=message[1]
             count=0
-            for msg in CheckDisco.msgs:
-                if SN in msg or SN in CheckDisco.msgs[msg]: # ("GivEnergy" in msg or GiV_Settings.MQTT_Topic in msg):
+            for topic in CheckDisco.msgs:
+                msg=CheckDisco.msgs[topic]
+                if SN in topic or SN in msg: # ("GivEnergy" in msg or GiV_Settings.MQTT_Topic in msg):
                     if exists('/config/GivTCP/.v3upgrade_'+str(GiV_Settings.givtcp_instance)):
                         logger.debug("V3 Upgrade so dropping old Discovery Messages")
-                        client.publish(msg)     #delete regardless of if it has changed
+                        client.publish(topic,None,0,True)     #delete regardless of if it has changed
                     else:
-                        if msg in newmsg:
-                            old=newmsg[msg]
-                            new=CheckDisco.msgs[msg][2:-1]     #.split('}')[:0]
+                        if topic in newmsg:
+                            old=newmsg[topic]
+                            new=msg[2:-1]     #.split('}')[:0]
                             if not old == new:       #if payload is different delete old one
-                                client.publish(msg)
+                                client.publish(topic,None,0,True)
                                 count+=1
             logger.debug(str(count)+" discovery messages changed and removed")
             time.sleep(2)
