@@ -1,16 +1,12 @@
 
 # Change Log
-Future updates from v3 will be pushed to https://github.com/britkat1980/ha-addons. Please add this to your Home Assistant Addon Store to get the upcoming v3 release
+All notable changes to this project will be documented in this file.
+ 
+The format is based on [Keep a Changelog](http://keepachangelog.com/)
+and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [2.4.8] - 2024-09-09
-### Fixed
-- Pre v3 release, will store v2 settings locally to ease upgrade to v3
 
-## [2.4.7] - 2023-08-18
-### Fixed
-- Fix for broken 2.4.3, re-push no new features
-
-## [2.4.3] - 2023-11-24
+## [2.4.2] - 2023-11-24
 ### Fixed
 - Removed recurring MQTT error message at Midnight (type error)
 ### Added

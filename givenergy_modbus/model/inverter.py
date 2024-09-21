@@ -21,6 +21,8 @@ class Model(str, Enum):
 
     AC = 'AC'
     Hybrid = 'Hybrid'
+    Hybrid_3ph = "3 Phase Hybrid"
+    AC_3ph = "3 Phase AC"
     EMS = 'EMS'
     Gateway = 'Gateway'
     AllinOne = "All in One"
@@ -28,9 +30,9 @@ class Model(str, Enum):
     __dtc_to_models_lut__ = {
         2: Hybrid,
         3: AC,
-        4: Hybrid,
+        4: Hybrid_3ph,
         5: EMS,
-        6: AC,
+        6: AC_3ph,
         7: Gateway,
         8: AllinOne,
     }
@@ -100,18 +102,17 @@ class Generation(str, Enum):
     Gen2 = 'Gen 2'
     Gen3 = 'Gen 3'
 
-    __dtc_to_models_lut__ = {
-        3: Gen3,
-        8: Gen2,
-        9: Gen2,
-    }
-
     @classmethod
-    def from_fw_version(cls, firmware_version: str):
-        """Return the appropriate model from a given serial number."""
-        genint=math.floor(int(firmware_version)/100) 
-        if genint in cls.__dtc_to_models_lut__:
-            return cls.__dtc_to_models_lut__[genint]
+    def _missing_(cls, value: int):
+        """Pick generation from the arm_firmware_version."""
+        arm_firmware_version_to_gen = {
+            3: cls.Gen3,
+            8: cls.Gen2,
+            9: cls.Gen2,
+        }
+        key = math.floor(int(value) / 100)
+        if gen := arm_firmware_version_to_gen.get(key):
+            return gen
         else:
             return cls.Gen1
 

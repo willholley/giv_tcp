@@ -92,7 +92,7 @@ def findEVC(subnet):
         #threader.append(connect, BASE_IP, PORT)
     threader.start()
     threader.join()
-    logger.info("evcList (inside): "+str(invlist))
+    logger.debug("evcList (inside): "+str(invlist))
     return(invlist)
 
 if __name__ == '__main__':

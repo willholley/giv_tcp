@@ -1,29 +1,44 @@
 import { defineStore } from 'pinia'
-import { useStorage } from '@vueuse/core'
+import { useSessionStorage } from '@vueuse/core'
 
 export const useTcpStore = defineStore('givtcp-form', {
   state: () => ({
-    inverter1: useStorage('inverter1', {
-      NUMINVERTORS: 1,
-      invertorIP1: "",
-      numBatteries1: 1,
-      isAIO1: false,
-      isAC1: false
+    inverters: useSessionStorage('inverters', {
+      inverter_enable_1: true,
+      invertorIP_1: "",
+      serial_number_1: "",
+      inverterName_1: "",
+      inverter_enable_2: false,
+      invertorIP_2: "",
+      serial_number_2: "",
+      inverterName_2: "",
+      inverter_enable_3: false,
+      invertorIP_3: "",
+      serial_number_3: "",
+      inverterName_3: "",
+      inverter_enable_4: false,
+      invertorIP_4: "",
+      serial_number_4: "",
+      inverterName_4: "",
+      inverter_enable_5: false,
+      invertorIP_5: "",
+      serial_number_5: "",
+      inverterName_5: "",
     }),
-    inverter2: useStorage('inverter2', {
-      invertorIP2: "",
-      numBatteries2: 1,
-      isAIO2: false,
-      isAC2: false
+    evc: useSessionStorage('evc', {
+      evc_enable: false,
+      evc_ip_address: "",
+      evc_self_run_timer: 10,
+      evc_import_max_current: 60
     }),
-    inverter3: useStorage('inverter3', {
-      invertorIP3: "",
-      numBatteries3: 1,
-      isAIO3: false,
-      isAC3: false
+    selfrun: useSessionStorage('selfrun', {
+      self_run: false,
+      self_run_timer: 30,
+      self_run_timer_full: 120,
+      HA_Auto_D: true,
     }),
-    mqtt: useStorage('mqtt', {
-      MQTT_Output: false,
+    mqtt: useSessionStorage('mqtt', {
+      MQTT_Output: true,
       MQTT_Address: "",
       MQTT_Username: "",
       MQTT_Password: "",
@@ -32,19 +47,14 @@ export const useTcpStore = defineStore('givtcp-form', {
       MQTT_Topic: "GivEnergy",
       MQTT_Port: 1883
     }),
-    influx: useStorage('influx', {
+    influx: useSessionStorage('influx', {
       Influx_Output: false,
       influxURL: "",
       influxToken: "",
       influxBucket: "",
       influxOrg: ""
     }),
-    homeAssistant: useStorage('homeAssistant', {
-      HA_Auto_D: true,
-      ha_device_prefix: "GivTCP"
-      //PYTHONPATH: '/app',
-    }),
-    tariffs: useStorage('tariffs', {
+    tariffs: useSessionStorage('tariffs', {
       dynamic_tariff: false,
       export_rate: 0.04,
       day_rate:0.395,
@@ -52,22 +62,11 @@ export const useTcpStore = defineStore('givtcp-form', {
       night_rate: 0.155,
       night_rate_start: "23:30",
     }),
-    miscellaneous: useStorage('miscellaneous', {
-      TZ: 'Europe/London',
-      Print_Raw_Registers: true,
-      Log_Level: "Info",
-      self_run: true,
-      self_run_timer: 15,
-      queue_retries: 2,
-      data_smoother: "medium",
-      cache_location: "/config/GivTCP"
-    }),
-    web: useStorage('web', {
-      Host_IP: "",
-      Web_Dash: false,
+    web: useSessionStorage('web', {
+      Web_Dash: true,
       Web_Dash_Port: 3000
     }),
-    palm: useStorage('palm', {
+    palm: useSessionStorage('palm', {
       Smart_Target: false,
       GE_API: "",
       SOLCASTAPI:"",
@@ -82,152 +81,264 @@ export const useTcpStore = defineStore('givtcp-form', {
       PALM_WEIGHT: 35,
       LOAD_HIST_WEIGHT: 1
     }),
-    evc: useStorage('evc', {
-      evc_enable: false,
-      evc_ip_address: "",
-      evc_self_run_timer: 10,
-      evc_import_max_current: 60
-    }),
-    restart: useStorage('restart',{
-      restart:false,
-      hasRestarted:null
+    misc: useSessionStorage('misc', {
+      TZ: 'Europe/London',
+      Print_Raw_Registers: true,
+      Log_Level: "Info",
+      queue_retries: 2,
+      data_smoother: "medium",
     })
   })
 })
 
 export const useStep = defineStore('step', {
   state: () => ({
-    step: useStorage('step', -1),
-    isNew: useStorage('isNew', true)
+    step: useSessionStorage('step', -1),
+    isNew: useSessionStorage('isNew', true)
   })
 })
 
 export const useCard = defineStore('card', {
   state: () => ({
-    inverter: {
-      title: 'Inverter 1',
-      subtitle: 'Setup your inverter configurations',
+    inverters: {
+      title: 'Inverter Config',
+      subtitle: 'Key Invertor details. Serial Number will be automatically added.',
       fields: [
         {
-          type: 'select',
+          type: 'checkbox',
           options: {
-            label: 'Number Of Inverters',
-            items: [1, 2, 3],
-            parent: 'inverter',
-            key: 'NUMINVERTORS'
-          }
-        },
-        {
-          type: 'select',
-          options: {
-            label: 'Number Of Batteries',
-            items: [1, 2, 3],
-            parent: 'inverter',
-            key: 'numBatteries1'
+            label: 'Inverter 1 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_1'
           }
         },
         {
           type: 'text',
           options: {
-            label: 'IP Address',
-            parent: 'inverter',
-            key: 'invertorIP1'
+            label: 'Inverter 1 IP Address',
+            parent: 'inverters',
+            key: 'invertorIP_1'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 1 Serial Number',
+            parent: 'inverters',
+            key: 'serial_number_1'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 1 Friendly Name (HA Device Prefix)',
+            parent: 'inverters',
+            key: 'inverterName_1'
           }
         },
         {
           type: 'checkbox',
           options: {
-            label: 'Is this Invertor an AIO?',
-            parent: 'inverter',
-            key: 'isAIO1'
+            label: 'Inverter 2 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_2'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 2 IP Address',
+            parent: 'inverters',
+            key: 'invertorIP_2'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 2 Serial Number',
+            parent: 'inverters',
+            key: 'serial_number_2'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 2 Friendly Name (HA Device Prefix)',
+            parent: 'inverters',
+            key: 'inverterName_2'
           }
         },
         {
           type: 'checkbox',
           options: {
-            label: 'Is this Invertor on "old firmware"?',
-            parent: 'inverter',
-            key: 'isAC1'
+            label: 'Inverter 3 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_3'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 3 IP Address',
+            parent: 'inverters',
+            key: 'invertorIP_3'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 3 Serial Number',
+            parent: 'inverters',
+            key: 'serial_number_3'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 3 Friendly Name (HA Device Prefix)',
+            parent: 'inverters',
+            key: 'inverterName_3'
+          }
+        },        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 4 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_4'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 4 IP Address',
+            parent: 'inverters',
+            key: 'invertorIP_4'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 4 Serial Number',
+            parent: 'inverters',
+            key: 'serial_number_4'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 4 Friendly Name (HA Device Prefix)',
+            parent: 'inverters',
+            key: 'inverterName_4'
+          }
+        },
+        {
+          type: 'checkbox',
+          options: {
+            label: 'Inverter 5 Enable',
+            parent: 'inverters',
+            key: 'inverter_enable_5'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 5 IP Address',
+            parent: 'inverters',
+            key: 'invertorIP_5'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 5 Serial Number',
+            parent: 'inverters',
+            key: 'serial_number_5'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Inverter 5 Friendly Name (HA Device Prefix)',
+            parent: 'inverters',
+            key: 'inverterName_5'
           }
         },
       ]
     },
-    inverter: {
-      title: 'Inverter 2',
-      subtitle: 'Setup your inverter configurations',
+    evc: {
+      title: 'EVC',
+      subtitle: 'Connect to GivEnergy EV Charger and allow control',
       fields: [
         {
-          type: 'select',
+          type: 'checkbox',
           options: {
-            label: 'Number Of Batteries',
-            items: [1, 2, 3],
-            parent: 'inverter',
-            key: 'numBatteries2'
+            label: 'EVC Enable',
+            parent: 'evc',
+            key: 'evc_enable'
           }
         },
         {
           type: 'text',
           options: {
-            label: 'IP Address',
-            parent: 'inverter',
-            key: 'invertorIP2'
+            label: 'EVC IP',
+            parent: 'evc',
+            key: 'evc_ip_address'
           }
         },
         {
-          type: 'checkbox',
+          type: 'text',
           options: {
-            label: 'Is this Invertor an AIO?',
-            parent: 'inverter',
-            key: 'isAIO2'
+            label: 'Timer',
+            parent: 'evc',
+            key: 'evc_self_run_timer'
           }
         },
         {
-          type: 'checkbox',
+          type: 'text',
           options: {
-            label: 'Is this Invertor on "old firmware"?',
-            parent: 'inverter',
-            key: 'isAC2'
+            label: 'Max Import Current',
+            parent: 'evc',
+            key: 'evc_import_max_current'
           }
-        },
+        }
       ]
     },
-    inverter: {
-      title: 'Inverter 3',
-      subtitle: 'Setup your inverter configurations',
+    selfrun: {
+      title: 'Self Run',
+      subtitle: 'Setup the MQTT broker that stores information about your incoming inverter data',
       fields: [
         {
-          type: 'select',
+          type: 'checkbox',
           options: {
-            label: 'Number Of Batteries',
-            items: [1, 2, 3],
-            parent: 'inverter',
-            key: 'numBatteries3'
+            label: 'Self Run',
+            parent: 'selfrun',
+            key: 'self_run'
           }
         },
         {
           type: 'text',
           options: {
-            label: 'IP Address',
-            parent: 'inverter',
-            key: 'invertorIP3'
+            label: 'Self Run Loop Timer',
+            parent: 'selfrun',
+            key: 'self_run_timer'
+          }
+        },
+        {
+          type: 'text',
+          options: {
+            label: 'Self Run Loop Timer (Full)',
+            parent: 'selfrun',
+            key: 'self_run_timer_full'
           }
         },
         {
           type: 'checkbox',
           options: {
-            label: 'Is this Invertor an AIO?',
-            parent: 'inverter',
-            key: 'isAIO3'
+            label: 'Home Assistant Auto Discovery',
+            parent: 'selfrun',
+            key: 'HA_Auto_D'
           }
-        },
-        {
-          type: 'checkbox',
-          options: {
-            label: 'Is this Invertor on "old firmware"?',
-            parent: 'inverter',
-            key: 'isAC3'
-          }
-        },
+        }
       ]
     },
     mqtt: {
@@ -338,28 +449,6 @@ export const useCard = defineStore('card', {
         }
       ]
     },
-    homeAssistant: {
-      title: 'Home Assistant',
-      subtitle: 'Setup your Home Assistant instance',
-      fields: [
-        {
-          type: 'checkbox',
-          options: {
-            label: 'Auto Discovery',
-            parent: 'homeAssistant',
-            key: 'HA_Auto_D'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Device Prefix',
-            parent: 'homeAssistant',
-            key: 'ha_device_prefix'
-          }
-        }
-      ]
-    },
     tariffs: {
       title: 'Tariffs',
       subtitle: 'Setup your Tariffs',
@@ -414,87 +503,9 @@ export const useCard = defineStore('card', {
         }
       ]
     },
-    miscellaneous: {
-      title: 'Miscellaneous',
-      subtitle: 'Setup Any Miscellaneous variables',
-      fields: [
-        {
-          type: 'text',
-          options: {
-            label: 'Timezone',
-            parent: 'miscellaneous',
-            key: 'TZ'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Log Level',
-            parent: 'miscellaneous',
-            key: 'Log_Level'
-          }
-        },
-        {
-          type: 'checkbox',
-          options: {
-            label: 'Print Raw',
-            parent: 'miscellaneous',
-            key: 'Print_Raw_Registers'
-          }
-        },{
-          type: 'checkbox',
-          options: {
-            label: 'Self Run',
-            parent: 'miscellaneous',
-            key: 'self_run'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Self Run Loop Timer',
-            parent: 'miscellaneous',
-            key: 'self_run_timer'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Queue Retries',
-            parent: 'miscellaneous',
-            key: 'queue_retries'
-          }
-        },
-        {
-          type: 'select',
-          options: {
-            label: 'Smoothing',
-            parent: 'miscellaneous',
-            items: ["high", "medium", "low","none"],
-            key: 'data_smoother'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Cache Location',
-            parent: 'miscellaneous',
-            key: 'cache_location'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Timezone',
-            parent: 'miscellaneous',
-            key: 'TZ'
-          }
-        },
-      ]
-    },
     web: {
-      title: 'Web',
-      subtitle: 'Web Dashboard',
+      title: 'Dashboard',
+      subtitle: 'Simple in home display dashboard',
       fields: [
         {
           type: 'checkbox',
@@ -502,14 +513,6 @@ export const useCard = defineStore('card', {
             label: 'Dashboard',
             parent: 'web',
             key: 'Web_Dash'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Host IP',
-            parent: 'web',
-            key: 'Host_IP'
           }
         },
         {
@@ -523,8 +526,8 @@ export const useCard = defineStore('card', {
       ]
     },
     palm: {
-      title: 'Palm',
-      subtitle: 'Setup your Smart Target variables',
+      title: 'Smart Target',
+      subtitle: 'Automtically update your target SOC every night based on olar prediction and historical usage',
       fields: [
         ,{
           type: 'checkbox',
@@ -547,7 +550,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'SolCast API Key',
             parent: 'palm',
-            key: 'Solcast_API'
+            key: 'SOLCASTAPI'
           }
         },
         {
@@ -555,7 +558,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'SolCast Site ID 1',
             parent: 'palm',
-            key: 'Solcast_SiteID'
+            key: 'SOLCASTSITEID'
           }
         },
         {
@@ -563,7 +566,7 @@ export const useCard = defineStore('card', {
           options: {
             label: 'SolCast Site ID 2',
             parent: 'palm',
-            key: 'Solcast_SiteID2'
+            key: 'SOLCASTSITEID2'
           }
         },
         {
@@ -632,70 +635,58 @@ export const useCard = defineStore('card', {
         }
       ]
     },
-    evc: {
-      title: 'EVC',
-      subtitle: 'Setup Any Web variables',
+    misc: {
+      title: 'Misc',
+      subtitle: 'Setup Any Miscellaneous variables',
       fields: [
+        {
+          type: 'text',
+          options: {
+            label: 'Timezone',
+            parent: 'misc',
+            key: 'TZ'
+          }
+        },
+        {
+          type: 'select',
+          options: {
+            label: 'Log Level',
+            parent: 'misc',
+            items: ["critical", "info", "debug","write_debug"],
+            key: 'Log_Level'
+          }
+        },
         {
           type: 'checkbox',
           options: {
-            label: 'EVC Enable',
-            parent: 'evc',
-            key: 'evc_enable'
+            label: 'Print Raw',
+            parent: 'misc',
+            key: 'Print_Raw_Registers'
           }
         },
         {
           type: 'text',
           options: {
-            label: 'EVC IP',
-            parent: 'evc',
-            key: 'evc_ip_address'
+            label: 'Queue Retries',
+            parent: 'misc',
+            key: 'queue_retries'
+          }
+        },
+        {
+          type: 'select',
+          options: {
+            label: 'Smoothing',
+            parent: 'misc',
+            items: ["high", "medium", "low","none"],
+            key: 'data_smoother'
           }
         },
         {
           type: 'text',
           options: {
-            label: 'Timer',
-            parent: 'evc',
-            key: 'evc_self_run_timer'
-          }
-        },
-        {
-          type: 'text',
-          options: {
-            label: 'Max Import Current',
-            parent: 'evc',
-            key: 'evc_import_max_current'
-          }
-        }
-      ]
-    },
-    restart:{
-      title:"Finished Setup",
-      subtitle:"Restart Container to apply changes",
-      fields:[
-        {
-          type: 'button',
-          options: {
-            label: 'Restart Container',
-            parent: 'restart',
-            key: 'restart',
-            message:useTcpStore().restart.hasRestarted != null ? useTcpStore().restart.hasRestarted ? "Container Restarted Successfully" : "Container Failed to Restart. Try Restarting Manually" : '',
-            onClick:async ()=>{
-              const store = useTcpStore()
-              try{
-                var host = window.location.protocol + "//" + window.location.hostname+":6345/restart"
-                //var host = "http://127.0.0.1:6345/restart"
-              const res = await fetch(host)
-              if(res.ok){
-                store.restart.hasRestarted = true
-              }else{
-                store.restart.hasRestarted = false
-              }
-            } catch(e){
-              store.restart.hasRestarted = false
-            }
-            }
+            label: 'Timezone',
+            parent: 'misc',
+            key: 'TZ'
           }
         },
       ]

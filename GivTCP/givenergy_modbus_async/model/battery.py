@@ -1,28 +1,28 @@
-from enum import IntEnum
+"""
+High level interpretation of the battery modbus registers.
 
-from pydantic import BaseConfig, create_model
+The Battery itself is the primary class; the others are
+supporting enumerations.
+"""
 
-from givenergy_modbus_async.model.register import IR
-from givenergy_modbus_async.model.register import (
+from .register import *
+
+from .register import (
     Converter as DT,
-)
-from givenergy_modbus_async.model.register import (
+    DynamicDoc,
     RegisterDefinition as Def,
-)
-from givenergy_modbus_async.model.register import (
+    IR,
     RegisterGetter,
 )
 
 
-class UsbDevice(IntEnum):
-    """USB devices that can be inserted into batteries."""
-
-    NONE = 0
-    DISK = 8
-
-
-class BatteryRegisterGetter(RegisterGetter):
-    """Structured format for all battery attributes."""
+class Battery(RegisterGetter, metaclass=DynamicDoc):
+    # pylint: disable=missing-class-docstring
+    # The metaclass turns accesses to __doc__ into calls to
+    # _gendoc()  (which we inherit from RegisterGetter)
+    
+  
+    _DOC = """Battery presents all battery attributes as python types."""
 
     REGISTER_LUT = {
         # Input Registers, block 60-119
@@ -70,34 +70,18 @@ class BatteryRegisterGetter(RegisterGetter):
         "cap_design2": Def(DT.uint32, DT.centi, IR(101), IR(102)),
         "t_max": Def(DT.deci, None, IR(103)),
         "t_min": Def(DT.deci, None, IR(104)),
-        # IR(105-109) unused
-
+        # IR(107-109) unused
+        "e_battery_discharge_total": Def(DT.deci, None, IR(105)),
+        "e_battery_charge_total": Def(DT.deci, None, IR(106)),
         "serial_number": Def(
             DT.string, None, IR(110), IR(111), IR(112), IR(113), IR(114)
         ),
         "usb_device_inserted": Def(DT.uint16, UsbDevice, IR(115)),
-        # IR(116-119) unused
     }
-
-
-class BatteryConfig(BaseConfig):
-    """Pydantic configuration for the Battery class."""
-
-    orm_mode = True
-    getter_dict = BatteryRegisterGetter
-
-
-_Battery = create_model(
-    "Battery", __config__=BatteryConfig, **BatteryRegisterGetter.to_fields()
-)  # type: ignore[call-overload]
-
-
-class Battery(_Battery):  # type: ignore[misc,valid-type]
-    """Add some utility methods to the base pydantic class."""
 
     def is_valid(self) -> bool:
         """Try to detect if a battery exists based on its attributes."""
-        return self.serial_number not in (
+        return self.get('serial_number') not in (
             None,
             "",
             "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",

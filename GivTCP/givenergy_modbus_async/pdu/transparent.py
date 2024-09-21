@@ -1,8 +1,8 @@
 import logging
 from abc import ABC
 
-from givenergy_modbus_async.codec import PayloadDecoder
-from givenergy_modbus_async.pdu.base import (
+from ..codec import PayloadDecoder
+from .base import (
     BasePDU,
     ClientIncomingMessage,
     ClientOutgoingMessage,
@@ -24,7 +24,7 @@ class TransparentMessage(BasePDU, ABC):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.slave_address = kwargs.get("slave_address", 0x32)
+        self.slave_address = kwargs.get("slave_address", 0x31)
         self.error = kwargs.get("error", False)
         self.padding = kwargs.get("padding", 0x08)  # this does seem significant
         self.check = kwargs.get("check", 0x0000)
@@ -86,7 +86,9 @@ class TransparentMessage(BasePDU, ABC):
         attrs["padding"] = decoder.decode_64bit_uint()
         attrs["slave_address"] = decoder.decode_8bit_uint()
         transparent_function_code = decoder.decode_8bit_uint()
-        if transparent_function_code & 0x80:
+        if transparent_function_code > 135:
+#         if transparent_function_code & 0x80:
+            _logger.critical("Function code response was: "+str(transparent_function_code))
             error = True
             transparent_function_code &= 0x7F
         else:
@@ -133,8 +135,8 @@ class TransparentRequest(TransparentMessage, ClientOutgoingMessage, ABC):
     def lookup_transparent_function_decoder(
         cls, transparent_function_code: int
     ) -> type["TransparentRequest"]:
-        from givenergy_modbus_async.pdu import (
-            ReadBatteryInputRegistersRequest,
+        from .import (
+            ReadMeterProductRegistersRequest,
             ReadHoldingRegistersRequest,
             ReadInputRegistersRequest,
             WriteHoldingRegisterRequest,
@@ -146,8 +148,8 @@ class TransparentRequest(TransparentMessage, ClientOutgoingMessage, ABC):
             return ReadInputRegistersRequest
         elif transparent_function_code == 6:
             return WriteHoldingRegisterRequest
-        elif transparent_function_code == 0x16:
-            return ReadBatteryInputRegistersRequest
+        elif transparent_function_code == 22:
+            return ReadMeterProductRegistersRequest
         else:
             raise NotImplementedError(
                 f"TransparentRequest function #{transparent_function_code} decoder"
@@ -175,8 +177,9 @@ class TransparentResponse(TransparentMessage, ClientIncomingMessage, ABC):
     def lookup_transparent_function_decoder(
         cls, transparent_function_code: int
     ) -> type["TransparentResponse"]:
-        from givenergy_modbus_async.pdu import (
+        from .import (
             NullResponse,
+            ReadMeterProductRegistersResponse,
             ReadHoldingRegistersResponse,
             ReadInputRegistersResponse,
             WriteHoldingRegisterResponse,
@@ -190,6 +193,11 @@ class TransparentResponse(TransparentMessage, ClientIncomingMessage, ABC):
             return ReadInputRegistersResponse
         elif transparent_function_code == 6:
             return WriteHoldingRegisterResponse
+        elif transparent_function_code == 134:       #Accept as the broken AC3 BPM response
+            _logger.critical("Function code 86 recieved. Gracefully handled")
+            return WriteHoldingRegisterResponse
+        elif transparent_function_code == 22:        #This is meter product responses - currently unused
+            return ReadMeterProductRegistersResponse
         else:
             raise NotImplementedError(
                 f"TransparentResponse function #{transparent_function_code} decoder"

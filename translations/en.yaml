@@ -64,6 +64,10 @@ configuration:
     name: Inverter 3 - Home Assistant Entity Prefix
     description: >-
       A unique prefix applied to all of inverter 3's entities in Home Assistant.
+  NUMBATTERIES_4:
+    name: Inverter 4 - How many connected batteries?
+    description: >-
+      How many batteries are directly connected to inverter 3?
   MQTT_OUTPUT:
     name: Enable MQTT Output
     description: >-
@@ -115,8 +119,12 @@ configuration:
   SELF_RUN_LOOP_TIMER:
     name: Self Run Loop Timer
     description: >-
-      How often should GivTCP connect to the inverter to check for data when self run is enabled? Default is 5, measured in seconds.
-  QUEUE_RETRIES:
+      How often should GivTCP connect to the inverter to check for frequently changing data when self run is enabled? Default is 30, measured in seconds.
+  SELF_RUN_LOOP_TIMER_FULL:
+    name: Self Run Loop Timer FULL
+    description: >-
+      How often should GivTCP connect to the inverter to check for infrequent data when self run is enabled? Default is 120, measured in seconds.
+    QUEUE_RETRIES:
     name: Queue Retries
     description: >-
       How many times should GivTCP write to the inverter to ensure the posted value is sucessfully set.  

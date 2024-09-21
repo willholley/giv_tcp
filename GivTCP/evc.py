@@ -1,19 +1,46 @@
 '''Test Module for GivEVC'''
 from pymodbus.client.sync import ModbusTcpClient
+import paho.mqtt.client as mqtt
+import logging
+import importlib
+import settings
 import datetime
 import time
 import pickle
-from os.path import exists
+from os.path import exists, basename
 import os
 from threading import Lock
 import json
-import read as rd
+import GivLUT
 from settings import GiV_Settings
 from GivLUT import GivLUT
 import sys
 
 logger = GivLUT.logger
 cacheLock = Lock()
+logging.getLogger("pymodbus").setLevel(logging.CRITICAL) 
+
+if GiV_Settings.MQTT_Port=='':
+    MQTT_Port=1883
+else:
+    MQTT_Port=int(GiV_Settings.MQTT_Port)
+MQTT_Address=GiV_Settings.MQTT_Address
+if GiV_Settings.MQTT_Username=='':
+    MQTTCredentials=False
+else:
+    MQTTCredentials=True
+    MQTT_Username=GiV_Settings.MQTT_Username
+    MQTT_Password=GiV_Settings.MQTT_Password
+if GiV_Settings.MQTT_Retain:
+    MQTT_Retain=True
+else:
+    MQTT_Retain=False
+if GiV_Settings.MQTT_Topic=='':
+    MQTT_Topic='GivEnergy'
+else:
+    MQTT_Topic=GiV_Settings.MQTT_Topic
+
+_client=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, "GivEnergy_GivEVC")
 
 class EVCType:
     """Defines type for data objects"""
@@ -83,19 +110,27 @@ class EVCLut:
         111: 'Voltage_L2',
         113: 'Voltage_L3'}
 
-def getEVC():
+def getEVC(client:ModbusTcpClient):
     regs=[]
     output={}
     multi_output={}
     try:
-        client = ModbusTcpClient(GiV_Settings.evc_ip_address)
-        client.connect()
-        if not client.is_socket_open():
-            logger.error("Modbus connection failed, check EVC WiFi/LAN connection")
-            return output
+        #if client.connect():
+        if client.is_socket_open():
+            logger.debug("Socket is already open")
+        else:
+            logger.debug("Socket isn't yet open")
         result = client.read_holding_registers(0,60)
+        if not client.is_socket_open():
+            logger.debug("Socket is closed")
+        else:
+            logger.debug("Socket is still open")
         result2 = client.read_holding_registers(60,55)
-        client.close()
+        #else:
+        #    return output
+
+        if not hasattr(result,'registers') or not hasattr(result2,'registers'):
+            return output
         regs=result.registers+result2.registers
         for reg in EVCLut.evc_lut.items():
             if isinstance(reg[1],tuple):
@@ -174,12 +209,6 @@ def getEVC():
         now=datetime.datetime.utcnow()
         delta=now-evcTime
 
-        #if abs(delta.total_seconds())>90:
-        #    # Send system time update to EVC
-        #    logger.info("EVC Time is "+ str(delta.total_seconds()) +"s out from local time. Syncing time...")
-        #    setDateTime(now)
-        #    evcTime=now
-
         output['System_Time']= evcTime.replace(tzinfo=datetime.timezone.utc).isoformat()
 
         td=datetime.timedelta(seconds=int(regs[79]))
@@ -191,15 +220,15 @@ def getEVC():
             with open(EVCLut.regcache, 'wb') as outp:
                 pickle.dump(multi_output, outp, pickle.HIGHEST_PROTOCOL)
     except Exception:
-        e = sys.exc_info()
-        #logger.error("Error: "+ str(e))
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        logger.debug("Error: "+ str(e))
     return output
 
 def pubFromPickle():  # Publish last cached EVC Data
     multi_output = {}
     result = "Success"
     if not exists(EVCLut.regcache):  # if there is no cache, create it
-        result = "Please get data from Inverter first, either by calling runAll or waiting until the self-run has completed"
+        result = "Please get data from EVC first, either by calling runAll or waiting until the self-run has completed"
     if "Success" in result:
         with cacheLock:
             with open(EVCLut.regcache, 'rb') as inp:
@@ -210,17 +239,34 @@ def pubFromPickle():  # Publish last cached EVC Data
         multi_output['result'] = result
     return json.dumps(multi_output, indent=4, sort_keys=True, default=str)
 
-def runAll():  # Read from EVC put in cache and publish
+def runAll(client):  # Read from EVC put in cache and publish
     # full_refresh=True
-    result=getEVC()
-    # Step here to validate data against previous pickle?
-    multi_output = pubFromPickle()
+    result=getEVC(client)
+    # implement timout on multiple failures
+    if len(result)==0:
+        multi_output={}
+    else:
+        # Step here to validate data against previous pickle?
+        multi_output = pubFromPickle()
     return multi_output
 
 def self_run2():
+    client = ModbusTcpClient(GiV_Settings.evc_ip_address, auto_open=True, auto_close=True)
+    TimeoutError=0
     while True:
-        runAll()
-        time.sleep(GiV_Settings.evc_self_run_timer)
+        result=runAll(client)
+        if len(result)==0:
+            TimeoutError+=1
+        else:
+            TimeoutError=0
+        if TimeoutError>10:
+            logger.error("10 consecutive errors, pausing and waiting 5 mins for EVC modbus port to come back")
+            client.close()
+            time.sleep(300)
+            TimeoutError=0
+        else:
+            time.sleep(GiV_Settings.evc_self_run_timer)
+            
 
 # Additional Publish options can be added here.
 # A separate file in the folder can be added with a new publish "plugin"
@@ -234,13 +280,12 @@ def publishOutput(array, SN):
             if GiV_Settings.HA_Auto_D:        # Home Assistant MQTT Discovery
                 logger.critical("Publishing Home Assistant Discovery messages")
                 from HA_Discovery import HAMQTT
-                HAMQTT.publish_discovery(tempoutput, SN)
+                HAMQTT.publish_discovery2(tempoutput, SN)
             GiV_Settings.first_run_evc = False  
-        from mqtt import GivMQTT
         logger.debug("Publish all to MQTT")
         if GiV_Settings.MQTT_Topic == "":
             GiV_Settings.MQTT_Topic = "GivEnergy"
-        GivMQTT.multi_MQTT_publish(str(GiV_Settings.MQTT_Topic+"/"+SN+"/"), tempoutput)
+        multi_MQTT_publish(str(GiV_Settings.MQTT_Topic+"/"+SN+"/"), tempoutput)
     if GiV_Settings.Influx_Output:
         from influx import GivInflux
         logger.debug("Pushing output to Influx")
@@ -288,6 +333,63 @@ def updateFirstRun(SN):
             logger.debug("removing lockfile")
             break
 
+def on_connect(_client, userdata, flags, reason_code, properties):
+    if reason_code==0:
+        _client.connected_flag=True #set flag
+        logger.debug("connected OK Returned code="+str(reason_code))
+        _client.subscribe(MQTT_Topic+"/control/#")
+        logger.debug("Subscribing to "+MQTT_Topic+"/control/#")
+    else:
+        logger.error("Bad connection Returned code= "+str(reason_code))
+    
+
+def get_connection():
+    global _client
+    if not _client.connected_flag:
+        logger.debug("MQTT Connection appears closed, re-opening")
+        if MQTTCredentials:
+            _client.username_pw_set(MQTT_Username,MQTT_Password)
+        _client.on_connect=on_connect     			#bind call back function
+        _client.on_message=on_message     			#bind call back function
+        logger.debug("Opening MQTT Connection to "+str(MQTT_Address))
+        _client.connect(MQTT_Address,port=MQTT_Port)
+        _client.loop_start()
+    return _client
+
+def multi_MQTT_publish(rootTopic,array):                    #Recieve multiple payloads with Topics and publish in a single MQTT connection
+    client=get_connection()
+    try:
+        while not client.connected_flag:        			#wait in loop
+            logger.debug ("In wait loop (multi_MQTT_publish)")
+            time.sleep(0.2)
+        for p_load in array:
+            payload=array[p_load]
+            logger.debug('Publishing: '+rootTopic+p_load)
+            output=iterate_dict_mqtt(payload,rootTopic+p_load)   #create LUT for MQTT publishing
+            for value in output:
+                if isinstance(output[value],(int, str, float, bytearray)):      #Only publish typesafe data
+                    client.publish(value,output[value], retain=GiV_Settings.MQTT_Retain)
+    except:
+        e=sys.exc_info()[0].__name__, basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
+        logger.error("Error connecting to MQTT Broker: " + str(e))
+        client.loop_stop()                      			    #Stop loop
+        client.disconnect()
+
+def iterate_dict_mqtt(array,topic):      #Create LUT of topics and datapoints
+    MQTT_LUT={}
+    if isinstance(array, dict):
+        # Create a publish safe version of the output
+        for p_load in array:
+            output=array[p_load]
+            if isinstance(output, dict):
+                MQTT_LUT.update(iterate_dict_mqtt(output,topic+"/"+p_load))
+                logger.debug('Prepping '+p_load+" for publishing")
+            else:
+                MQTT_LUT[topic+"/"+p_load]=output
+    else:
+        MQTT_LUT[topic]=array
+    return(MQTT_LUT)
+
 def iterate_dict(array):        # Create a publish safe version of the output (convert non-string or int datapoints)
     safeoutput = {}
     for p_load in array:
@@ -318,6 +420,61 @@ def iterate_dict(array):        # Create a publish safe version of the output (c
             safeoutput[p_load] = output
     return(safeoutput)
 
+def isfloat(num):
+    try:
+        float(num)
+        return True
+    except ValueError:
+        return False
+
+def on_message(client, userdata, message):
+    from settings import GiV_Settings
+    proceed=False
+    if not hasattr(GiV_Settings,'serial_number_evc'):
+        importlib.reload(settings)
+        from settings import GiV_Settings
+        if hasattr(GiV_Settings,'serial_number_evc'):
+            logger.debug("EVC serial num now found and is: "+str(GiV_Settings.serial_number_evc))
+            proceed=True
+    else:
+        proceed=True
+
+    if proceed:
+        if not GiV_Settings.serial_number_evc in message.topic:
+            return
+        payload={}
+        logger.debug("MQTT Message Recieved: "+str(message.topic)+"= "+str(message.payload.decode("utf-8")))
+        writecommand={}
+        try:
+            command=str(message.topic).split("/")[-1]
+            if command=="chargeMode":
+                writecommand=message.payload.decode("utf-8")
+                setChargeMode(writecommand)
+            elif command=="controlCharge":
+                writecommand=message.payload.decode("utf-8")
+                setChargeControl(writecommand)
+            elif command=="setCurrentLimit":
+                writecommand=message.payload.decode("utf-8")
+                setCurrentLimit(int(writecommand))
+            elif command=="setImportCap":
+                writecommand=message.payload.decode("utf-8")
+                setImportCap(writecommand)
+            elif command=="setChargingMode":
+                writecommand=message.payload.decode("utf-8")
+                setChargingMode(writecommand)
+            elif command=="setMaxSessionEnergy":
+                writecommand=message.payload.decode("utf-8")
+                setMaxSessionEnergy(int(writecommand))
+            elif command=="setSystemTime":
+                writecommand=message.payload.decode("utf-8")
+                setDateTime(writecommand)
+        except:
+            e = sys.exc_info()
+            logger.error("MQTT.OnMessage Exception: "+str(e))
+            return
+    else:
+        logger.info("No serial_number_evc found in MQTT queue. MQTT Control not yet available.")
+
 def getEVCCache():
     if exists(EVCLut.regcache):
         with open(EVCLut.regcache, 'rb') as inp:
@@ -327,16 +484,16 @@ def getEVCCache():
         return json.dumps("No EVC data found",indent=4)
 
 def setChargeMode(mode):
-    if mode=="enable":
-        val=0
-    elif mode=="disable":
-        val=1
-    else:
-        logger.error("Invalid control mode called: "+str(mode))
-        return
-    logger.info("Setting Charge mode to: "+ mode)
-    logger.debug("numeric value "+str(val)+ " sent to EVC")
     try:
+        if mode=="enable":
+            val=0
+        elif mode=="disable":
+            val=1
+        else:
+            logger.error("Invalid control mode called: "+str(mode))
+            return
+        logger.info("Setting Charge mode to: "+ mode)
+        logger.debug("numeric value "+str(val)+ " sent to EVC")
         client=ModbusTcpClient(GiV_Settings.evc_ip_address)
         client.write_registers(93,val)
     except:
@@ -344,88 +501,97 @@ def setChargeMode(mode):
         logger.error("Error controlling EVC: "+str(e))
 
 def setChargeControl(mode):
-    if mode in GivLUT.charge_control:
-        logger.info("Setting Charge control to: "+ mode)
-        val=GivLUT.charge_control.index(mode)
-        logger.debug("numeric value "+str(val)+ " sent to EVC")
-        try:
-            client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-            client.write_registers(95,val)
-        except:
-            e=sys.exc_info()
-            logger.error("Error controlling EVC: "+str(e))
-    else:
-        logger.error("Invalid selection for Charge Control ("+str(mode)+")")
+    try:
+        if mode in GivLUT.charge_control:
+            logger.info("Setting Charge control to: "+ mode)
+            val=GivLUT.charge_control.index(mode)
+            logger.debug("numeric value "+str(val)+ " sent to EVC")
+            try:
+                client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+                client.write_registers(95,val)
+            except:
+                e=sys.exc_info()
+                logger.error("Error controlling EVC: "+str(e))
+        else:
+            logger.error("Invalid selection for Charge Control ("+str(mode)+")")
+    except:
+        e=sys.exc_info()
+        logger.error("Error setting Charge Conrol: "+str(e))
 
 def setCurrentLimit(val):
-    #Check limit is between 6 and MAX SAFE LIMIT
-    with cacheLock:
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-    safeMax=int(evcRegCache['Charger']['Evse_Max_Current'])
-    safeMin=int(evcRegCache['Charger']['Evse_Min_Current'])
-    val=max(val,safeMin)  #Force to 6 if less than
-    val=min(val,safeMax) # Get safe MAX value from pkl
-    logger.info("Setting Charge current limit to: "+ str(val))
     try:
-        client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-        client.write_registers(91,(val*10))
+        #Check limit is between 6 and MAX SAFE LIMIT
+        if exists(EVCLut.regcache):
+            with cacheLock:
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+            safeMax=int(evcRegCache['Charger']['Evse_Max_Current'])
+            safeMin=int(evcRegCache['Charger']['Evse_Min_Current'])
+            val=max(val,safeMin)  #Force to 6 if less than
+            val=min(val,safeMax) # Get safe MAX value from pkl
+            logger.info("Setting Charge current limit to: "+ str(val))
+            client=ModbusTcpClient(GiV_Settings.evc_ip_address)
+            client.write_registers(91,(val*10))
     except:
         e=sys.exc_info()
         logger.error("Error controlling EVC: "+str(e))
 
-def test():
-    client=ModbusTcpClient(GiV_Settings.evc_ip_address)
-    result=client.write_registers(95,2)
-    client.close()
-    #getEVC()
-    print (result)
-
 def chargeMode(once=False):
     while True:
         #Run a regular check and manage load based on current mode and session energy
-        if exists(EVCLut.regcache):
-            with open(EVCLut.regcache, 'rb') as inp:
-                evcRegCache= pickle.load(inp)                
-            if evcRegCache['Charger']['Charging_State']=="Charging" or evcRegCache['Charger']['Charging_State']=="Connected":
-                if evcRegCache['Charger']['Charging_Mode']=="Hybrid":
-                    hybridmode()
-                elif evcRegCache['Charger']['Charging_Mode']=="Solar":
-                    solarmode()
-            if not evcRegCache['Charger']['Max_Session_Energy']==0 and evcRegCache['Charger']['Charge_Session_Energy']>=evcRegCache['Charger']['Max_Session_Energy'] and evcRegCache['Charger']['Charge_Control']=="Start":
-                logger.info("Session energy limit reached: "+str(evcRegCache['Charger']['Charge_Session_Energy'])+"kWh stopping charge")
-                setChargeControl("Stop")
-            if not int(evcRegCache['Charger']['Import_Cap'])==0:
-                if exists(GivLUT.regcache):
-                    with open(GivLUT.regcache, 'rb') as inp:
-                        invRegCache= pickle.load(inp)
-                    if float(invRegCache[4]['Power']['Power']['Grid_Current'])>(float(evcRegCache['Charger']['Import_Cap'])*0.95):
-                        target=float(evcRegCache['Charger']['Import_Cap'])*0.9
-                        reduction=(float(invRegCache[4]['Power']['Power']['Grid_Current']))-target
-                        newlimit=int(float(evcRegCache['Charger']['Charge_Limit'])-reduction)
-                        if not int(evcRegCache['Charger']['Charge_Limit'])==4:
-                            logger.info("Grid import threshold within 5%, reducing EVC charge current to: "+str(newlimit))
-                            setCurrentLimit(newlimit)
-                        else:
-                            logger.info("Grid import threshold within 5%, cannot reduce Charge limit below 6A. Stopping Charge")
-                            setChargeControl("Stop")
+        try:
+            if exists(EVCLut.regcache):
+                with cacheLock:
+                    with open(EVCLut.regcache, 'rb') as inp:
+                        evcRegCache= pickle.load(inp)                
+                if evcRegCache['Charger']['Charging_State']=="Charging" or evcRegCache['Charger']['Charging_State']=="Connected":
+                    if evcRegCache['Charger']['Charging_Mode']=="Hybrid":
+                        hybridmode()
+                    elif evcRegCache['Charger']['Charging_Mode']=="Solar":
+                        solarmode()
+                if not evcRegCache['Charger']['Max_Session_Energy']==0 and evcRegCache['Charger']['Charge_Session_Energy']>=evcRegCache['Charger']['Max_Session_Energy'] and evcRegCache['Charger']['Charge_Control']=="Start":
+                    logger.info("Session energy limit reached: "+str(evcRegCache['Charger']['Charge_Session_Energy'])+"kWh stopping charge")
+                    setChargeControl("Stop")
+                if not int(evcRegCache['Charger']['Import_Cap'])==0 and evcRegCache['Charger']['Charging_State']=="Charging":
+                    invRegCache = GivLUT.get_regcache()
+                    if invRegCache:
+                        if float(invRegCache[4]['Power']['Power']['Grid_Current'])>(float(evcRegCache['Charger']['Import_Cap'])*0.95):
+                            target=float(evcRegCache['Charger']['Import_Cap'])*0.9
+                            reduction=(float(invRegCache[4]['Power']['Power']['Grid_Current']))-target
+                            newlimit=int(float(evcRegCache['Charger']['Charge_Limit'])-reduction)
+                            logger.info("Car charge current too high reducing... ("+str(evcRegCache['Charger']['Charge_Limit'])+"A - "+str(reduction)+"A = "+str(newlimit)+")")
+                            #if not int(evcRegCache['Charger']['Charge_Limit'])==4:
+                            if int(newlimit)>=6:
+                                logger.info("Grid import threshold within 5%, reducing EVC charge current to: "+str(newlimit))
+                                setCurrentLimit(newlimit)
+                            else:
+                                logger.info("Grid import threshold within 5%, cannot reduce Charge limit below 6A. Stopping Charge")
+                                setChargeControl("Stop")
+        except:
+            e=sys.exc_info()
+            logger.error("Error in EVC charge mode loop: "+str(e))
         if once:
             break
-        time.sleep(60)
+        time.sleep(30)
     
 
 def hybridmode():
-    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
-        # Set charging current to min 6A plus the level of excess solar
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        with open(GivLUT.regcache, 'rb') as inp:
-            invRegCache= pickle.load(inp)
-        sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
-        spareCurrent=int(max((sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']),0)+6)   #Spare current cannot be negative
-        if not spareCurrent==evcRegCache['Charger']['Charge_Limit']:
-            logger.info("Topping up min charge with Solar curent ("+str(spareCurrent-6)+"A), setting EVC charge to: "+str(spareCurrent)+"A")
-            setCurrentLimit(spareCurrent)
+    try:
+        if exists(EVCLut.regcache) and exists(GivLUT.regcache):
+            # Set charging current to min 6A plus the level of excess solar
+            with cacheLock:
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+            invRegCache = GivLUT.get_regcache()
+            if invRegCache:
+                sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
+                spareCurrent=int(max((sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']),0)+6)   #Spare current cannot be negative
+                if not spareCurrent==evcRegCache['Charger']['Charge_Limit']:
+                    logger.info("Topping up min charge with Solar curent ("+str(spareCurrent-6)+"A), setting EVC charge to: "+str(spareCurrent)+"A")
+                    setCurrentLimit(spareCurrent)
+    except:
+        e=sys.exc_info()
+        logger.error("Error in EVC hybrid mode: "+str(e))
 
 def gridmode():
     # Just don't do anything in Grid Mode and leave charging current as it was
@@ -433,73 +599,76 @@ def gridmode():
 
 def solarmode():
     # Set charging current to the level of excess solar
-    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        with open(GivLUT.regcache, 'rb') as inp:
-            invRegCache= pickle.load(inp)
-        sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
-        spareCurrent=sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']
-        if sparePower>6:    #only if there's excess above min evse level
-            if not spareCurrent==evcRegCache['Charger']['Current_L1']:
-                logger.info("Spare Solar curent ("+str(spareCurrent)+"), setting EVC charge to: "+str(spareCurrent)+"A")
-                setChargeControl("Start")
-                setCurrentLimit(spareCurrent)
-        else:
-            if not evcRegCache['Charger']['Charge_Control']=="Stop":
-                logger.info("Solar excess dropped to below 6A, stopping charge")
-                setChargeControl("Stop")
-
-def importcap():
-    # Check grid import and ensure its not exceeding threshold
-    if exists(EVCLut.regcache) and exists(GivLUT.regcache):
-        with open(GivLUT.regcache, 'rb') as inp:
-            invRegCache= pickle.load(inp)
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        importcurrent=float(invRegCache[4]['Power']['Power']['Grid_Current'])
-        evccurrent=float(evcRegCache['Charger']['Current_L1'])
-        if importcurrent>GiV_Settings.evc_import_max_current:
-            excess=importcurrent-GiV_Settings.evc_import_max_current
-            newcurrent=int(max(6,evccurrent-excess))    #newcurrent must be at least 6A
-            logger.info("Import current exceeded ("+str(excess)+"), reducing EVC charge to: "+str(newcurrent)+"A")
-            setCurrentLimit(newcurrent)
-
+    try:
+        if exists(EVCLut.regcache) and exists(GivLUT.regcache):
+            with cacheLock:
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+            invRegCache = GivLUT.get_regcache()
+            if invRegCache:
+                sparePower=invRegCache[4]['Power']['Power']['PV_Power']-invRegCache[4]['Power']['Power']['Load_Power']+evcRegCache['Charger']['Active_Power_L1']
+                spareCurrent=sparePower/invRegCache[4]['Power']['Power']['Grid_Voltage']
+                if sparePower>6:    #only if there's excess above min evse level
+                    if not spareCurrent==evcRegCache['Charger']['Current_L1']:
+                        logger.info("Spare Solar curent ("+str(spareCurrent)+"), setting EVC charge to: "+str(spareCurrent)+"A")
+                        setChargeControl("Start")
+                        setCurrentLimit(spareCurrent)
+                else:
+                    if not evcRegCache['Charger']['Charge_Control']=="Stop":
+                        logger.info("Solar excess dropped to below 6A, stopping charge")
+                        setChargeControl("Stop")
+    except:
+        e=sys.exc_info()
+        logger.error("Error setting EVC solar mode: "+str(e))
 
 def setMaxSessionEnergy(val):
-    if exists(EVCLut.regcache):
-        logger.info("Setting Max Session energy to: "+str(val))
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        evcRegCache['Charger']['Max_Session_Energy']=val
-        with cacheLock:
-            with open(EVCLut.regcache, 'wb') as outp:
-                pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
-
-
-def setImportCap(val):
-    if exists(EVCLut.regcache):
-        logger.info("Setting Import Cap to: "+str(val))
-        with open(EVCLut.regcache, 'rb') as inp:
-            evcRegCache= pickle.load(inp)
-        evcRegCache['Charger']['Import_Cap']=val
-        with cacheLock:
-            with open(EVCLut.regcache, 'wb') as outp:
-                pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
-
-def setChargingMode(mode):
-    if mode in GivLUT.charging_mode:
+    try:
         if exists(EVCLut.regcache):
-            logger.info("Setting Charging Mode to: "+str(mode))
+            logger.info("Setting Max Session energy to: "+str(val))
             with open(EVCLut.regcache, 'rb') as inp:
                 evcRegCache= pickle.load(inp)
-            evcRegCache['Charger']['Charging_Mode']=mode
+            evcRegCache['Charger']['Max_Session_Energy']=val
             with cacheLock:
                 with open(EVCLut.regcache, 'wb') as outp:
                     pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
-            chargeMode(True)    # Run an initial call when changing modes
-    else:
-        logger.error("Invalid selection for Charge Mode ("+str(mode)+")")
+    except:
+        e=sys.exc_info()
+        logger.error("Error in setting Max Session energy: "+str(e))
+
+
+def setImportCap(val):
+    try:
+        if exists(EVCLut.regcache):
+            logger.info("Setting Import Cap to: "+str(val))
+            with cacheLock:
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+            evcRegCache['Charger']['Import_Cap']=val
+            with cacheLock:
+                with open(EVCLut.regcache, 'wb') as outp:
+                    pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
+    except:
+        e=sys.exc_info()
+        logger.error("Error setting EVC Import Cap: "+str(e))
+
+def setChargingMode(mode):
+    try:
+        if mode in GivLUT.charging_mode:
+            if exists(EVCLut.regcache):
+                logger.info("Setting Charging Mode to: "+str(mode))
+                with open(EVCLut.regcache, 'rb') as inp:
+                    evcRegCache= pickle.load(inp)
+                evcRegCache['Charger']['Charging_Mode']=mode
+                with cacheLock:
+                    with open(EVCLut.regcache, 'wb') as outp:
+                        pickle.dump(evcRegCache, outp, pickle.HIGHEST_PROTOCOL)
+                chargeMode(True)    # Run an initial call when changing modes
+        else:
+            logger.error("Invalid selection for Charge Mode ("+str(mode)+")")
+    except:
+        e=sys.exc_info()
+        logger.error("Error setting EVC Charge Mode: "+str(e))
+
 
 def setDateTime(sysTime):
     temp={}
@@ -521,7 +690,7 @@ def setDateTime(sysTime):
             e=sys.exc_info()
             logger.error("Error Setting EVC Time: "+str(e))
     except:
-        e = sys.exc_info()
+        e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
         temp['result']="Setting inverter DateTime failed: " + str(e) 
         logger.error (temp['result'])
     return json.dumps(temp)

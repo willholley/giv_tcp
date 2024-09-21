@@ -99,20 +99,24 @@ class GivEnergyClient:
                 )
 
     def get_inverter_stats(self):
-        try:
-            SN={}
-            regs=self.modbus_client.read_holding_registers(0,22)
-            DTC=hex(regs[0])[-4:] #plant.inverter.device_type_code
-            SN_1=bytes.fromhex(hex(regs[13])[2:]).decode("ASCII")
-            SN_2=bytes.fromhex(hex(regs[14])[2:]).decode("ASCII")
-            SN_3=bytes.fromhex(hex(regs[15])[2:]).decode("ASCII")
-            SN_4=bytes.fromhex(hex(regs[16])[2:]).decode("ASCII")
-            SN_5=bytes.fromhex(hex(regs[17])[2:]).decode("ASCII")
-            SN=SN_1+SN_2+SN_3+SN_4+SN_5 #SN=plant.inverter.inverter_serial_number
-            FW=regs[21] #plant.inverter.arm_firmware_version
-            return DTC,FW,SN
-        except:
-            return ("ERROR: "+str(sys.exc_info()))
+        for i in range(3):
+            try:
+                #Loop 3 times
+                SN={}
+                print ("get_inverter_stats try: "+str(i))
+                regs=self.modbus_client.read_holding_registers(0,22)
+                DTC=hex(regs[0])[-4:] #plant.inverter.device_type_code
+                SN_1=bytes.fromhex(hex(regs[13])[2:]).decode("ASCII")
+                SN_2=bytes.fromhex(hex(regs[14])[2:]).decode("ASCII")
+                SN_3=bytes.fromhex(hex(regs[15])[2:]).decode("ASCII")
+                SN_4=bytes.fromhex(hex(regs[16])[2:]).decode("ASCII")
+                SN_5=bytes.fromhex(hex(regs[17])[2:]).decode("ASCII")
+                SN=SN_1+SN_2+SN_3+SN_4+SN_5 #SN=plant.inverter.inverter_serial_number
+                FW=regs[21] #plant.inverter.arm_firmware_version
+                return DTC,FW,SN
+            except:
+                pass        
+        return ("ERROR: "+str(sys.exc_info()))
 
     def enable_charge_target(self, target_soc: int):
         """Sets inverter to stop charging when SOC reaches the desired level. Also referred to as "winter mode"."""

@@ -1,14 +1,20 @@
-import logging
-from typing import Any
 
-from givenergy_modbus_async.model import GivEnergyBaseModel
-from givenergy_modbus_async.model.battery import Battery
-from givenergy_modbus_async.model.inverter import Inverter, Model, Generation
-from givenergy_modbus_async.model.register import HR, IR
-from givenergy_modbus_async.model.register_cache import (
+import logging
+
+from .battery import Battery
+from .hvbcu import BCU
+from .hvbmu import BMU
+from .ems import EMS
+from .gateway import Gateway
+from .threephase import ThreePhaseInverter
+from .meter import Meter, MeterProduct
+from .inverter import Inverter
+from .register import Model
+from .register import HR, IR
+from .register_cache import (
     RegisterCache,
 )
-from givenergy_modbus_async.pdu import (
+from ..pdu import (
     ClientIncomingMessage,
     NullResponse,
     ReadHoldingRegistersResponse,
@@ -20,22 +26,23 @@ from givenergy_modbus_async.pdu import (
 _logger = logging.getLogger(__name__)
 
 
-class Plant(GivEnergyBaseModel):
+class Plant:
     """Representation of a complete GivEnergy plant."""
 
     register_caches: dict[int, RegisterCache] = {}
     additional_holding_registers: list[int] = []
+    additional_input_registers: list[int] = []
     inverter_serial_number: str = ""
     data_adapter_serial_number: str = ""
     number_batteries: int = 0
-    slave_address: int = 0x32
+    meter_list: list[int] = [1]
+    number_bcus: int = 0
+    bcu_list: list[tuple] = []
+    slave_address: int = 0x31
+    isHV: bool = True
+    device_type: Model
 
-    class Config:  # noqa: D106
-        allow_mutation = True
-        frozen = False
-
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
+    def __init__(self) -> None:
         if not self.register_caches:
             self.register_caches = {self.slave_address: RegisterCache()}
 
@@ -71,10 +78,12 @@ class Plant(GivEnergyBaseModel):
             self.register_caches[slave_address].update(
                 {HR(k): v for k, v in pdu.to_dict().items()}
             )
+            self.register_caches[slave_address]['serial_number']=pdu.inverter_serial_number
         elif isinstance(pdu, ReadInputRegistersResponse):
             self.register_caches[slave_address].update(
                 {IR(k): v for k, v in pdu.to_dict().items()}
             )
+            self.register_caches[slave_address]['serial_number']=pdu.inverter_serial_number
         elif isinstance(pdu, WriteHoldingRegisterResponse):
             if pdu.register == 0:
                 _logger.warning(f"Ignoring, likely corrupt: {pdu}")
@@ -82,6 +91,7 @@ class Plant(GivEnergyBaseModel):
                 self.register_caches[slave_address].update(
                     {HR(pdu.register): pdu.value}
                 )
+                self.register_caches[slave_address]['serial_number']=pdu.inverter_serial_number
 
     def detect_batteries(self) -> None:
         """Determine the number of batteries based on whether the register data is valid.
@@ -89,31 +99,102 @@ class Plant(GivEnergyBaseModel):
         Since we attempt to decode register data in the process, it's possible for an
         exception to be raised.
         """
-        i = 0
-        for i in range(6):
+        if self.inverter.model==Model.EMS or self.inverter.model==Model.GATEWAY:
+            self.number_batteries=0
+            return
+        if self.isHV:
+            self.number_batteries=0
+            for bcu in self.bcu_list:
+                self.number_batteries+=bcu[1]
+                #self.number_batteries=BCU(self.register_caches[0x70]).get('number_of_module')
+        else:
+            i = 0
+            for i in range(6):
+                try:
+                    assert Battery(self.register_caches[i + 0x32]).is_valid()
+                except (KeyError, AssertionError):
+                    break
+            self.number_batteries = i
+
+    def detect_meters(self) -> None:
+        """Determine the number of meters based on whether the register data is valid.
+
+        Since we attempt to decode register data in the process, it's possible for an
+        exception to be raised.
+        """
+        meter_list=[]
+        i = 1
+        for i in range(8):
             try:
-                assert Battery.from_orm(self.register_caches[i + 0x32]).is_valid()
+                assert Meter(self.register_caches[i + 0x01]).is_valid()
+                meter_list.append(i+1)
             except (KeyError, AssertionError):
-                break
-        self.number_batteries = i
+                continue
+        self.meter_list = meter_list
 
 
     @property
-    def inverter(self) -> Inverter:
+    def inverter(self) -> Inverter:     #Would an AIO Class make sense here?
         """Return Inverter model for the Plant."""
-        return Inverter.from_orm(self.register_caches[self.slave_address])
+        if hex(self.register_caches[self.slave_address][HR(0)])[2:3]=="4":
+            return ThreePhaseInverter(self.register_caches[self.slave_address])
+        elif hex(self.register_caches[self.slave_address][HR(0)])[2:3] in ("2","3","8"):
+            return Inverter(self.register_caches[self.slave_address])
+    
+#    @property
+#    def threephaseinverter(self) -> Inverter:
+#        """Return 3ph Inverter model for the Plant."""
+#        return ThreePhaseInverter(self.register_caches[self.slave_address])
+    
+    @property
+    def ems(self) -> EMS:
+        """Return EMS model for the Plant."""
+        if hex(self.register_caches[self.slave_address][HR(0)])[2:3]=="5":
+            return EMS(self.register_caches[self.slave_address])
+    
+    @property
+    def gateway(self) -> Gateway:
+        """Return Gateway model for the Plant."""
+        if hex(self.register_caches[self.slave_address][HR(0)])[2:3]=="7":
+            return Gateway(self.register_caches[self.slave_address])
+
+    @property
+    def HVStack(self) -> list:
+        stacks=[]
+        if self.isHV:
+            for bcu in self.bcu_list:
+                stack=[]
+                stack.append(BCU(self.register_caches[bcu[0] + 0x70]))
+                bmus=[]
+                for bmu in range(bcu[1]):
+                    bmus.append(BMU(self.register_caches[bmu + 0x50],bcu[0]))
+                stack.append(bmus)
+                stacks.append(stack)
+        return stacks
 
     @property
     def batteries(self) -> list[Battery]:
-        """Return Battery models for the Plant."""
-        return [
-            Battery.from_orm(self.register_caches[i + self.slave_address])
-            for i in range(self.number_batteries)
-        ]
-
-##try single battery for testing
-#    @property
-#    def batteries_test(self) -> list[Battery]:
-#        """Return Battery models for the Plant."""
-#        return Battery.from_orm(self.register_caches[self.slave_address])
+        """Return LV Battery models for the Plant."""
+        if not self.isHV:
+            return [
+                Battery(self.register_caches[i + 0x32])
+                for i in range(self.number_batteries)
+            ]
         
+    @property
+    def meters(self) -> dict[Meter]:
+        """Return Meter models for the Plant."""
+        temp={}
+        for i in self.meter_list:
+            if i in self.register_caches:
+                temp[i]=Meter(self.register_caches[i + 0x00])
+        return temp
+    
+    @property
+    def meterproduct(self) -> list[Meter]:
+        """Return Meter models for the Plant."""
+        temp=[]
+        for i in self.meter_list:
+            if i in self.register_caches:
+                temp[i]=MeterProduct(self.register_caches[i + 0x01])
+        return temp

@@ -29,7 +29,7 @@
             color='#4fbba9'
             style="color:white;"
           >{{input?.options?.label}}</v-btn>
-          <h3>{{ storeTCP.restart.hasRestarted != null ? storeTCP.restart.hasRestarted ? "Container Restarted Successfully" : "Container Failed to Restart. Try Restarting Manually" : ''}}</h3>
+          <h3>{{ storeTCP.restart.hasRestarted != null ? storeTCP.restart.hasRestarted ? "GivTCP Restarted Successfully" : "GivTCP Failed to Restart. Try Restarting Manually" : ''}}</h3>
           </div>
         </div>
       </v-card-text>

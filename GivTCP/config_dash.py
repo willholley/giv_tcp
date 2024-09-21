@@ -10,7 +10,7 @@ def get_config():
     if exists(GivLUT.regcache):      # if there is a cache then grab it
         with open(GivLUT.regcache, 'rb') as inp:
             regCacheStack= pickle.load(inp)
-            multi_output_old=regCacheStack[4]
+            multi_output_old=regCacheStack[-1]
         serial_number=multi_output_old["Invertor_Details"]['Invertor_Serial_Number']
     else:
         serial_number="Unknown"

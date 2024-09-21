@@ -1,16 +1,18 @@
 import datetime
 import json
-from typing import TYPE_CHECKING, DefaultDict, Optional
+import logging
+from typing import DefaultDict, Optional
 
-from givenergy_modbus_async.model.register import (
+from .register import (
     HR,
     IR,
+    MR,
     Register,
 )
 
-if TYPE_CHECKING:
-    from givenergy_modbus_async.model import TimeSlot
+from ..model import TimeSlot
 
+_logger = logging.getLogger(__name__)
 
 class RegisterCache(DefaultDict[Register, int]):
     """Holds a cache of Registers populated after querying a device."""
@@ -18,7 +20,7 @@ class RegisterCache(DefaultDict[Register, int]):
     def __init__(self, registers: Optional[dict[Register, int]] = None) -> None:
         if registers is None:
             registers = {}
-        super().__init__(lambda: 0, registers)
+        super().__init__(lambda: None, registers)
 
     def json(self) -> str:
         """Return JSON representation of the register cache, to mirror `from_json()`."""  # noqa: D402,D202,E501
@@ -89,12 +91,16 @@ class RegisterCache(DefaultDict[Register, int]):
         s: Register,
     ):
         """Combine 6 registers into a datetime, with safe defaults for zeroes."""
-        return datetime.datetime(
-            self[y] + 2000, self.get(m, 1), self.get(d, 1), self[h], self[min], self[s]
-        )
+        # Try to stop spurios datetime errors when dodgy data comes in
+        try:
+            return datetime.datetime(
+                self[y] + 2000, self.get(m, 1), self.get(d, 1), self[h], self[min], self[s]
+            )
+        except: 
+            _logger.debug("Cache: Error processing to_datetime. Sending Zero Date")
+            return datetime.datetime(
+                2000, 0,0,0,0,0)
 
     def to_timeslot(self, start: Register, end: Register) -> "TimeSlot":
         """Combine two registers into a time slot."""
-        from custom_components.givenergy_local.givenergy_modbus_async.model import TimeSlot
-
         return TimeSlot.from_repr(self[start], self[end])

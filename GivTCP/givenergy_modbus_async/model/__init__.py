@@ -1,32 +1,31 @@
-"""Data model."""
+"""
+The data model that represents a GivEnergy system.
+
+From a modbus perspective, devices present themselves as collections
+of 16-bit numbered registers. An instance of *Plant* is used to cache
+the values of these registers for the various devices (inverter and
+batteries) making up your system.
+
+Then from the plant you can access an Inverter and an array of Battery
+instances - these interpret the low-level modbus registers as higher-level
+python datatypes.
+
+Note that the model package provides read-only access to the state of
+the system.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import time
 from enum import IntEnum
 from typing import TYPE_CHECKING
-
-from pydantic import BaseModel
+import json
 
 if TYPE_CHECKING:
-    from custom_components.givenergy_local.givenergy_modbus.model.register_cache import (
+    from .register_cache import (
         RegisterCache,
     )
-
-
-class GivEnergyBaseModel(BaseModel):
-    """Structured format for all other attributes."""
-
-    class Config:  # noqa: D106
-        allow_mutation = False
-        frozen = True
-        use_enum_values = True
-        orm_mode = True
-
-    @classmethod
-    def from_registers(cls, register_cache: RegisterCache):
-        """Constructor parsing registers directly."""
-        raise NotImplementedError()
 
 
 class DefaultUnknownIntEnum(IntEnum):
@@ -62,12 +61,15 @@ class TimeSlot:
             end = f"{end:04d}"
         end_hour = int(end[:-2])
         end_minute = int(end[-2:])
-        return cls(time(start_hour, start_minute), time(end_hour, end_minute))
-
-
-# from custom_components.givenergy_local.givenergy_modbus.model import battery, inverter, plant, register_cache
-#
-# Plant = plant.Plant
-# Inverter = inverter.Inverter
-# Battery = battery.Battery
-# RegisterCache = register_cache.RegisterCache
+        try:
+            return cls(time(start_hour, start_minute), time(end_hour, end_minute))
+        except:
+            # if there's garbage data return midnight
+            return cls(time(0,0), time(0,0))
+        
+    @classmethod
+    def toJson(cls, start: int | str, end: int | str):
+        slot={}
+        slot['start']=start.strftime("%H:%M")
+        slot['end']=end.strftime("%H:%M")
+        return json.dumps(slot)

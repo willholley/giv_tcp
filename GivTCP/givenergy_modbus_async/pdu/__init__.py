@@ -1,23 +1,23 @@
 """Package for the tree of PDU messages."""
 
 
-from givenergy_modbus_async.pdu.base import (
+from .base import (
     BasePDU,
     ClientIncomingMessage,
     ClientOutgoingMessage,
     ServerIncomingMessage,
     ServerOutgoingMessage,
 )
-from givenergy_modbus_async.pdu.heartbeat import (
+from .heartbeat import (
     HeartbeatMessage,
     HeartbeatRequest,
     HeartbeatResponse,
 )
-from givenergy_modbus_async.pdu.null import NullResponse
-from givenergy_modbus_async.pdu.read_registers import (
-    ReadBatteryInputRegisters,
-    ReadBatteryInputRegistersRequest,
-    ReadBatteryInputRegistersResponse,
+from .null import NullResponse
+from .read_registers import (
+    ReadMeterProductRegisters,
+    ReadMeterProductRegistersRequest,
+    ReadMeterProductRegistersResponse,
     ReadHoldingRegisters,
     ReadHoldingRegistersRequest,
     ReadHoldingRegistersResponse,
@@ -28,12 +28,12 @@ from givenergy_modbus_async.pdu.read_registers import (
     ReadRegistersRequest,
     ReadRegistersResponse,
 )
-from givenergy_modbus_async.pdu.transparent import (
+from .transparent import (
     TransparentMessage,
     TransparentRequest,
     TransparentResponse,
 )
-from givenergy_modbus_async.pdu.write_registers import (
+from .write_registers import (
     WriteHoldingRegister,
     WriteHoldingRegisterRequest,
     WriteHoldingRegisterResponse,
@@ -53,9 +53,9 @@ __all__ = [
     "ReadInputRegisters",
     "ReadInputRegistersRequest",
     "ReadInputRegistersResponse",
-    "ReadBatteryInputRegisters",
-    "ReadBatteryInputRegistersRequest",
-    "ReadBatteryInputRegistersResponse",
+    "ReadMeterProductRegisters",
+    "ReadMeterProductRegistersRequest",
+    "ReadMeterProductRegistersResponse",
     "ReadRegistersMessage",
     "ReadRegistersRequest",
     "ReadRegistersResponse",

@@ -72,7 +72,7 @@ def findInvertor(subnet):
     PORT = 8899
     start = perf_counter()
     # I didn't need a timeout of 1 so I used 0.1
-    socket.setdefaulttimeout(0.1)
+    socket.setdefaulttimeout(1)
 
     error_dict = {}
     invlist = {}
