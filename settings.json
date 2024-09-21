@@ -25,6 +25,7 @@
     "Model_5": "",
     "serial_number_5": "",
     "inverterName_5":"GivTCP5",
+    "Host_IP": "",
     "MQTT_Output": true,
     "MQTT_Address": "",
     "MQTT_Username": "",

@@ -719,7 +719,7 @@ def processInverterInfo(plant: Plant):
             multi_output_old = regCacheStack[-1]
         else:
             regCacheStack = [0]
-            multi_output_old = []
+            multi_output_old = {}
 
         # If System Time is wrong (default date) use last good time or local time if all else fails
         if GEInv.system_time.year == 2000:
@@ -867,10 +867,10 @@ def processInverterInfo(plant: Plant):
     #        if int(GiV_Settings.numBatteries) > 0:  # only do this if there are batteries
         if GEInv.battery_percent != 0 or GEInv.soc_force_adjust !=0:        #if we're in calibration mode accept any value
             power_output['SOC'] = GEInv.battery_percent
-        elif GEInv.battery_percent == 0 and 'multi_output_old' in locals():
+        elif GEInv.battery_percent == 0 and len(multi_output_old)>0:
             power_output['SOC'] = multi_output_old['Power']['Power']['SOC']
             logger.debug("\"Battery SOC\" reported as: "+str(GEInv.battery_percent)+"% so using previous value")
-        elif GEInv.battery_percent == 0 and not 'multi_output_old' in locals():
+        elif GEInv.battery_percent == 0 and len(multi_output_old)==0:
             power_output['SOC'] = 1
             logger.debug("\"Battery SOC\" reported as: "+str(GEInv.battery_percent)+"% and no previous value so setting to 1%")  
         else:
@@ -1251,10 +1251,10 @@ def processGatewayInfo(plant: Plant):
 
 
     ### Is this bit right? If not parallel then are there multiple aios to check? Can you have multiple AIOs not in parallel mode?
-        if GEInv.parallel_aio_soc>0:
-            power_output['SOC']=GEInv.parallel_aio_soc
-            power_output['SOC_kWh'] = round((int(power_output['SOC'])*(inverterModel.batterycapacity))/100,2)
-        else:
+        if GEInv.parallel_aio_num>1:
+        #    power_output['SOC']=GEInv.parallel_aio_soc
+        #    power_output['SOC_kWh'] = round((int(power_output['SOC'])*(inverterModel.batterycapacity))/100,2)
+        #else:
             # Calc based on individual SOCs
             count=0
             total=0
@@ -2152,7 +2152,6 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
             else:
                 max=lookup.max
         ## Make sure its a number...
-        newData=float(newData)
 
         now = inv_time
         then = datetime.datetime.fromisoformat(lastUpdate)
@@ -2178,14 +2177,14 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
 ## Finally smooth data if its not already Zero (avoid div by Zero)
         if oldData != 0:
     ### Run checks against the conditions in GivLUT ###
-            if "Power" in name:
+            if "power" in name.lower():
                 if newData==12179:
                     return oldData
             if lookup.smooth:     # apply smoothing if required
                 if newData != oldData:  # Only if its not the same
                     timeDelta = (now-then).total_seconds()
                     dataDelta = abs(newData-oldData)/oldData    #Should it be a ratio or an abs value as low values easily meet the threshold
-                    if "Power" in name:
+                    if "power" in name.lower():
                         if abs(newData-oldData)>abssmooth:
                             if checkRawcache(newData,name,abssmooth): #If new data is persistently outside bounds then use new value
                                 return(newData)
@@ -2194,7 +2193,7 @@ def dataSmoother2(dataNew, dataOld, lastUpdate, invtype,inv_time):
                                 return(oldData)
                     else:
                         if dataDelta > smoothRate and timeDelta < 60:
-                            logger.debug(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
+                            logger.info(str(name)+" jumped too far in a single read: "+str(oldData)+"->"+str(newData)+" so using previous value")
                             return(oldData)
 
     return(newData)

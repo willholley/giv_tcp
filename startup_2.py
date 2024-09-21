@@ -47,7 +47,7 @@ def validateEVC(HOST):
             return False
     except:
         e=sys.exc_info()
-        logger.error(e)
+        logger.debug(str(HOST)+" isn't a GE EVC, so ignoring. "+e)
         return False
 
 async def getInvDeets(HOST):
@@ -336,11 +336,24 @@ logger.debug("Host IP Address is: "+str(hostIP))
 
 sleep(2)        # Sleep to allow port scanning socket to close
 
-#write ingress data to json file for config page to use
-with open('/app/ingress/hostip.json', 'w') as f:
-    f.write(json.dumps(hostIP,indent=4))
-with open('/app/ingress/ingressurl.json', 'w') as f:
-    f.write(json.dumps(baseurl,indent=4))
+PATH= "/app/GivTCP_"
+SFILE="/config/GivTCP/allsettings.json"
+v3upgrade=False      #Check if its a new upgrade or already has new json config file
+if not exists(SFILE):
+    v3upgrade=True
+    logger.debug("Copying in a template settings.json to: "+str(SFILE))
+    shutil.copyfile("settings.json",SFILE)
+else:
+    # If theres already a settings file, make sure its got any new elements
+    with open(SFILE, 'r') as f1:
+        setts=json.load(f1)
+    with open("/app/settings.json", 'r') as f2:
+        templatesetts=json.load(f2)
+    for setting in templatesetts:
+        if not setting in setts:
+            setts[setting]=templatesetts[setting]
+    with open(SFILE, 'w') as f:
+        f.write(json.dumps(setts,indent=4))
 
 finv={}
 i=0
@@ -373,26 +386,6 @@ subprocess.Popen(["nginx","-g","daemon off;"])
 logger.debug("Running nginx")
 
 
-PATH= "/app/GivTCP_"
-SFILE="/config/GivTCP/allsettings.json"
-v3upgrade=False      #Check if its a new upgrade or already has new json config file
-if not exists(SFILE):
-    v3upgrade=True
-    logger.debug("Copying in a template settings.json to: "+str(SFILE))
-    shutil.copyfile("settings.json",SFILE)
-else:
-    # If theres already a settings file, make sure its got any new elements
-    with open(SFILE, 'r') as f1:
-        setts=json.load(f1)
-    with open("/app/settings.json", 'r') as f2:
-        templatesetts=json.load(f2)
-    for setting in templatesetts:
-        if not setting in setts:
-            setts[setting]=templatesetts[setting]
-    with open(SFILE, 'w') as f:
-        f.write(json.dumps(setts,indent=4))
-
-
 # Update json object with found data
 logger.debug ("Creating master allsettings.json for all inverters.")
 with open(SFILE, 'r') as f:
@@ -407,6 +400,17 @@ if hasMQTT:
     if setts["MQTT_Password"]=="": setts["MQTT_Password"]=mqtt_password
     setts["MQTT_Port"]=mqtt_port
 if setts["MQTT_Address"]=="": setts['MQTT_Output']=False
+if not hostIP=="":
+    setts["Host_IP"]=hostIP
+elif setts["Host_IP"]=="":
+    logger.error("Unable to determine Host IP, manually configure the allsettings.json file with your HA instance IP")
+
+#write ingress data to json file for config page to use
+with open('/app/ingress/hostip.json', 'w') as f:
+    f.write(json.dumps(setts["Host_IP"],indent=4))
+with open('/app/ingress/ingressurl.json', 'w') as f:
+    f.write(json.dumps(baseurl,indent=4))
+
 
 for inv in inverterStats:
     logger.debug("Using found Inverter data to autosetup settings.json")
@@ -482,7 +486,10 @@ if exists("/config/GivTCP/v2env.pkl") and v3upgrade:
     setts["influxBucket"]=envs[0]["INFLUX_BUCKET"]
     setts["influxOrg"]=envs[0]["INFLUX_ORG"]
     setts["self_run"]=True
-    setts['evc_enable']=bool(envs[0]["EVC_ENABLE"])
+    if envs[0]["EVC_ENABLE"].lower()=="true":
+        setts['evc_enable']=True
+    else:
+        setts['evc_enable']=False
     setts['evc_self_run_timer']=envs[0]["EVC_SELF_RUN_TIMER"]
 
     ## Match HAPREFIX to inverterIP
@@ -684,7 +691,7 @@ while True:
                 logger.info ("Starting Mosquitto on port "+str(setts['MQTT_Port']))
                 mqttBroker=subprocess.Popen(["/usr/sbin/mosquitto", "-c",PATH+"/mqtt.conf"])
 
-        if setts['evc_enable']==True:
+        if setts['evc_enable']==True and not setts['evc_ip_address'] == '':
             if not evcSelfRun.poll()==None:
                 evcSelfRun.kill()
                 logger.error("EVC Self Run loop process died. restarting...")

@@ -90,7 +90,6 @@ def outlierRemoval(CacheStack):
                 CacheStack[i][path[0]][path[1]][item]=cleanFlatStack[item]
             elif len(path)==3:
                 CacheStack[i][path[0]][path[1]][path[2]][item]=cleanFlatStack[item]
-
     return CacheStack
 
 def find(field_name, d, current_path=''):
