@@ -206,8 +206,6 @@ def getEVC(client:ModbusTcpClient):
             output['Plug_and_Go']='disable'
 
         evcTime=datetime.datetime(regs[97],regs[98],regs[99],regs[100],regs[101],regs[102])
-        now=datetime.datetime.utcnow()
-        delta=now-evcTime
 
         output['System_Time']= evcTime.replace(tzinfo=datetime.timezone.utc).isoformat()
 

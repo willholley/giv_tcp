@@ -188,7 +188,7 @@ class HAMQTT():
                 if entity_type.onlyIncrease:        #"soc" in str(topic.split("/")[-1]).lower() or "today" in str(topic.split("/")[-1]).lower():
                     tempObj['state_class']="total_increasing"
                 else:
-                    tempObj['state_class']="measurement"
+                    tempObj['state_class']="total"
             if entity_type.sensorClass=="money":
                 if "ppkwh" in str(topic).lower() or "rate" in str(topic).lower():
                     tempObj['unit_of_meas']="{GBP}/kWh"

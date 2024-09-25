@@ -65,7 +65,8 @@ class TimeSlot:
             return cls(time(start_hour, start_minute), time(end_hour, end_minute))
         except:
             # if there's garbage data return midnight
-            return cls(time(0,0), time(0,0))
+            #return cls(time(0,0), time(0,0))
+            return cls(None,None)
         
     @classmethod
     def toJson(cls, start: int | str, end: int | str):

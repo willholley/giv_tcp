@@ -4,9 +4,28 @@ import pandas as pd
 import numpy as np
 logger = GivLUT.logger
 
-def subData(data,item):
-    logger.info ("Bad data found in: "+str(item))
-    return np.nan
+def outlier_smoother(x, m=3, win=3, plots=True):
+    ''' finds outliers in x, points > m*mdev(x) [mdev:median deviation] 
+    and replaces them with the median of win points around them '''
+    x_corr = np.copy(x)
+    d = np.abs(x - np.median(x))
+    mdev = np.median(d)
+    idxs_outliers = np.nonzero(d > m*mdev)[0]
+    for i in idxs_outliers:
+        if i-win < 0:
+            x_corr[i] = np.median(np.append(x[0:i], x[i+1:i+win+1]))
+        elif i+win+1 > len(x):
+            x_corr[i] = np.median(np.append(x[i-win:i], x[i+1:len(x)]))
+        else:
+            x_corr[i] = np.median(np.append(x[i-win:i], x[i+1:i+win+1]))
+#    if plots:
+#        plt.figure('outlier_smoother', clear=True)
+#        plt.plot(x, label='orig.', lw=5)
+#        plt.plot(idxs_outliers, x[idxs_outliers], 'ro', label='outliers')                                                                                                                    
+#        plt.plot(x_corr, '-o', label='corrected')
+#        plt.legend()
+    
+    return x_corr
 
 def impute_outliers_IQR(df: np.array, item):
     if GiV_Settings.data_smoother.lower()=="high":
@@ -23,13 +42,17 @@ def impute_outliers_IQR(df: np.array, item):
     lower = df[~(df<(q1-1.5*IQR))].min()
     # replace outliers with NaN then interpolate
     clean = np.where(df > upper,
-        subData(df, item),
+        np.nan,
         np.where(
             df < lower,
-            subData(df,item),
+            np.nan,
             df
             )
         )
+    # iterate clean stack find the dodgy data and log it
+    for idx,num in enumerate(clean):
+        if np.isnan(num[0]):
+            logger.debug(str(item)+" has Outliers: "+str(df.to_dict(orient='list')[0][idx])+" outside bounds: "+str(upper[0])+" - "+str(lower[0]))    
     return pd.DataFrame(clean,dtype=float).interpolate(method='linear',limit_direction='both')
 
 def iterate_dict(array):        # Create a publish safe version of the output (convert non string or int datapoints)
@@ -61,36 +84,44 @@ def makeFlatStack(CacheStack):
                 flatstack[item]=[cache[item]]
     return flatstack
 
-def outlierRemoval(CacheStack):
-    cleanCacheStack={}
+def outlierRemoval(latest_data,CacheStack):
     cleanFlatStack={}
-    #get all keys in regcachestack
-    flatstack=makeFlatStack(CacheStack)
+    # put latest data into stack
+    CacheStack.append(latest_data)
 
+    # get all keys from the stack
+    flatstack=makeFlatStack(CacheStack)
+    # iterate through a remove outliers
     for item in flatstack:
         test=flatstack[item][0]
         if isinstance(test,(int, float)) and not isinstance(test,bool):
             df = pd.DataFrame(flatstack[item])
             newdf=impute_outliers_IQR(df, item)
+#            newnewdf=outlier_smoother(df)
             cleanFlatStack[item]=newdf.to_dict(orient='list')[0]
         else:
             cleanFlatStack[item]=flatstack[item]
+
 ### NOW put back in the right place...
     for item in cleanFlatStack:
         #find its location in regCache
-        newCache=[]
         outp=list(find(item,CacheStack[0]))
-        path=outp[0][1:].split('.')
-        for i in range (0, len(CacheStack)):
-            if len(path)==0:
-                CacheStack[i][item]=cleanFlatStack[item]
-            elif len(path)==1:
-                CacheStack[i][path[0]][item]=cleanFlatStack[item]
-            elif len(path)==2:
-                CacheStack[i][path[0]][path[1]][item]=cleanFlatStack[item]
-            elif len(path)==3:
-                CacheStack[i][path[0]][path[1]][path[2]][item]=cleanFlatStack[item]
-    return CacheStack
+        if not outp == []:
+            path=outp[0][1:].split('.')
+            for i in range (0, len(CacheStack)-1):  
+                try:
+                    newdata=cleanFlatStack[item][i]
+                    if len(path)==0:
+                        CacheStack[i][item]=cleanFlatStack[item][i]
+                    elif len(path)==1:
+                        CacheStack[i][path[0]][item]=cleanFlatStack[item][i]
+                    elif len(path)==2 and not path[1]=="Rates":
+                        CacheStack[i][path[0]][path[1]][item]=cleanFlatStack[item][i]
+                    elif len(path)==3:
+                        CacheStack[i][path[0]][path[1]][path[2]][item]=cleanFlatStack[item][i]
+                except:
+                    logger.debug("Data item not in cleanFlat Stack")
+    return CacheStack[-1],CacheStack[:-1]
 
 def find(field_name, d, current_path=''):
     if not isinstance(d, dict):

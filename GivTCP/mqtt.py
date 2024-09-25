@@ -706,7 +706,7 @@ class GivMQTT():
                     # Get the Job ID from the touchfile
                     if exists(".FCRunning"+str(GiV_Settings.givtcp_instance)):
                         jobid= str(open(".FCRunning"+str(GiV_Settings.givtcp_instance),"r").readline().strip('\n'))
-                        logger.info("Retrieved jobID to cancel Force Charge: "+ str(jobid))
+                        logger.debug("Retrieved jobID to cancel Force Charge: "+ str(jobid))
                         requestcommand("cancelJob",jobid)
                     else:
                         logger.error("Force Charge is not currently running")
@@ -719,7 +719,7 @@ class GivMQTT():
                     # Get the Job ID from the touchfile
                     if exists(".FERunning"+str(GiV_Settings.givtcp_instance)):
                         jobid= str(open(".FERunning"+str(GiV_Settings.givtcp_instance),"r").readline().strip('\n'))
-                        logger.info("Retrieved jobID to cancel Force Export: "+ str(jobid))
+                        logger.debug("Retrieved jobID to cancel Force Export: "+ str(jobid))
                         requestcommand("cancelJob",jobid)
                     else:
                         logger.error("Force Export is not currently running")
