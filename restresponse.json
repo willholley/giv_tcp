@@ -1,1 +1,1 @@
-[{"id": "setChargeSlotStart", "result": "{\"result\": \"Setting Charge Slot 1 Start to: 23:00 was a success\"}"}]
+[{"id": "switchRate", "result": "{}"}, {"id": "enableChargeSchedule", "result": "{\"result\": \"Setting Charge Schedule to disable was a success\"}"}, {"id": "setBatteryPauseMode", "result": "{\"result\": \"Setting Battery Pause Mode to Disabled was a success\"}"}]

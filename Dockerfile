@@ -1,16 +1,17 @@
 # set base image (host OS)
-FROM python:3.11-rc-alpine
-#FROM python:alpine3.15
+#FROM python:3.11-rc-alpine
+FROM python:alpine3.19
 
 RUN apk add mosquitto
-RUN apk add --update npm
-RUN apk add git
-RUN apk add tzdata
-RUN apk add musl-utils
-RUN apk add xsel
+RUN apk add npm 
+RUN apk add git 
+RUN apk add tzdata 
+RUN apk add musl 
+RUN apk add xsel 
 RUN apk add redis
+RUN apk add nginx
 
-RUN apk add nginx && mkdir -p /run/nginx
+RUN mkdir -p /run/nginx
 RUN npm install -g serve
 
 # set the working directory in the container
@@ -34,7 +35,7 @@ RUN rm /etc/nginx/http.d/default.conf
 COPY GivTCP/ ./GivTCP
 COPY WebDashboard ./WebDashboard
 # COPY givenergy_modbus/ /usr/local/lib/python3.11/site-packages/givenergy_modbus
-COPY GivTCP/givenergy_modbus_async/ /usr/local/lib/python3.11/site-packages/givenergy_modbus_async
+COPY GivTCP/givenergy_modbus_async/ /usr/local/lib/python3.12/site-packages/givenergy_modbus_async
 
 COPY api.json ./GivTCP/api.json
 COPY startup.py startup.py

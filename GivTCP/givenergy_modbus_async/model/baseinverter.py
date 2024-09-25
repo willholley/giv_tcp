@@ -44,7 +44,7 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "serial_number": Def(C.string, None, HR(13), HR(14), HR(15), HR(16), HR(17)),
         "first_battery_bms_firmware_version": Def(C.uint16, None, HR(18)),
         "dsp_firmware_version": Def(C.uint16, None, HR(19)),
-        "enable_charge_target": Def(C.bool, None, HR(20), valid=(0, 1)),
+        "enable_charge_target": Def(C.uint16, Enable, HR(20), valid=(0, 1)),
         "arm_firmware_version": Def(C.uint16, None, HR(21)),
         "generation": Def(C.uint16, Generation, HR(21)),
         "firmware_version": Def(C.firmware_version, None, HR(19), HR(21)),
@@ -53,8 +53,8 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "variable_address": Def(C.uint16, None, HR(24)),
         "variable_value": Def(C.uint16, None, HR(25)),
         "grid_port_max_power_output": Def(C.uint16, None, HR(26)),
-        "eco_mode": Def(C.uint16, BatteryPowerMode, HR(27), valid=(0, 1)),
-        "enable_60hz_freq_mode": Def(C.bool, None, HR(28)),
+        "eco_mode": Def(C.uint16, Enable, HR(27), valid=(0, 1)),
+        "enable_60hz_freq_mode": Def(C.uint16, Enable, HR(28)),
         "soc_force_adjust": Def(C.uint16, BatteryCalibrationStage, HR(29), valid=(0,3)),
         "modbus_address": Def(C.uint16, None, HR(30)),
         "charge_slot_2": Def(C.timeslot, None, HR(31), HR(32)),
@@ -65,8 +65,8 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "system_time": Def(
             C.datetime, None, HR(35), HR(36), HR(37), HR(38), HR(39), HR(40)
         ),
-        "enable_drm_rj45_port": Def(C.bool, None, HR(41)),
-        "enable_reversed_ct_clamp": Def(C.bool, None, HR(42)),
+        "enable_drm_rj45_port": Def(C.uint16, Enable, HR(41)),
+        "enable_reversed_ct_clamp": Def(C.uint16, Enable, HR(42)),
         "charge_soc": Def((C.duint8, 0), None, HR(43)),
         "discharge_soc": Def((C.duint8, 1), None, HR(43)),
         "discharge_slot_2": Def(C.timeslot, None, HR(44), HR(45)),
@@ -74,8 +74,8 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "discharge_slot_2_end": Def(C.uint16, None, HR(45), valid=(0, 2359)),
         "bms_firmware_version": Def(C.uint16, None, HR(46)),
         "meter_type": Def(C.uint16, MeterType, HR(47)),
-        "enable_reversed_115_meter": Def(C.bool, None, HR(48)),
-        "enable_reversed_418_meter": Def(C.bool, None, HR(49)),
+        "enable_reversed_115_meter": Def(C.uint16, Enable, HR(48)),
+        "enable_reversed_418_meter": Def(C.uint16, Enable, HR(49)),
         "active_power_rate": Def(C.uint16, None, HR(50)),
         "reactive_power_rate": Def(C.uint16, None, HR(51)),
         "power_factor": Def(C.uint16, None, HR(52)),  # /10_000 - 1
@@ -86,8 +86,8 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "discharge_slot_1": Def(C.timeslot, None, HR(56), HR(57)),
         "discharge_slot_1_start": Def(C.uint16, None, HR(56), valid=(0, 2359)),
         "discharge_slot_1_end": Def(C.uint16, None, HR(57), valid=(0, 2359)),
-        "enable_auto_judge_battery_type": Def(C.bool, None, HR(58)),
-        "enable_discharge": Def(C.bool, None, HR(59)),
+        "enable_auto_judge_battery_type": Def(C.uint16, Enable, HR(58)),
+        "enable_discharge": Def(C.uint16, Enable, HR(59)),
         #
         # Holding Registers, block 60-119
         #
@@ -98,7 +98,7 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "charge_slot_1": Def(C.timeslot, None, HR(94), HR(95)),
         "charge_slot_1_start": Def(C.uint16, None, HR(94), valid=(0, 2359)),
         "charge_slot_1_end": Def(C.uint16, None, HR(95), valid=(0, 2359)),
-        "enable_charge": Def(C.bool, None, HR(96)),
+        "enable_charge": Def(C.uint16, Enable, HR(96)),
         "battery_low_voltage_protection_limit": Def(C.uint16, C.centi, HR(97)),
         "battery_high_voltage_protection_limit": Def(C.uint16, C.centi, HR(98)),
         # skip voltage adjustment settings 99-104
@@ -106,11 +106,11 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "battery_voltage_adjust": Def(C.uint16, C.centi, HR(105)),
         # skip voltage adjustment settings 106-107
         "battery_low_force_charge_time": Def(C.uint16, None, HR(108)),
-        "enable_bms_read": Def(C.bool, None, HR(109)),
+        "enable_bms_read": Def(C.uint16, Enable, HR(109)),
         "battery_soc_reserve": Def(C.uint16, None, HR(110)),
         "battery_charge_limit": Def(C.uint16, None, HR(111), valid=(0, 50)),
         "battery_discharge_limit": Def(C.uint16, None, HR(112), valid=(0, 50)),
-        "enable_buzzer": Def(C.bool, None, HR(113)),
+        "enable_buzzer": Def(C.uint16, Enable, HR(113)),
         "battery_discharge_min_power_reserve": Def(
             C.uint16, None, HR(114), valid=(4, 100)
         ),
@@ -123,14 +123,14 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         # Holding Registers, block 120-179
         #
         "discharge_soc_stop_1": Def(C.uint16, None, HR(120)),
-        "enable_local_command_test": Def(C.bool, None, HR(121)),
+        "enable_local_command_test": Def(C.uint16, Enable, HR(121)),
         "power_factor_function_model": Def(C.uint16, PowerFactorFunctionModel, HR(122)),
         "frequency_load_limit_rate": Def(C.uint16, None, HR(123)),
-        "enable_low_voltage_fault_ride_through": Def(C.bool, None, HR(124)),
-        "enable_frequency_derating": Def(C.bool, None, HR(125)),
-        "enable_above_6kw_system": Def(C.bool, None, HR(126)),
+        "enable_low_voltage_fault_ride_through": Def(C.uint16, Enable, HR(124)),
+        "enable_frequency_derating": Def(C.uint16, Enable, HR(125)),
+        "enable_above_6kw_system": Def(C.uint16, Enable, HR(126)),
         "start_system_auto_test": Def(C.bool, None, HR(127)),
-        "enable_spi": Def(C.bool, None, HR(128)),
+        "enable_spi": Def(C.uint16, Enable, HR(128)),
         # skip PF configuration and protection settings 129-166
         "inverter_reboot": Def(C.uint16, None, HR(163)),
         "threephase_balance_mode": Def(C.uint16, None, HR(167)),
@@ -139,15 +139,15 @@ class BaseInverter(RegisterGetter, metaclass=DynamicDoc):
         "threephase_balance_2": Def(C.uint16, None, HR(170)),
         "threephase_balance_3": Def(C.uint16, None, HR(171)),
         # HR(172-174) unused
-        "enable_battery_on_pv_or_grid": Def(C.bool, None, HR(175)),
+        "enable_battery_on_pv_or_grid": Def(C.uint16, Enable, HR(175)),
         "debug_inverter": Def(C.uint16, None, HR(176)),
-        "enable_ups_mode": Def(C.bool, None, HR(177)),
+        "enable_ups_mode": Def(C.uint16, Enable, HR(177)),
         "enable_g100_limit_switch": Def(C.bool, None, HR(178)),
         "enable_battery_cable_impedance_alarm": Def(C.bool, None, HR(179)),
         #
         # Holding Registers, block 180-239
         #
-        "enable_standard_self_consumption_logic": Def(C.bool, None, HR(199)),
+        "enable_standard_self_consumption_logic": Def(C.uint16, Enable, HR(199)),
         "cmd_bms_flash_update": Def(C.bool, None, HR(200)),
         # 202-239 - Hot Water Diverter
 

@@ -593,11 +593,12 @@ class BatteryPriority(IntEnum):
 class Enable(IntEnum):
     DISABLE = 0
     ENABLE = 1
+    UNKNOWN = 3
 
     @classmethod
     def _missing_(cls, value):
-        """Default to 0."""
-        return cls(0)
+        """Default to Unknown"""
+        return cls(3)
 
 class MeterStatus(IntEnum):
     DISABLED = 0

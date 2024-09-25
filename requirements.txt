@@ -15,4 +15,4 @@ pymodbus
 async_timeout
 vite
 tzdata
-arrow
+pandas

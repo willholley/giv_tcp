@@ -97,12 +97,9 @@ export default {
         if(res.ok){
           this.snackbar = true
           this.message = "Restarting GivTCP..."
-        }else{
-          this.snackbar = true
-          this.message = "GivTCP not restarted... try manually"
         }
       } catch(e){
-        this.snackbar = true
+        this.snackbar = false
         this.message = "GivTCP not restarted... try manually"
       }
     }
@@ -207,7 +204,7 @@ export default {
           this.message = `Error Saving config change`
         }
         else {
-          this.snackbar = true
+          this.snackbar = false
           this.message = `Success: Saving config change`
         }
 

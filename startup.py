@@ -231,7 +231,7 @@ def findinv(networks):
             e=sys.exc_info()[0].__name__, os.path.basename(sys.exc_info()[2].tb_frame.f_code.co_filename), sys.exc_info()[2].tb_lineno
             logger.error("Error scanning for Inverters- "+str(e))
     else:
-        logger.error("Unable to get host details from Supervisor\Container")
+        logger.error("Unable to get host details from Supervisor / Container")
     return inverterStats, invList, evclist
 
 ###############################
@@ -312,9 +312,11 @@ if isAddon:
     i=0
     for interface in hostDetails['data']['interfaces']:
         ip=str(interface['ipv4']['address']).split('/')[0][2:]
+        mask=str(interface['ipv4']['address']).split('/')[1][:-2]
         if not ip == "":
             hostIP=ip
-        networks[i]=interface['ipv4']['gateway']
+        networks[i]=interface['ipv4']['gateway']+"/"+str(mask)
+        logger.debug("Network Found: "+str(networks[i]))
         i=i+1
 else:
     # Get subnet from docker if not addon
@@ -326,13 +328,14 @@ else:
         s.connect(('10.254.254.254', 1))
         IP = s.getsockname()[0]
         s.close()
-        networks[0]=IP
+        networks[0]=IP+"/24"
         hostIP=IP
         baseurl="/"
     except:
         e=sys.exc_info()
         logger.error("Could not get network info: "+ str(e))
 logger.debug("Host IP Address is: "+str(hostIP))
+
 
 sleep(2)        # Sleep to allow port scanning socket to close
 
@@ -407,6 +410,7 @@ if hasMQTT:
     if setts["MQTT_Password"]=="": setts["MQTT_Password"]=mqtt_password
     setts["MQTT_Port"]=mqtt_port
 if setts["MQTT_Address"]=="": setts['MQTT_Output']=False
+if setts["Host_IP"]=="": setts["Host_IP"]=hostIP
 
 for inv in inverterStats:
     logger.debug("Using found Inverter data to autosetup settings.json")
