@@ -176,6 +176,7 @@ class GivLUT:
                     break
                 if count==10:
                     return
+## Remove Raw from regCache??
         open(GivLUT.cachelockfile, 'w').close() #create lock file
         with open(GivLUT.regcache, 'wb') as outp:
             pickle.dump(regCacheStack, outp, pickle.HIGHEST_PROTOCOL)
@@ -426,6 +427,7 @@ class GivLUT:
         "Discharge_Target_SOC_9":GEType("number","","setDischargeTarget9",4,100,False,False,False),
         "Discharge_Target_SOC_10":GEType("number","","setDischargeTarget10",4,100,False,False,False),
         "Enable_Charge_Schedule":GEType("switch","","enableChargeSchedule","","",False,False,False),
+        "Enable_Charge_Target":GEType("switch","","enableChargeTarget","","",False,False,False),
         "Enable_Discharge_Schedule":GEType("switch","","enableDischargeSchedule","","",False,False,False),
         "Sync_Time":GEType("switch","","syncDateTime","","",False,False,False),
         "Enable_Discharge":GEType("switch","","enableDischarge","","",False,False,False),

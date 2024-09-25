@@ -178,7 +178,7 @@ def enChargeTrgt():
     """
     payload = request.get_json(silent=True, force=True)
     requestcommand("enableChargeTarget",payload)
-    return response("setChargeTarget")
+    return response("enableChargeTarget")
 
 
 @giv_api.route('/enableChargeSchedule', methods=['POST'])
