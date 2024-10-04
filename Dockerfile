@@ -12,7 +12,7 @@ RUN apk add redis
 RUN apk add nginx
 
 RUN mkdir -p /run/nginx
-RUN npm install -g serve
+RUN npm install -g http-server
 
 # set the working directory in the container
 WORKDIR /app
@@ -43,6 +43,6 @@ COPY redis.conf redis.conf
 COPY settings.json ./settings.json
 COPY ingress/ ./ingress
 
-EXPOSE 1883 6379 8099
+EXPOSE 1883 3000 6379 8099
 
 CMD ["python3", "/app/startup.py"]

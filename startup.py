@@ -625,7 +625,7 @@ if setts['Web_Dash']==True:
         outp.write("}")
     WDPORT=int(setts['Web_Dash_Port'])
     logger.info ("Serving Web Dashboard from port "+str(WDPORT))
-    command=shlex.split("/usr/bin/node /usr/local/bin/serve -p "+ str(WDPORT))
+    command=shlex.split("/usr/bin/node /usr/local/bin/http-server -p "+ str(WDPORT))
     webDash=subprocess.Popen(command)
 
 
@@ -678,7 +678,7 @@ while True:
                 os.chdir("/app/WebDashboard")
                 WDPORT = int(setts['Web_Dash_Port'])
                 logger.info("Serving Web Dashboard from port " + str(WDPORT))
-                command = shlex.split("/usr/bin/node /usr/local/bin/serve -p " + str(WDPORT))
+                command = shlex.split("/usr/bin/node /usr/local/bin/http-server -p " + str(WDPORT))
                 webDash = subprocess.Popen(command)
 
         if setts['MQTT_Address']=="127.0.0.1":
